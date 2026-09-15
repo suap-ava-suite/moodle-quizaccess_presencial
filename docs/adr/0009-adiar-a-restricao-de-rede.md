@@ -1,0 +1,3 @@
+# Adiar a restrição de rede
+
+A primeira versão da Liberação Presencial não comparará os endereços de rede do estudante e do Aplicador. O requisito de mesma rede fica fora do escopo atual, inclusive suas configurações administrativas, registros de falha e critérios de aceite. A presença será controlada pela solicitação e pela atuação do Aplicador, com QR Code opcional, preservando a possibilidade de adicionar uma política de rede em uma entrega futura. Essa decisão reduz complexidade operacional e evita assumir que dois endereços IP bastam para identificar uma rede em instalações com proxies, NAT ou topologias distintas.

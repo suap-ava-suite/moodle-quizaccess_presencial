@@ -1,0 +1,3 @@
+# Autorizar diretamente pela leitura do QR Code
+
+O QR Code exibido na espera representa uma Solicitação de liberação específica e utiliza token próprio, separado do Convite por link. O código é rotacionado automaticamente a cada 60 segundos e deixa de funcionar quando a solicitação não for mais revisável. Quando um Professor ou Aplicador autenticado lê um código válido, a solicitação é autorizada imediatamente, sem uma tela adicional de confirmação. Essa escolha reduz o número de ações durante uma aplicação presencial, aceitando o risco de uma leitura intencional feita para a solicitação errada; por isso, todas as validações são executadas no servidor e a autorização resultante permanece auditável e revisável até a criação da tentativa.
