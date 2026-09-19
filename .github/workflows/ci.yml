@@ -169,6 +169,17 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Install Moodle site for lifecycle tests
+        if: >-
+          ${{ !cancelled() && steps.install.outcome == 'success' && matrix.php == '8.3' }}
+        working-directory: moodle
+        run: >-
+          php admin/cli/install_database.php
+          --agree-license
+          --adminpass='Moodle-CI_2026!'
+          --fullname='Presencial lifecycle test'
+          --shortname='presencial-test'
+
       - name: Exercise update lifecycle
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' && matrix.php == '8.3' }}
@@ -183,7 +194,12 @@ jobs:
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' && matrix.php == '8.3' }}
         working-directory: moodle
-        run: php admin/cli/uninstall_plugins.php --plugins=quizaccess_presencial --run
+        run: |
+          php admin/cli/uninstall_plugins.php --plugins=quizaccess_presencial --run
+          if php admin/cli/cfg.php --component=quizaccess_presencial --name=version; then
+            echo 'quizaccess_presencial is still installed after the uninstall command.' >&2
+            exit 1
+          fi
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}

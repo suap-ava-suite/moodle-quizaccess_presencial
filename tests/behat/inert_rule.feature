@@ -1,4 +1,4 @@
-@quizaccess_presencial @mod_quiz
+@quizaccess @quizaccess_presencial @mod_quiz
 Feature: Keep the native quiz attempt flow when Presencial release is not configured
   In order to take a regular quiz
   As a student
