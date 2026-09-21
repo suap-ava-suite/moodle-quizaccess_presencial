@@ -8,15 +8,18 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+// along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial;
 
 defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->libdir . '/adminlib.php');
 
 /**
  * Tests for the Presencial access rule global settings.
@@ -35,7 +38,10 @@ final class settings_test extends \advanced_testcase {
 
         $this->assertSame('15', $root->locate('quizaccess_presencial/requestvalidity')->get_defaultsetting());
         $this->assertSame('5', $root->locate('quizaccess_presencial/authorisationvalidity')->get_defaultsetting());
-        $this->assertSame('0', $root->locate('quizaccess_presencial/rejectionjustificationrequired')->get_defaultsetting());
+        $this->assertSame(
+            '0',
+            $root->locate('quizaccess_presencial/rejectionjustificationrequired')->get_defaultsetting()
+        );
         $this->assertSame('15', get_config('quizaccess_presencial', 'requestvalidity'));
         $this->assertSame('5', get_config('quizaccess_presencial', 'authorisationvalidity'));
         $this->assertSame('0', get_config('quizaccess_presencial', 'rejectionjustificationrequired'));
@@ -50,7 +56,10 @@ final class settings_test extends \advanced_testcase {
 
         $this->assertSame('', $root->locate('quizaccess_presencial/requestvalidity')->write_setting('20'));
         $this->assertSame('', $root->locate('quizaccess_presencial/authorisationvalidity')->write_setting('10'));
-        $this->assertSame('', $root->locate('quizaccess_presencial/rejectionjustificationrequired')->write_setting('1'));
+        $this->assertSame(
+            '',
+            $root->locate('quizaccess_presencial/rejectionjustificationrequired')->write_setting('1')
+        );
 
         $this->assertSame('20', get_config('quizaccess_presencial', 'requestvalidity'));
         $this->assertSame('10', get_config('quizaccess_presencial', 'authorisationvalidity'));
