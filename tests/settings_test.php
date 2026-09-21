@@ -31,7 +31,7 @@ final class settings_test extends \advanced_testcase {
      * The operational settings provide safe defaults.
      */
     public function test_operational_settings_have_safe_defaults(): void {
-        $root = admin_get_root(true, true);
+        $root = \admin_get_root(true, true);
 
         $this->assertSame('15', $root->locate('quizaccess_presencial/requestvalidity')->get_defaultsetting());
         $this->assertSame('5', $root->locate('quizaccess_presencial/authorisationvalidity')->get_defaultsetting());
@@ -46,7 +46,7 @@ final class settings_test extends \advanced_testcase {
      */
     public function test_administrator_can_persist_global_policies(): void {
         $this->resetAfterTest();
-        $root = admin_get_root(true, true);
+        $root = \admin_get_root(true, true);
 
         $this->assertSame('', $root->locate('quizaccess_presencial/requestvalidity')->write_setting('20'));
         $this->assertSame('', $root->locate('quizaccess_presencial/authorisationvalidity')->write_setting('10'));
@@ -65,7 +65,7 @@ final class settings_test extends \advanced_testcase {
      */
     public function test_invalid_duration_does_not_replace_saved_policy(string $value): void {
         $this->resetAfterTest();
-        $root = admin_get_root(true, true);
+        $root = \admin_get_root(true, true);
         $setting = $root->locate('quizaccess_presencial/requestvalidity');
 
         $this->assertSame('', $setting->write_setting('20'));
