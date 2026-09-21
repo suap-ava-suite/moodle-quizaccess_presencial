@@ -112,7 +112,10 @@ final class settings_test extends \advanced_testcase {
      * @return \admin_setting
      */
     private function get_setting(string $name): \admin_setting {
-        global $CFG;
+        global $CFG, $ADMIN;
+
+        $ADMIN = new \stdClass();
+        $ADMIN->fulltree = true;
 
         $hassiteconfig = true;
         $settings = new \admin_settingpage(
