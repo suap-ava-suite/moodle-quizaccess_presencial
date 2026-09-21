@@ -34,13 +34,17 @@ final class settings_test extends \advanced_testcase {
      * The operational settings provide safe defaults.
      */
     public function test_operational_settings_have_safe_defaults(): void {
-        $root = \admin_get_root(true, true);
-
-        $this->assertSame('15', $root->locate('quizaccess_presencial/requestvalidity')->get_defaultsetting());
-        $this->assertSame('5', $root->locate('quizaccess_presencial/authorisationvalidity')->get_defaultsetting());
+        $this->assertSame(
+            '15',
+            $this->get_setting('quizaccess_presencial/requestvalidity')->get_defaultsetting()
+        );
+        $this->assertSame(
+            '5',
+            $this->get_setting('quizaccess_presencial/authorisationvalidity')->get_defaultsetting()
+        );
         $this->assertSame(
             '0',
-            $root->locate('quizaccess_presencial/rejectionjustificationrequired')->get_defaultsetting()
+            $this->get_setting('quizaccess_presencial/rejectionjustificationrequired')->get_defaultsetting()
         );
         $this->assertSame('15', get_config('quizaccess_presencial', 'requestvalidity'));
         $this->assertSame('5', get_config('quizaccess_presencial', 'authorisationvalidity'));
@@ -52,13 +56,18 @@ final class settings_test extends \advanced_testcase {
      */
     public function test_administrator_can_persist_global_policies(): void {
         $this->resetAfterTest();
-        $root = \admin_get_root(true, true);
 
-        $this->assertSame('', $root->locate('quizaccess_presencial/requestvalidity')->write_setting('20'));
-        $this->assertSame('', $root->locate('quizaccess_presencial/authorisationvalidity')->write_setting('10'));
         $this->assertSame(
             '',
-            $root->locate('quizaccess_presencial/rejectionjustificationrequired')->write_setting('1')
+            $this->get_setting('quizaccess_presencial/requestvalidity')->write_setting('20')
+        );
+        $this->assertSame(
+            '',
+            $this->get_setting('quizaccess_presencial/authorisationvalidity')->write_setting('10')
+        );
+        $this->assertSame(
+            '',
+            $this->get_setting('quizaccess_presencial/rejectionjustificationrequired')->write_setting('1')
         );
 
         $this->assertSame('20', get_config('quizaccess_presencial', 'requestvalidity'));
@@ -74,8 +83,7 @@ final class settings_test extends \advanced_testcase {
      */
     public function test_invalid_duration_does_not_replace_saved_policy(string $value): void {
         $this->resetAfterTest();
-        $root = \admin_get_root(true, true);
-        $setting = $root->locate('quizaccess_presencial/requestvalidity');
+        $setting = $this->get_setting('quizaccess_presencial/requestvalidity');
 
         $this->assertSame('', $setting->write_setting('20'));
         $this->assertSame(get_string('validateerror', 'admin'), $setting->write_setting($value));
@@ -95,5 +103,25 @@ final class settings_test extends \advanced_testcase {
             'text' => ['five'],
             'empty' => [''],
         ];
+    }
+
+    /**
+     * Gets a setting from the Presencial administration page.
+     *
+     * @param string $name Full configuration name.
+     * @return \admin_setting
+     */
+    private function get_setting(string $name): \admin_setting {
+        $root = \admin_get_root(true, true);
+        $page = $root->locate('modsettingsquizcatpresencial');
+
+        $this->assertInstanceOf(\admin_settingpage::class, $page);
+        foreach ($page->settings as $setting) {
+            if ($setting->get_full_name() === $name) {
+                return $setting;
+            }
+        }
+
+        $this->fail("The setting '{$name}' was not found on the Presencial administration page.");
     }
 }
