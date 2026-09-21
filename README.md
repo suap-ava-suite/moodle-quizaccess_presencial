@@ -18,9 +18,19 @@ Depois, execute a atualização administrativa do Moodle pela interface web ou p
 php admin/cli/upgrade.php --non-interactive
 ```
 
+## Configuração global
+
+Em **Administração do site > Plugins > Módulos de atividade > Questionário > Liberação Presencial**, o administrador configura:
+
+- a validade da Solicitação de liberação, em minutos inteiros positivos (padrão: 15);
+- a validade da Autorização de tentativa não consumida, em minutos inteiros positivos (padrão: 5); e
+- se a justificativa de rejeição é obrigatória (padrão: não).
+
+Valores de prazo inválidos não são salvos.
+
 ## Estado atual
 
-Esta entrega fornece o componente instalável, o contrato da regra, internacionalização, declaração de privacidade e testes automatizados. Ela não adiciona configurações, tabelas ou restrições ao início de tentativas.
+Esta entrega fornece o componente instalável, a configuração global, o contrato da regra, internacionalização, declaração de privacidade e testes automatizados. Ela ainda não adiciona tabelas ou restrições ao início de tentativas.
 
 ## Testes
 

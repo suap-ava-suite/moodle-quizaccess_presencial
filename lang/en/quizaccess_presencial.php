@@ -23,4 +23,10 @@
  */
 
 $string['pluginname'] = 'In-person release';
+$string['authorisationvalidity'] = 'Attempt authorisation validity';
+$string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
 $string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
+$string['rejectionjustificationrequired'] = 'Require a rejection justification';
+$string['rejectionjustificationrequired_desc'] = 'Require a justification when a release request is rejected.';
+$string['requestvalidity'] = 'Release request validity';
+$string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';

@@ -23,4 +23,12 @@
  */
 
 $string['pluginname'] = 'Liberação Presencial';
+$string['authorisationvalidity'] = 'Validade da autorização de tentativa';
+$string['authorisationvalidity_desc'] = 'Número de minutos inteiros durante os quais uma autorização de tentativa não consumida ' .
+    'permanece válida.';
 $string['privacy:metadata'] = 'A regra de acesso Liberação Presencial não armazena dados pessoais.';
+$string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
+$string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';
+$string['requestvalidity'] = 'Validade da solicitação de liberação';
+$string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
+    'permanece válida.';
