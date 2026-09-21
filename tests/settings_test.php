@@ -106,22 +106,29 @@ final class settings_test extends \advanced_testcase {
     }
 
     /**
-     * Gets a setting from the Presencial administration page.
+     * Gets a setting declared by the Presencial settings file.
      *
      * @param string $name Full configuration name.
      * @return \admin_setting
      */
     private function get_setting(string $name): \admin_setting {
-        $root = \admin_get_root(true, true);
-        $page = $root->locate('modsettingsquizcatpresencial');
+        global $CFG;
 
-        $this->assertInstanceOf(\admin_settingpage::class, $page);
-        foreach ($page->settings as $setting) {
+        $hassiteconfig = true;
+        $settings = new \admin_settingpage(
+            'quizaccess_presencial_test',
+            '',
+            'moodle/site:config'
+        );
+
+        require($CFG->dirroot . '/mod/quiz/accessrule/presencial/settings.php');
+
+        foreach ($settings->settings as $setting) {
             if ($setting->get_full_name() === $name) {
                 return $setting;
             }
         }
 
-        $this->fail("The setting '{$name}' was not found on the Presencial administration page.");
+        $this->fail("The setting '{$name}' was not declared by settings.php.");
     }
 }
