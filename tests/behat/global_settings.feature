@@ -14,6 +14,7 @@ Feature: Configure the global In-person release policies
     Then I should see "Changes saved"
     And the "value" attribute of "#id_s_quizaccess_presencial_requestvalidity" "css_element" should contain "20"
     And the "value" attribute of "#id_s_quizaccess_presencial_authorisationvalidity" "css_element" should contain "10"
+    And the "checked" attribute of "#id_s_quizaccess_presencial_rejectionjustificationrequired" "css_element" should be set
 
   Scenario: Reject an invalid deadline
     Given I log in as "admin"
