@@ -8,39 +8,27 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
-/**
- * Global configuration settings for the Presencial quiz access rule.
- *
- * @package    quizaccess_presencial
- * @copyright  2026 SUAP AVA Suite
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
+// along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 
 defined('MOODLE_INTERNAL') || die();
 
 if ($hassiteconfig) {
-    $positiveinteger = '/^[1-9][0-9]*$/';
-
-    $settings->add(new admin_setting_configtext(
+    $settings->add(new \quizaccess_presencial\admin_setting\positive_integer(
         'quizaccess_presencial/requestvalidity',
         get_string('requestvalidity', 'quizaccess_presencial'),
         get_string('requestvalidity_desc', 'quizaccess_presencial'),
-        '15',
-        $positiveinteger
+        '15'
     ));
 
-    $settings->add(new admin_setting_configtext(
+    $settings->add(new \quizaccess_presencial\admin_setting\positive_integer(
         'quizaccess_presencial/authorisationvalidity',
         get_string('authorisationvalidity', 'quizaccess_presencial'),
         get_string('authorisationvalidity_desc', 'quizaccess_presencial'),
-        '5',
-        $positiveinteger
+        '5'
     ));
 
     $settings->add(new admin_setting_configcheckbox(
