@@ -30,17 +30,17 @@ class positive_integer extends \admin_setting_configtext {
      * Validate a submitted value as a positive whole integer.
      *
      * @param mixed $data Submitted value.
-     * @return string Empty when valid, otherwise the standard admin error.
+     * @return true|string True when valid, otherwise the standard admin error.
      */
     public function validate($data) {
         if (!is_string($data) && !is_int($data)) {
             return get_string('validateerror', 'admin');
         }
 
-        if (!preg_match('/^[1-9][0-9]*$/', (string)$data)) {
+        if (!preg_match('/^[1-9][0-9]*$/', (string) $data)) {
             return get_string('validateerror', 'admin');
         }
 
-        return '';
+        return true;
     }
 }

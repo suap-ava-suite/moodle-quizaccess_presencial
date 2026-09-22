@@ -37,6 +37,8 @@ final class settings_test extends \advanced_testcase {
      * The operational settings provide safe defaults.
      */
     public function test_operational_settings_have_safe_defaults(): void {
+        $this->resetAfterTest();
+
         $this->assertSame(
             '15',
             $this->duration_setting('quizaccess_presencial/requestvalidity', '15')->get_defaultsetting()

@@ -12,8 +12,8 @@ Feature: Configure the global In-person release policies
     And I set the field "Require a rejection justification" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
-    And the "value" attribute of "Release request validity" "field" should contain "20"
-    And the "value" attribute of "Attempt authorisation validity" "field" should contain "10"
+    And the "value" attribute of "#id_s_quizaccess_presencial_requestvalidity" "css_element" should contain "20"
+    And the "value" attribute of "#id_s_quizaccess_presencial_authorisationvalidity" "css_element" should contain "10"
 
   Scenario: Reject an invalid deadline
     Given I log in as "admin"
