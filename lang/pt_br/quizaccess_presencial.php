@@ -15,18 +15,20 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Language strings for the Presencial quiz access rule.
+ * Strings de idioma da regra de acesso Liberação Presencial.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['authorisationvalidity'] = 'Attempt authorisation validity';
-$string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
-$string['pluginname'] = 'In-person release';
-$string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
-$string['rejectionjustificationrequired'] = 'Require a rejection justification';
-$string['rejectionjustificationrequired_desc'] = 'Require a justification when a release request is rejected.';
-$string['requestvalidity'] = 'Release request validity';
-$string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';
+$string['authorisationvalidity'] = 'Validade da autorização de tentativa';
+$string['authorisationvalidity_desc'] = 'Número de minutos inteiros durante os quais uma autorização de tentativa não consumida ' .
+    'permanece válida.';
+$string['pluginname'] = 'Liberação Presencial';
+$string['privacy:metadata'] = 'A regra de acesso Liberação Presencial não armazena dados pessoais.';
+$string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
+$string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';
+$string['requestvalidity'] = 'Validade da solicitação de liberação';
+$string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
+    'permanece válida.';
