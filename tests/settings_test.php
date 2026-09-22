@@ -106,17 +106,16 @@ final class settings_test extends \advanced_testcase {
     }
 
     /**
-     * Gets a setting declared by the Presencial settings file.
+     * Load and retrieve a setting declared by the plugin settings file.
      *
      * @param string $name Full configuration name.
      * @return \admin_setting
      */
     private function get_setting(string $name): \admin_setting {
-        global $CFG, $ADMIN;
+        global $CFG, $ADMIN, $hassiteconfig, $settings;
 
         $ADMIN = new \stdClass();
         $ADMIN->fulltree = true;
-
         $hassiteconfig = true;
         $settings = new \admin_settingpage(
             'quizaccess_presencial_test',
