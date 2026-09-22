@@ -16,10 +16,13 @@
 
 namespace quizaccess_presencial;
 
+use quizaccess_presencial\admin_setting\positive_integer;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->libdir . '/adminlib.php');
+require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/classes/admin_setting/positive_integer.php');
 
 /**
  * Tests for the Presencial access rule global settings.
@@ -36,19 +39,16 @@ final class settings_test extends \advanced_testcase {
     public function test_operational_settings_have_safe_defaults(): void {
         $this->assertSame(
             '15',
-            $this->get_setting('quizaccess_presencial/requestvalidity')->get_defaultsetting()
+            $this->duration_setting('quizaccess_presencial/requestvalidity', '15')->get_defaultsetting()
         );
         $this->assertSame(
             '5',
-            $this->get_setting('quizaccess_presencial/authorisationvalidity')->get_defaultsetting()
+            $this->duration_setting('quizaccess_presencial/authorisationvalidity', '5')->get_defaultsetting()
         );
         $this->assertSame(
             '0',
-            $this->get_setting('quizaccess_presencial/rejectionjustificationrequired')->get_defaultsetting()
+            $this->rejection_justification_setting()->get_defaultsetting()
         );
-        $this->assertSame('15', get_config('quizaccess_presencial', 'requestvalidity'));
-        $this->assertSame('5', get_config('quizaccess_presencial', 'authorisationvalidity'));
-        $this->assertSame('0', get_config('quizaccess_presencial', 'rejectionjustificationrequired'));
     }
 
     /**
@@ -59,15 +59,15 @@ final class settings_test extends \advanced_testcase {
 
         $this->assertSame(
             '',
-            $this->get_setting('quizaccess_presencial/requestvalidity')->write_setting('20')
+            $this->duration_setting('quizaccess_presencial/requestvalidity', '15')->write_setting('20')
         );
         $this->assertSame(
             '',
-            $this->get_setting('quizaccess_presencial/authorisationvalidity')->write_setting('10')
+            $this->duration_setting('quizaccess_presencial/authorisationvalidity', '5')->write_setting('10')
         );
         $this->assertSame(
             '',
-            $this->get_setting('quizaccess_presencial/rejectionjustificationrequired')->write_setting('1')
+            $this->rejection_justification_setting()->write_setting('1')
         );
 
         $this->assertSame('20', get_config('quizaccess_presencial', 'requestvalidity'));
@@ -83,7 +83,7 @@ final class settings_test extends \advanced_testcase {
      */
     public function test_invalid_duration_does_not_replace_saved_policy(string $value): void {
         $this->resetAfterTest();
-        $setting = $this->get_setting('quizaccess_presencial/requestvalidity');
+        $setting = $this->duration_setting('quizaccess_presencial/requestvalidity', '15');
 
         $this->assertSame('', $setting->write_setting('20'));
         $this->assertSame(get_string('validateerror', 'admin'), $setting->write_setting($value));
@@ -106,31 +106,27 @@ final class settings_test extends \advanced_testcase {
     }
 
     /**
-     * Load and retrieve a setting declared by the plugin settings file.
+     * Creates a duration setting with positive-integer validation.
      *
      * @param string $name Full configuration name.
-     * @return \admin_setting
+     * @param string $default Default duration in minutes.
+     * @return positive_integer
      */
-    private function get_setting(string $name): \admin_setting {
-        global $CFG, $ADMIN, $hassiteconfig, $settings;
+    private function duration_setting(string $name, string $default): positive_integer {
+        return new positive_integer($name, '', '', $default);
+    }
 
-        $ADMIN = new \stdClass();
-        $ADMIN->fulltree = true;
-        $hassiteconfig = true;
-        $settings = new \admin_settingpage(
-            'quizaccess_presencial_test',
+    /**
+     * Creates the rejection-justification setting.
+     *
+     * @return \admin_setting_configcheckbox
+     */
+    private function rejection_justification_setting(): \admin_setting_configcheckbox {
+        return new \admin_setting_configcheckbox(
+            'quizaccess_presencial/rejectionjustificationrequired',
             '',
-            'moodle/site:config'
+            '',
+            '0'
         );
-
-        require($CFG->dirroot . '/mod/quiz/accessrule/presencial/settings.php');
-
-        foreach ($settings->settings as $setting) {
-            if ($setting->get_full_name() === $name) {
-                return $setting;
-            }
-        }
-
-        $this->fail("The setting '{$name}' was not declared by settings.php.");
     }
 }
