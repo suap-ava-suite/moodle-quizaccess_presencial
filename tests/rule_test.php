@@ -34,6 +34,21 @@ require_once($CFG->dirroot . '/mod/quiz/mod_form.php');
  */
 final class rule_test extends \advanced_testcase {
     /**
+     * Test that an unconfigured rule initially exposes the native quiz availability.
+     */
+    public function test_unconfigured_rule_uses_native_availability_as_initial_period(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+
+        $this->assertEmpty($settings->presencial_enabled);
+        $this->assertEquals($quiz->timeopen, $settings->presencial_timeopen);
+        $this->assertEquals($quiz->timeclose, $settings->presencial_timeclose);
+    }
+
+    /**
      * Test that saving an enabled configuration persists its authorization period.
      */
     public function test_saving_enabled_configuration_persists_the_authorization_period(): void {
@@ -47,6 +62,7 @@ final class rule_test extends \advanced_testcase {
         $events = $sink->get_events();
 
         $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEquals(1, $settings->presencial_enabled);
         $this->assertEquals($start, $settings->presencial_timeopen);
         $this->assertEquals($end, $settings->presencial_timeclose);
         $this->assertCount(1, $events);
@@ -68,7 +84,7 @@ final class rule_test extends \advanced_testcase {
         \quizaccess_presencial::save_settings($quiz);
 
         $settings = quiz_settings::create($quiz->id)->get_quiz();
-        $this->assertEmpty($settings->presencial_timeclose);
+        $this->assertEmpty($settings->presencial_enabled);
         $this->assertCount(1, $sink->get_events());
     }
 
@@ -214,7 +230,7 @@ final class rule_test extends \advanced_testcase {
      */
     public function test_rule_is_inactive_without_configuration(): void {
         $quizsettings = $this->createStub(quiz_settings::class);
-        $quizsettings->method('get_quiz')->willReturn((object) ['presencial_timeclose' => 0]);
+        $quizsettings->method('get_quiz')->willReturn((object) ['presencial_enabled' => null]);
 
         $this->assertNull(\quizaccess_presencial::make($quizsettings, time(), false));
     }

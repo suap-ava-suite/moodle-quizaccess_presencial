@@ -39,7 +39,7 @@ class quizaccess_presencial extends access_rule_base {
      * @return self|null The active rule, or null when it does not apply.
      */
     public static function make(quiz_settings $quizobj, $timenow, $canignoretimelimits) {
-        if (empty($quizobj->get_quiz()->presencial_timeclose)) {
+        if (empty($quizobj->get_quiz()->presencial_enabled)) {
             return null;
         }
 
@@ -57,17 +57,9 @@ class quizaccess_presencial extends access_rule_base {
             return;
         }
 
-        $current = $quizform->get_current();
-        $configured = !empty($current->presencial_timeclose);
-        if (!$configured) {
-            // moodleform_mod applies $current after definition(), so set values on it
-            // instead of using form defaults that its empty plugin fields would replace.
-            $current->presencial_timeopen = $current->timeopen ?? 0;
-            $current->presencial_timeclose = $current->timeclose ?? 0;
-        }
         $mform->addElement('header', 'presencialsettings', get_string('pluginname', 'quizaccess_presencial'));
         $mform->addElement('selectyesno', 'presencial_enabled', get_string('enable', 'quizaccess_presencial'));
-        $mform->setDefault('presencial_enabled', $configured);
+        $mform->setDefault('presencial_enabled', 0);
         $mform->addElement(
             'date_time_selector',
             'presencial_timeopen',
@@ -175,7 +167,9 @@ class quizaccess_presencial extends access_rule_base {
      */
     public static function get_settings_sql($quizid): array {
         return [
-            'presencial.timeopen AS presencial_timeopen, presencial.timeclose AS presencial_timeclose',
+            'CASE WHEN presencial.id IS NULL THEN 0 ELSE 1 END AS presencial_enabled, ' .
+                'COALESCE(presencial.timeopen, quiz.timeopen) AS presencial_timeopen, ' .
+                'COALESCE(presencial.timeclose, quiz.timeclose) AS presencial_timeclose',
             'LEFT JOIN {quizaccess_presencial} presencial ON presencial.quizid = quiz.id',
             [],
         ];
