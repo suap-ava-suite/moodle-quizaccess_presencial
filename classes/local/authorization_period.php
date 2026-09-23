@@ -5,6 +5,14 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial\local;
 
@@ -21,10 +29,22 @@ final class authorization_period {
     /**
      * Validate a proposed authorization period against quiz availability.
      *
-     * @return array field name => language string identifier.
+     * @param bool $enabled Whether the rule is enabled.
+     * @param int $start Proposed authorization period start.
+     * @param int $end Proposed authorization period end.
+     * @param int $quizstart Native quiz availability start.
+     * @param int $quizend Native quiz availability end.
+     * @param int $now Current time.
+     * @return array Validation errors indexed by form field.
      */
     public static function validate(
-            bool $enabled, int $start, int $end, int $quizstart, int $quizend, int $now): array {
+        bool $enabled,
+        int $start,
+        int $end,
+        int $quizstart,
+        int $quizend,
+        int $now,
+    ): array {
         if (!$enabled) {
             return [];
         }

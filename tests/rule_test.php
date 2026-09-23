@@ -33,7 +33,9 @@ require_once($CFG->dirroot . '/mod/quiz/mod_form.php');
  * @covers     \quizaccess_presencial
  */
 final class rule_test extends \advanced_testcase {
-    /** A valid enabled period is persisted and emits a Moodle event. */
+    /**
+     * Test that saving an enabled configuration persists its authorization period.
+     */
     public function test_saving_enabled_configuration_persists_the_authorization_period(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -51,7 +53,9 @@ final class rule_test extends \advanced_testcase {
         $this->assertInstanceOf(\quizaccess_presencial\event\configuration_updated::class, $events[0]);
     }
 
-    /** Disabling the rule removes its configuration and emits a Moodle event. */
+    /**
+     * Test that disabling the rule removes its configuration and emits an event.
+     */
     public function test_disabling_configuration_removes_the_authorization_period(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -68,7 +72,9 @@ final class rule_test extends \advanced_testcase {
         $this->assertCount(1, $sink->get_events());
     }
 
-    /** A user without mod/quiz:manage cannot change an existing configuration. */
+    /**
+     * Test that a user without quiz management capability cannot change settings.
+     */
     public function test_user_without_quiz_management_capability_cannot_change_configuration(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -85,7 +91,9 @@ final class rule_test extends \advanced_testcase {
         $this->assertEquals($end, $settings->presencial_timeclose);
     }
 
-    /** Both bounds are required when the rule is enabled. */
+    /**
+     * Test that both authorization period bounds are required when enabling the rule.
+     */
     public function test_validation_requires_both_authorization_period_bounds(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -97,49 +105,77 @@ final class rule_test extends \advanced_testcase {
         $this->assertArrayHasKey('presencial_timeclose', $errors);
     }
 
-    /** The period must be ordered and must end in the future. */
+    /**
+     * Test that the authorization period is ordered and ends in the future.
+     */
     public function test_validation_requires_an_ordered_future_authorization_period(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
         $now = time();
 
-        $orderederrors = $this->validate_configuration($quiz, $now + (2 * HOURSECS),
-                $now + HOURSECS, $quiz->timeopen, $quiz->timeclose);
-        $pasterrors = $this->validate_configuration($quiz, $now - (2 * HOURSECS),
-                $now - HOURSECS, $now - (3 * HOURSECS), $now + HOURSECS);
+        $orderederrors = $this->validate_configuration(
+            $quiz,
+            $now + (2 * HOURSECS),
+            $now + HOURSECS,
+            $quiz->timeopen,
+            $quiz->timeclose,
+        );
+        $pasterrors = $this->validate_configuration(
+            $quiz,
+            $now - (2 * HOURSECS),
+            $now - HOURSECS,
+            $now - (3 * HOURSECS),
+            $now + HOURSECS,
+        );
 
         $this->assertArrayHasKey('presencial_timeclose', $orderederrors);
         $this->assertArrayHasKey('presencial_timeclose', $pasterrors);
     }
 
-    /** A valid period can be enabled after the quiz has opened. */
+    /**
+     * Test that a valid period can be enabled after the quiz has opened.
+     */
     public function test_validation_allows_enabling_after_quiz_opens(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
         $now = time();
 
-        $errors = $this->validate_configuration($quiz, $now - HOURSECS, $now + HOURSECS,
-                $now - (2 * HOURSECS), $now + (2 * HOURSECS));
+        $errors = $this->validate_configuration(
+            $quiz,
+            $now - HOURSECS,
+            $now + HOURSECS,
+            $now - (2 * HOURSECS),
+            $now + (2 * HOURSECS),
+        );
 
         $this->assertEmpty($errors);
     }
 
-    /** A proposed period must be contained in the native quiz availability. */
+    /**
+     * Test that a proposed period is contained in native quiz availability.
+     */
     public function test_validation_rejects_a_period_outside_quiz_availability(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
         $now = time();
 
-        $errors = $this->validate_configuration($quiz, $now + HOURSECS, $now + (3 * HOURSECS),
-                $now + (2 * HOURSECS), $now + (4 * HOURSECS));
+        $errors = $this->validate_configuration(
+            $quiz,
+            $now + HOURSECS,
+            $now + (3 * HOURSECS),
+            $now + (2 * HOURSECS),
+            $now + (4 * HOURSECS),
+        );
 
         $this->assertArrayHasKey('presencial_timeclose', $errors);
     }
 
-    /** Changing native availability cannot exclude an already configured period. */
+    /**
+     * Test that native availability cannot exclude an already configured period.
+     */
     public function test_validation_rejects_native_availability_changed_after_configuration(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -152,7 +188,9 @@ final class rule_test extends \advanced_testcase {
         $this->assertArrayHasKey('presencial_timeclose', $errors);
     }
 
-    /** Updating an existing period exposes its replacement through Moodle and emits an event. */
+    /**
+     * Test that changing a period persists replacement values and emits an event.
+     */
     public function test_changing_authorization_period_persists_new_values_and_emits_event(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -181,7 +219,11 @@ final class rule_test extends \advanced_testcase {
         $this->assertNull(\quizaccess_presencial::make($quizsettings, time(), false));
     }
 
-    /** Create a quiz record suitable for the rule lifecycle hooks. */
+    /**
+     * Create a quiz record suitable for the rule lifecycle hooks.
+     *
+     * @return \stdClass Quiz record.
+     */
     private function create_quiz(): \stdClass {
         $course = self::getDataGenerator()->create_course();
         $quiz = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_instance([
@@ -193,7 +235,14 @@ final class rule_test extends \advanced_testcase {
         return $quiz;
     }
 
-    /** Enable a valid period on a quiz and return its bounds. */
+    /**
+     * Enable a valid period on a quiz and return its bounds.
+     *
+     * @param \stdClass $quiz Quiz record.
+     * @param int|null $start Authorization period start.
+     * @param int|null $end Authorization period end.
+     * @return int[] Authorization period bounds.
+     */
     private function enable_configuration(\stdClass $quiz, ?int $start = null, ?int $end = null): array {
         $quiz->presencial_enabled = 1;
         $quiz->presencial_timeopen = $start ?? time() + HOURSECS;
@@ -201,17 +250,36 @@ final class rule_test extends \advanced_testcase {
         return [$quiz->presencial_timeopen, $quiz->presencial_timeclose];
     }
 
-    /** Submit settings to the rule's public Moodle form validation boundary. */
+    /**
+     * Submit settings to the rule's public Moodle form validation boundary.
+     *
+     * @param \stdClass $quiz Quiz record.
+     * @param int $start Authorization period start.
+     * @param int $end Authorization period end.
+     * @param int $quizstart Native quiz availability start.
+     * @param int $quizend Native quiz availability end.
+     * @return array Validation errors indexed by form field.
+     */
     private function validate_configuration(
-            \stdClass $quiz, int $start, int $end, int $quizstart, int $quizend): array {
+        \stdClass $quiz,
+        int $start,
+        int $end,
+        int $quizstart,
+        int $quizend,
+    ): array {
         $form = $this->createMock(\mod_quiz_mod_form::class);
         $form->method('get_context')->willReturn(\context_module::instance($quiz->coursemodule));
-        return \quizaccess_presencial::validate_settings_form_fields([], [
-            'presencial_enabled' => 1,
-            'presencial_timeopen' => $start,
-            'presencial_timeclose' => $end,
-            'timeopen' => $quizstart,
-            'timeclose' => $quizend,
-        ], [], $form);
+        return \quizaccess_presencial::validate_settings_form_fields(
+            [],
+            [
+                'presencial_enabled' => 1,
+                'presencial_timeopen' => $start,
+                'presencial_timeclose' => $end,
+                'timeopen' => $quizstart,
+                'timeclose' => $quizend,
+            ],
+            [],
+            $form,
+        );
     }
 }

@@ -43,10 +43,10 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
       | activity | name            | course | idnumber | timeopen              | timeclose             |
       | quiz     | Questionário 2  | C1     | quiz2    | ## 1 January 2030 ##  | ## 2 January 2030 ##  |
     And I am on the "Questionário 2" "mod_quiz > Edit settings" page logged in as "teacher1"
-    When I set the field "Habilitar Liberação Presencial" to "Yes"
+    When I set the field "Enable in-person release" to "Yes"
     Then the following fields match these values:
-      | Início do Período de Autorização | ## 1 January 2030 ## |
-      | Fim do Período de Autorização    | ## 2 January 2030 ## |
+      | Authorization period starts | ## 1 January 2030 ## |
+      | Authorization period ends   | ## 2 January 2030 ## |
     And I press "Save and return to course"
     Then I should see "Questionário 2"
 
@@ -55,7 +55,7 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
       | activity | name            | course | idnumber |
       | quiz     | Questionário 3  | C1     | quiz3    |
     And I am on the "Questionário 3" "mod_quiz > Edit settings" page logged in as "teacher1"
-    When I set the field "Habilitar Liberação Presencial" to "Yes"
+    When I set the field "Enable in-person release" to "Yes"
     And I press "Save and return to course"
-    Then I should see "Informe o início do Período de Autorização."
-    And I should see "Informe o fim do Período de Autorização."
+    Then I should see "Set when the authorization period starts."
+    And I should see "Set when the authorization period ends."

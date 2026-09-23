@@ -25,16 +25,16 @@
 $string['authorisationvalidity'] = 'Validade da autorização de tentativa';
 $string['authorisationvalidity_desc'] = 'Número de minutos inteiros durante os quais uma autorização de tentativa não consumida ' .
     'permanece válida.';
-$string['pluginname'] = 'Liberação Presencial';
-$string['enable'] = 'Habilitar Liberação Presencial';
-$string['authorizationperiodstart'] = 'Início do Período de Autorização';
-$string['authorizationperiodend'] = 'Fim do Período de Autorização';
-$string['authorizationperiodstartrequired'] = 'Informe o início do Período de Autorização.';
-$string['authorizationperiodendrequired'] = 'Informe o fim do Período de Autorização.';
-$string['authorizationperiodordered'] = 'O Período de Autorização deve terminar depois do início.';
-$string['authorizationperiodfuture'] = 'O Período de Autorização deve terminar no futuro.';
 $string['authorizationperiodavailability'] = 'O Período de Autorização deve estar contido na disponibilidade do Questionário.';
+$string['authorizationperiodend'] = 'Fim do Período de Autorização';
+$string['authorizationperiodendrequired'] = 'Informe o fim do Período de Autorização.';
+$string['authorizationperiodfuture'] = 'O Período de Autorização deve terminar no futuro.';
+$string['authorizationperiodordered'] = 'O Período de Autorização deve terminar depois do início.';
+$string['authorizationperiodstart'] = 'Início do Período de Autorização';
+$string['authorizationperiodstartrequired'] = 'Informe o início do Período de Autorização.';
+$string['enable'] = 'Habilitar Liberação Presencial';
 $string['eventconfigurationupdated'] = 'Configuração da Liberação Presencial atualizada';
+$string['pluginname'] = 'Liberação Presencial';
 $string['privacy:metadata'] = 'A regra de acesso Liberação Presencial não armazena dados pessoais.';
 $string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
 $string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';

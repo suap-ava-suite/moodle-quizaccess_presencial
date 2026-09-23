@@ -46,7 +46,12 @@ class quizaccess_presencial extends access_rule_base {
         return new self($quizobj, $timenow);
     }
 
-    /** Add the in-person release fields to the quiz settings form. */
+    /**
+     * Add the in-person release fields to the quiz settings form.
+     *
+     * @param \mod_quiz_mod_form $quizform Quiz settings form.
+     * @param \MoodleQuickForm $mform Wrapped MoodleQuickForm.
+     */
     public static function add_settings_form_fields(\mod_quiz_mod_form $quizform, \MoodleQuickForm $mform): void {
         if (!has_capability('mod/quiz:manage', $quizform->get_context())) {
             return;
@@ -56,10 +61,18 @@ class quizaccess_presencial extends access_rule_base {
         $mform->addElement('header', 'presencialsettings', get_string('pluginname', 'quizaccess_presencial'));
         $mform->addElement('selectyesno', 'presencial_enabled', get_string('enable', 'quizaccess_presencial'));
         $mform->setDefault('presencial_enabled', !empty($current->presencial_timeclose));
-        $mform->addElement('date_time_selector', 'presencial_timeopen',
-                get_string('authorizationperiodstart', 'quizaccess_presencial'), ['optional' => true]);
-        $mform->addElement('date_time_selector', 'presencial_timeclose',
-                get_string('authorizationperiodend', 'quizaccess_presencial'), ['optional' => true]);
+        $mform->addElement(
+            'date_time_selector',
+            'presencial_timeopen',
+            get_string('authorizationperiodstart', 'quizaccess_presencial'),
+            ['optional' => true],
+        );
+        $mform->addElement(
+            'date_time_selector',
+            'presencial_timeclose',
+            get_string('authorizationperiodend', 'quizaccess_presencial'),
+            ['optional' => true],
+        );
         if (empty($current->presencial_timeclose)) {
             $mform->setDefault('presencial_timeopen', $current->timeopen ?? 0);
             $mform->setDefault('presencial_timeclose', $current->timeclose ?? 0);
@@ -68,28 +81,45 @@ class quizaccess_presencial extends access_rule_base {
         $mform->hideIf('presencial_timeclose', 'presencial_enabled', 'eq', 0);
     }
 
-    /** Validate configuration before Moodle persists either quiz or plugin settings. */
+    /**
+     * Validate configuration before Moodle persists either quiz or plugin settings.
+     *
+     * @param array $errors Existing validation errors.
+     * @param array $data Submitted form data.
+     * @param array $files Submitted files.
+     * @param \mod_quiz_mod_form $quizform Quiz settings form.
+     * @return array Validation errors.
+     */
     public static function validate_settings_form_fields(
-            array $errors, array $data, $files, \mod_quiz_mod_form $quizform): array {
+        array $errors,
+        array $data,
+        $files,
+        \mod_quiz_mod_form $quizform,
+    ): array {
         if (!has_capability('mod/quiz:manage', $quizform->get_context())) {
             return $errors;
         }
 
         $enabled = !empty($data['presencial_enabled']);
         $perioderrors = authorization_period::validate(
-                $enabled,
-                (int) ($data['presencial_timeopen'] ?? 0),
-                (int) ($data['presencial_timeclose'] ?? 0),
-                (int) ($data['timeopen'] ?? 0),
-                (int) ($data['timeclose'] ?? 0),
-                time());
+            $enabled,
+            (int) ($data['presencial_timeopen'] ?? 0),
+            (int) ($data['presencial_timeclose'] ?? 0),
+            (int) ($data['timeopen'] ?? 0),
+            (int) ($data['timeclose'] ?? 0),
+            time(),
+        );
         foreach ($perioderrors as $field => $string) {
             $errors[$field] = get_string($string, 'quizaccess_presencial');
         }
         return $errors;
     }
 
-    /** Save or remove the in-person release settings. */
+    /**
+     * Save or remove the in-person release settings.
+     *
+     * @param \stdClass $quiz Quiz record and submitted settings.
+     */
     public static function save_settings($quiz): void {
         global $DB;
 
@@ -124,13 +154,22 @@ class quizaccess_presencial extends access_rule_base {
         self::trigger_configuration_event($quiz, $record->timeopen, $record->timeclose);
     }
 
-    /** Remove settings when the quiz is deleted. */
+    /**
+     * Remove settings when the quiz is deleted.
+     *
+     * @param \stdClass $quiz Quiz record.
+     */
     public static function delete_settings($quiz): void {
         global $DB;
         $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
     }
 
-    /** Include this rule's fields when loading quiz settings. */
+    /**
+     * Include this rule's fields when loading quiz settings.
+     *
+     * @param int $quizid Quiz identifier.
+     * @return array SQL fields, joins, and parameters.
+     */
     public static function get_settings_sql($quizid): array {
         return [
             'presencial.timeopen AS presencial_timeopen, presencial.timeclose AS presencial_timeclose',
@@ -139,7 +178,13 @@ class quizaccess_presencial extends access_rule_base {
         ];
     }
 
-    /** Trigger the Moodle event for a saved, changed, or disabled configuration. */
+    /**
+     * Trigger the Moodle event for a saved, changed, or disabled configuration.
+     *
+     * @param \stdClass $quiz Quiz record.
+     * @param int $start Authorization period start.
+     * @param int $end Authorization period end.
+     */
     private static function trigger_configuration_event($quiz, int $start, int $end): void {
         $event = configuration_updated::create([
             'context' => \context_module::instance($quiz->coursemodule),
