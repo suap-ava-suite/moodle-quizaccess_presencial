@@ -22,6 +22,7 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
+require_once($CFG->dirroot . '/mod/quiz/mod_form.php');
 
 /**
  * Tests for the Presencial access rule.
