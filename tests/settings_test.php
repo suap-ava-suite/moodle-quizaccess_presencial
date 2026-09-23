@@ -76,18 +76,26 @@ final class settings_test extends \advanced_testcase {
     }
 
     /**
-     * Invalid duration values are rejected without replacing the saved policy.
+     * Invalid duration values do not replace either saved duration policy.
      *
      * @dataProvider invalid_duration_provider
      * @param string $value Invalid duration submitted by the administrator.
      */
     public function test_invalid_duration_does_not_replace_saved_policy(string $value): void {
         $this->resetAfterTest();
-        $setting = $this->get_setting('quizaccess_presencial/requestvalidity');
 
-        $this->assertSame('', $setting->write_setting('20'));
-        $this->assertSame(get_string('validateerror', 'admin'), $setting->write_setting($value));
-        $this->assertSame('20', get_config('quizaccess_presencial', 'requestvalidity'));
+        $durations = [
+            'quizaccess_presencial/requestvalidity' => '20',
+            'quizaccess_presencial/authorisationvalidity' => '10',
+        ];
+
+        foreach ($durations as $name => $savedvalue) {
+            $setting = $this->get_setting($name);
+
+            $this->assertSame('', $setting->write_setting($savedvalue));
+            $this->assertSame(get_string('validateerror', 'admin'), $setting->write_setting($value));
+            $this->assertSame($savedvalue, $setting->get_setting());
+        }
     }
 
     /**
@@ -133,3 +141,4 @@ final class settings_test extends \advanced_testcase {
         $this->fail("The setting '{$name}' was not declared by settings.php.");
     }
 }
+
