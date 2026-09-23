@@ -23,4 +23,13 @@
  */
 
 $string['pluginname'] = 'Liberação Presencial';
+$string['enable'] = 'Habilitar Liberação Presencial';
+$string['authorizationperiodstart'] = 'Início do Período de Autorização';
+$string['authorizationperiodend'] = 'Fim do Período de Autorização';
+$string['authorizationperiodstartrequired'] = 'Informe o início do Período de Autorização.';
+$string['authorizationperiodendrequired'] = 'Informe o fim do Período de Autorização.';
+$string['authorizationperiodordered'] = 'O Período de Autorização deve terminar depois do início.';
+$string['authorizationperiodfuture'] = 'O Período de Autorização deve terminar no futuro.';
+$string['authorizationperiodavailability'] = 'O Período de Autorização deve estar contido na disponibilidade do Questionário.';
+$string['eventconfigurationupdated'] = 'Configuração da Liberação Presencial atualizada';
 $string['privacy:metadata'] = 'A regra de acesso Liberação Presencial não armazena dados pessoais.';

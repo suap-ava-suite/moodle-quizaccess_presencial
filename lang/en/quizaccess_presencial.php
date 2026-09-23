@@ -23,4 +23,13 @@
  */
 
 $string['pluginname'] = 'In-person release';
+$string['enable'] = 'Enable in-person release';
+$string['authorizationperiodstart'] = 'Authorization period starts';
+$string['authorizationperiodend'] = 'Authorization period ends';
+$string['authorizationperiodstartrequired'] = 'Set when the authorization period starts.';
+$string['authorizationperiodendrequired'] = 'Set when the authorization period ends.';
+$string['authorizationperiodordered'] = 'The authorization period must end after it starts.';
+$string['authorizationperiodfuture'] = 'The authorization period must end in the future.';
+$string['authorizationperiodavailability'] = 'The authorization period must be contained within the quiz availability.';
+$string['eventconfigurationupdated'] = 'In-person release configuration updated';
 $string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
