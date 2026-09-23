@@ -22,6 +22,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['authorisationvalidity'] = 'Attempt authorisation validity';
+$string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
 $string['pluginname'] = 'In-person release';
 $string['enable'] = 'Enable in-person release';
 $string['authorizationperiodstart'] = 'Authorization period starts';
@@ -33,3 +35,7 @@ $string['authorizationperiodfuture'] = 'The authorization period must end in the
 $string['authorizationperiodavailability'] = 'The authorization period must be contained within the quiz availability.';
 $string['eventconfigurationupdated'] = 'In-person release configuration updated';
 $string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
+$string['rejectionjustificationrequired'] = 'Require a rejection justification';
+$string['rejectionjustificationrequired_desc'] = 'Require a justification when a release request is rejected.';
+$string['requestvalidity'] = 'Release request validity';
+$string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';

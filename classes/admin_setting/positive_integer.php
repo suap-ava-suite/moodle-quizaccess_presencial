@@ -14,18 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace quizaccess_presencial\admin_setting;
+
 /**
- * Version information for the Presencial quiz access rule.
+ * Administration setting that accepts positive whole integers only.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+class positive_integer extends \admin_setting_configtext {
+    /**
+     * Validate a submitted value as a positive whole integer.
+     *
+     * @param mixed $data Submitted value.
+     * @return true|string True when valid, otherwise the standard admin error.
+     */
+    public function validate($data) {
+        if (!is_string($data) && !is_int($data)) {
+            return get_string('validateerror', 'admin');
+        }
 
-defined('MOODLE_INTERNAL') || die();
+        if (!preg_match('/^[1-9][0-9]*$/', (string) $data)) {
+            return get_string('validateerror', 'admin');
+        }
 
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.2.0';
-$plugin->version = 2026092200;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+        return true;
+    }
+}

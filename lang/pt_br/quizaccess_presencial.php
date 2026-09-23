@@ -22,6 +22,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['authorisationvalidity'] = 'Validade da autorização de tentativa';
+$string['authorisationvalidity_desc'] = 'Número de minutos inteiros durante os quais uma autorização de tentativa não consumida ' .
+    'permanece válida.';
 $string['pluginname'] = 'Liberação Presencial';
 $string['enable'] = 'Habilitar Liberação Presencial';
 $string['authorizationperiodstart'] = 'Início do Período de Autorização';
@@ -33,3 +36,8 @@ $string['authorizationperiodfuture'] = 'O Período de Autorização deve termina
 $string['authorizationperiodavailability'] = 'O Período de Autorização deve estar contido na disponibilidade do Questionário.';
 $string['eventconfigurationupdated'] = 'Configuração da Liberação Presencial atualizada';
 $string['privacy:metadata'] = 'A regra de acesso Liberação Presencial não armazena dados pessoais.';
+$string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
+$string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';
+$string['requestvalidity'] = 'Validade da solicitação de liberação';
+$string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
+    'permanece válida.';
