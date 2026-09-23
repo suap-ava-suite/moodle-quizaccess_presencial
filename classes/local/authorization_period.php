@@ -16,8 +16,6 @@
 
 namespace quizaccess_presencial\local;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Validates the finite period in which in-person releases can be granted.
  *

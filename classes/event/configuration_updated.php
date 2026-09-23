@@ -16,8 +16,6 @@
 
 namespace quizaccess_presencial\event;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Event triggered when an in-person release configuration changes.
  *

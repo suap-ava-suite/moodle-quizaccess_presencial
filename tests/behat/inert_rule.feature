@@ -42,7 +42,7 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     Given the following "activities" exist:
       | activity | name            | course | idnumber | timeopen              | timeclose             |
       | quiz     | Questionário 2  | C1     | quiz2    | ## 1 January 2030 ##  | ## 2 January 2030 ##  |
-    And I am on the "Questionário 2" "mod_quiz > Edit settings" page logged in as "teacher1"
+    And I am on the "quiz2" "Activity editing" page logged in as "teacher1"
     When I set the field "Enable in-person release" to "Yes"
     Then the following fields match these values:
       | Authorization period starts | ## 1 January 2030 ## |
@@ -54,7 +54,7 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     Given the following "activities" exist:
       | activity | name            | course | idnumber |
       | quiz     | Questionário 3  | C1     | quiz3    |
-    And I am on the "Questionário 3" "mod_quiz > Edit settings" page logged in as "teacher1"
+    And I am on the "quiz3" "Activity editing" page logged in as "teacher1"
     When I set the field "Enable in-person release" to "Yes"
     And I press "Save and return to course"
     Then I should see "Set when the authorization period starts."
