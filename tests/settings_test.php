@@ -141,4 +141,3 @@ final class settings_test extends \advanced_testcase {
         $this->fail("The setting '{$name}' was not declared by settings.php.");
     }
 }
-
