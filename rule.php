@@ -58,9 +58,16 @@ class quizaccess_presencial extends access_rule_base {
         }
 
         $current = $quizform->get_current();
+        $configured = !empty($current->presencial_timeclose);
+        if (!$configured) {
+            // moodleform_mod applies $current after definition(), so set values on it
+            // instead of using form defaults that its empty plugin fields would replace.
+            $current->presencial_timeopen = $current->timeopen ?? 0;
+            $current->presencial_timeclose = $current->timeclose ?? 0;
+        }
         $mform->addElement('header', 'presencialsettings', get_string('pluginname', 'quizaccess_presencial'));
         $mform->addElement('selectyesno', 'presencial_enabled', get_string('enable', 'quizaccess_presencial'));
-        $mform->setDefault('presencial_enabled', !empty($current->presencial_timeclose));
+        $mform->setDefault('presencial_enabled', $configured);
         $mform->addElement(
             'date_time_selector',
             'presencial_timeopen',
@@ -73,10 +80,6 @@ class quizaccess_presencial extends access_rule_base {
             get_string('authorizationperiodend', 'quizaccess_presencial'),
             ['optional' => true],
         );
-        if (empty($current->presencial_timeclose)) {
-            $mform->setDefault('presencial_timeopen', $current->timeopen ?? 0);
-            $mform->setDefault('presencial_timeclose', $current->timeclose ?? 0);
-        }
         $mform->hideIf('presencial_timeopen', 'presencial_enabled', 'eq', 0);
         $mform->hideIf('presencial_timeclose', 'presencial_enabled', 'eq', 0);
     }
