@@ -55,7 +55,11 @@ final class rule_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
-        [$start, $end] = $this->enable_configuration($quiz);
+        [$start, $end] = $this->enable_configuration(
+            $quiz,
+            $quiz->timeopen + HOURSECS,
+            $quiz->timeclose - HOURSECS,
+        );
 
         $sink = $this->redirectEvents();
         \quizaccess_presencial::save_settings($quiz);
@@ -67,16 +71,47 @@ final class rule_test extends \advanced_testcase {
         $this->assertEquals($end, $settings->presencial_timeclose);
         $this->assertCount(1, $events);
         $this->assertInstanceOf(\quizaccess_presencial\event\configuration_updated::class, $events[0]);
+        $this->assertSame('enabled', $events[0]->get_data()['other']['action']);
+        $this->assertSame(
+            ['enabled' => false, 'timeopen' => 0, 'timeclose' => 0],
+            $events[0]->get_data()['other']['previous'],
+        );
+        $this->assertSame(
+            ['enabled' => true, 'timeopen' => $start, 'timeclose' => $end],
+            $events[0]->get_data()['other']['current'],
+        );
     }
 
     /**
-     * Test that disabling the rule removes its configuration and emits an event.
+     * Test that initial configuration uses native availability for missing bounds.
      */
-    public function test_disabling_configuration_removes_the_authorization_period(): void {
+    public function test_initial_configuration_copies_native_quiz_availability(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
-        $this->enable_configuration($quiz);
+        $quiz->presencial_enabled = 1;
+        $quiz->presencial_timeopen = 0;
+        $quiz->presencial_timeclose = 0;
+
+        \quizaccess_presencial::save_settings($quiz);
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEquals($quiz->timeopen, $settings->presencial_timeopen);
+        $this->assertEquals($quiz->timeclose, $settings->presencial_timeclose);
+    }
+
+    /**
+     * Test that disabling and re-enabling the rule preserves a custom period.
+     */
+    public function test_disabling_and_reenabling_configuration_preserves_the_authorization_period(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+        [$start, $end] = $this->enable_configuration(
+            $quiz,
+            $quiz->timeopen + HOURSECS,
+            $quiz->timeclose - HOURSECS,
+        );
         \quizaccess_presencial::save_settings($quiz);
 
         $quiz->presencial_enabled = 0;
@@ -85,7 +120,37 @@ final class rule_test extends \advanced_testcase {
 
         $settings = quiz_settings::create($quiz->id)->get_quiz();
         $this->assertEmpty($settings->presencial_enabled);
+        $this->assertEquals($start, $settings->presencial_timeopen);
+        $this->assertEquals($end, $settings->presencial_timeclose);
         $this->assertCount(1, $sink->get_events());
+        $this->assertSame('disabled', $sink->get_events()[0]->get_data()['other']['action']);
+        $this->assertSame(
+            ['enabled' => true, 'timeopen' => $start, 'timeclose' => $end],
+            $sink->get_events()[0]->get_data()['other']['previous'],
+        );
+        $this->assertSame(
+            ['enabled' => false, 'timeopen' => $start, 'timeclose' => $end],
+            $sink->get_events()[0]->get_data()['other']['current'],
+        );
+
+        $settings->coursemodule = $quiz->coursemodule;
+        $settings->presencial_enabled = 1;
+        $sink->clear();
+        \quizaccess_presencial::save_settings($settings);
+
+        $reenabledsettings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEquals(1, $reenabledsettings->presencial_enabled);
+        $this->assertEquals($start, $reenabledsettings->presencial_timeopen);
+        $this->assertEquals($end, $reenabledsettings->presencial_timeclose);
+        $this->assertSame('enabled', $sink->get_events()[0]->get_data()['other']['action']);
+        $this->assertSame(
+            ['enabled' => false, 'timeopen' => $start, 'timeclose' => $end],
+            $sink->get_events()[0]->get_data()['other']['previous'],
+        );
+        $this->assertSame(
+            ['enabled' => true, 'timeopen' => $start, 'timeclose' => $end],
+            $sink->get_events()[0]->get_data()['other']['current'],
+        );
     }
 
     /**
@@ -122,6 +187,26 @@ final class rule_test extends \advanced_testcase {
     }
 
     /**
+     * Test that initial validation uses native availability for missing bounds.
+     */
+    public function test_initial_validation_uses_native_quiz_availability(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+
+        $errors = $this->validate_configuration(
+            $quiz,
+            0,
+            0,
+            $quiz->timeopen,
+            $quiz->timeclose,
+            true,
+        );
+
+        $this->assertEmpty($errors);
+    }
+
+    /**
      * Test that the authorization period is ordered and ends in the future.
      */
     public function test_validation_requires_an_ordered_future_authorization_period(): void {
@@ -147,6 +232,33 @@ final class rule_test extends \advanced_testcase {
 
         $this->assertArrayHasKey('presencial_timeclose', $orderederrors);
         $this->assertArrayHasKey('presencial_timeclose', $pasterrors);
+    }
+
+    /**
+     * Test that editing an unrelated quiz setting preserves an expired period.
+     */
+    public function test_validation_allows_an_unchanged_expired_authorization_period(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $now = time();
+        $quiz = $this->create_quiz($now - (3 * HOURSECS), $now + HOURSECS);
+        $start = $now - (2 * HOURSECS);
+        $end = $now - HOURSECS;
+        $this->enable_configuration($quiz, $start, $end);
+        \quizaccess_presencial::save_settings($quiz);
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $settings->coursemodule = $quiz->coursemodule;
+
+        $errors = $this->validate_configuration(
+            $settings,
+            $start,
+            $end,
+            $settings->timeopen,
+            $settings->timeclose,
+        );
+
+        $this->assertEmpty($errors);
     }
 
     /**
@@ -211,10 +323,10 @@ final class rule_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->create_quiz();
-        $this->enable_configuration($quiz);
+        [$oldstart, $oldend] = $this->enable_configuration($quiz);
         \quizaccess_presencial::save_settings($quiz);
 
-        [, $newend] = $this->enable_configuration($quiz, time() + HOURSECS, time() + (3 * HOURSECS));
+        [$newstart, $newend] = $this->enable_configuration($quiz, time() + HOURSECS, time() + (3 * HOURSECS));
         $sink = $this->redirectEvents();
         \quizaccess_presencial::save_settings($quiz);
 
@@ -222,17 +334,15 @@ final class rule_test extends \advanced_testcase {
         $settings = quiz_settings::create($quiz->id)->get_quiz();
         $this->assertEquals($newend, $settings->presencial_timeclose);
         $this->assertInstanceOf(\quizaccess_presencial\event\configuration_updated::class, $event);
-        $this->assertEquals($newend, $event->get_data()['other']['timeclose']);
-    }
-
-    /**
-     * The rule is inactive until a quiz explicitly enables it.
-     */
-    public function test_rule_is_inactive_without_configuration(): void {
-        $quizsettings = $this->createStub(quiz_settings::class);
-        $quizsettings->method('get_quiz')->willReturn((object) ['presencial_enabled' => null]);
-
-        $this->assertNull(\quizaccess_presencial::make($quizsettings, time(), false));
+        $this->assertSame('period_changed', $event->get_data()['other']['action']);
+        $this->assertSame(
+            ['enabled' => true, 'timeopen' => $oldstart, 'timeclose' => $oldend],
+            $event->get_data()['other']['previous'],
+        );
+        $this->assertSame(
+            ['enabled' => true, 'timeopen' => $newstart, 'timeclose' => $newend],
+            $event->get_data()['other']['current'],
+        );
     }
 
     /**
@@ -240,12 +350,12 @@ final class rule_test extends \advanced_testcase {
      *
      * @return \stdClass Quiz record.
      */
-    private function create_quiz(): \stdClass {
+    private function create_quiz(?int $timeopen = null, ?int $timeclose = null): \stdClass {
         $course = self::getDataGenerator()->create_course();
         $quiz = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_instance([
             'course' => $course->id,
-            'timeopen' => time() + HOURSECS,
-            'timeclose' => time() + (4 * HOURSECS),
+            'timeopen' => $timeopen ?? time() + HOURSECS,
+            'timeclose' => $timeclose ?? time() + (4 * HOURSECS),
         ]);
         $quiz->coursemodule = $quiz->cmid;
         return $quiz;
@@ -282,9 +392,12 @@ final class rule_test extends \advanced_testcase {
         int $end,
         int $quizstart,
         int $quizend,
+        bool $isnew = false,
     ): array {
         $form = $this->createMock(\mod_quiz_mod_form::class);
         $form->method('get_context')->willReturn(\context_module::instance($quiz->coursemodule));
+        $form->method('get_instance')->willReturn($isnew ? null : $quiz);
+        $form->method('get_current')->willReturn($isnew ? null : $quiz);
         return \quizaccess_presencial::validate_settings_form_fields(
             [],
             [
