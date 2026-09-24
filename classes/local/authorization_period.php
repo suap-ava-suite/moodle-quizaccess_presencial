@@ -33,6 +33,7 @@ final class authorization_period {
      * @param int $quizstart Native quiz availability start.
      * @param int $quizend Native quiz availability end.
      * @param int $now Current time.
+     * @param bool $requirefuture Whether the period must end in the future.
      * @return array Validation errors indexed by form field.
      */
     public static function validate(
@@ -42,6 +43,7 @@ final class authorization_period {
         int $quizstart,
         int $quizend,
         int $now,
+        bool $requirefuture,
     ): array {
         if (!$enabled) {
             return [];
@@ -60,7 +62,7 @@ final class authorization_period {
         if ($end <= $start) {
             $errors['presencial_timeclose'] = 'authorizationperiodordered';
         }
-        if ($end <= $now) {
+        if ($requirefuture && $end <= $now) {
             $errors['presencial_timeclose'] = 'authorizationperiodfuture';
         }
         if (($quizstart && $start < $quizstart) || ($quizend && $end > $quizend)) {
