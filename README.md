@@ -30,7 +30,11 @@ Valores de prazo inválidos não são salvos.
 
 ## Estado atual
 
-Esta entrega fornece o componente instalável, a configuração global, o contrato da regra, internacionalização, declaração de privacidade e testes automatizados. Ela ainda não adiciona tabelas ou restrições ao início de tentativas.
+Esta entrega fornece o componente instalável, a configuração global, o formulário de configuração por Questionário, internacionalização, declaração de privacidade e testes automatizados.
+
+Ao habilitar **Liberação Presencial** nas configurações de um Questionário, o plugin grava na tabela `quizaccess_presencial` a configuração daquele Questionário e o início e o fim do Período de Autorização. Há somente um registro por Questionário; desabilitar a opção suspende a regra e preserva o período para uma reabilitação posterior. As alterações também geram o evento de configuração correspondente no log do Moodle.
+
+Nesta etapa, a regra ainda não impede nem autoriza o início de novas tentativas. Em particular, ela não cria Solicitações de liberação, não emite Autorizações de tentativa e não oferece o fluxo para Professor ou Aplicador decidir essas solicitações. Assim, mesmo quando habilitada e com o período salvo, a Liberação Presencial não altera o fluxo nativo de tentativas do Questionário.
 
 ## Testes
 
@@ -43,7 +47,7 @@ moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
 
 ## Privacidade
 
-O plugin declara um `null_provider` porque esta versão não armazena nem transmite dados pessoais. Quando uma entrega futura introduzir persistência ou integração externa, o provider deverá ser atualizado para declarar e atender esses dados pela Privacy API do Moodle.
+O plugin declara um `null_provider`: embora armazene a configuração e o período de cada Questionário, não armazena nem transmite dados pessoais. Quando uma entrega futura introduzir dados pessoais ou integração externa, o provider deverá ser atualizado para declarar e atender esses dados pela Privacy API do Moodle.
 
 ## Licença
 
