@@ -96,13 +96,30 @@ class quizaccess_presencial extends access_rule_base {
         }
 
         $enabled = !empty($data['presencial_enabled']);
+        $current = $quizform->get_current();
+        $start = (int) ($data['presencial_timeopen'] ?? 0);
+        $end = (int) ($data['presencial_timeclose'] ?? 0);
+        if ($enabled && empty($quizform->get_instance())) {
+            [$start, $end] = self::initial_authorization_period(
+                $start,
+                $end,
+                (int) ($data['timeopen'] ?? 0),
+                (int) ($data['timeclose'] ?? 0),
+            );
+        }
+        $requirefuture = $enabled && (
+            empty($current->presencial_enabled) ||
+            $start !== (int) ($current->presencial_timeopen ?? 0) ||
+            $end !== (int) ($current->presencial_timeclose ?? 0)
+        );
         $perioderrors = authorization_period::validate(
             $enabled,
-            (int) ($data['presencial_timeopen'] ?? 0),
-            (int) ($data['presencial_timeclose'] ?? 0),
+            $start,
+            $end,
             (int) ($data['timeopen'] ?? 0),
             (int) ($data['timeclose'] ?? 0),
             time(),
+            $requirefuture,
         );
         foreach ($perioderrors as $field => $string) {
             $errors[$field] = get_string($string, 'quizaccess_presencial');
@@ -111,7 +128,7 @@ class quizaccess_presencial extends access_rule_base {
     }
 
     /**
-     * Save or remove the in-person release settings.
+     * Save the in-person release settings or suspend the rule.
      *
      * @param \stdClass $quiz Quiz record and submitted settings.
      */
@@ -123,30 +140,83 @@ class quizaccess_presencial extends access_rule_base {
             return;
         }
 
-        $existing = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id]);
+        $existing = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id]) ?: null;
         if (empty($quiz->presencial_enabled)) {
-            if ($existing) {
-                $DB->delete_records('quizaccess_presencial', ['id' => $existing->id]);
-                self::trigger_configuration_event($quiz, 0, 0);
+            if ($existing && !empty($existing->enabled)) {
+                $previous = self::configuration_state($existing);
+                $existing->enabled = 0;
+                $existing->timemodified = time();
+                $DB->update_record('quizaccess_presencial', $existing);
+                self::trigger_configuration_event(
+                    $quiz,
+                    'disabled',
+                    $previous,
+                    self::configuration_state($existing),
+                );
             }
             return;
         }
 
         $now = time();
+        $start = (int) ($quiz->presencial_timeopen ?? 0);
+        $end = (int) ($quiz->presencial_timeclose ?? 0);
+        if (!$existing) {
+            [$start, $end] = self::initial_authorization_period(
+                $start,
+                $end,
+                (int) ($quiz->timeopen ?? 0),
+                (int) ($quiz->timeclose ?? 0),
+            );
+        }
         $record = (object) [
             'quizid' => $quiz->id,
-            'timeopen' => (int) $quiz->presencial_timeopen,
-            'timeclose' => (int) $quiz->presencial_timeclose,
+            'enabled' => 1,
+            'timeopen' => $start,
+            'timeclose' => $end,
             'timemodified' => $now,
         ];
+        $previous = self::configuration_state($existing);
+        $current = self::configuration_state($record);
         if ($existing) {
+            if ($previous === $current) {
+                return;
+            }
             $record->id = $existing->id;
             $DB->update_record('quizaccess_presencial', $record);
+            $action = $previous['enabled'] ? 'period_changed' : 'enabled';
         } else {
             $record->timecreated = $now;
             $DB->insert_record('quizaccess_presencial', $record);
+            $action = 'enabled';
         }
-        self::trigger_configuration_event($quiz, $record->timeopen, $record->timeclose);
+        self::trigger_configuration_event($quiz, $action, $previous, $current);
+    }
+
+    /**
+     * Use native availability for the missing bounds of an initial period.
+     *
+     * @param int $start Submitted authorization period start.
+     * @param int $end Submitted authorization period end.
+     * @param int $quizstart Native quiz availability start.
+     * @param int $quizend Native quiz availability end.
+     * @return int[] Authorization period bounds.
+     */
+    private static function initial_authorization_period(int $start, int $end, int $quizstart, int $quizend): array {
+        return [$start ?: $quizstart, $end ?: $quizend];
+    }
+
+    /**
+     * Convert a persisted configuration to the audit state included in events.
+     *
+     * @param \stdClass|null $configuration Persisted configuration, if any.
+     * @return array Configuration state.
+     */
+    private static function configuration_state(?\stdClass $configuration): array {
+        return [
+            'enabled' => (bool) ($configuration->enabled ?? false),
+            'timeopen' => (int) ($configuration->timeopen ?? 0),
+            'timeclose' => (int) ($configuration->timeclose ?? 0),
+        ];
     }
 
     /**
@@ -167,7 +237,7 @@ class quizaccess_presencial extends access_rule_base {
      */
     public static function get_settings_sql($quizid): array {
         return [
-            'CASE WHEN presencial.id IS NULL THEN 0 ELSE 1 END AS presencial_enabled, ' .
+            'COALESCE(presencial.enabled, 0) AS presencial_enabled, ' .
                 'COALESCE(presencial.timeopen, quiz.timeopen) AS presencial_timeopen, ' .
                 'COALESCE(presencial.timeclose, quiz.timeclose) AS presencial_timeclose',
             'LEFT JOIN {quizaccess_presencial} presencial ON presencial.quizid = quiz.id',
@@ -176,17 +246,18 @@ class quizaccess_presencial extends access_rule_base {
     }
 
     /**
-     * Trigger the Moodle event for a saved, changed, or disabled configuration.
+     * Trigger the Moodle event for a configuration transition.
      *
      * @param \stdClass $quiz Quiz record.
-     * @param int $start Authorization period start.
-     * @param int $end Authorization period end.
+     * @param string $action Transition action.
+     * @param array $previous Configuration state before the transition.
+     * @param array $current Configuration state after the transition.
      */
-    private static function trigger_configuration_event($quiz, int $start, int $end): void {
+    private static function trigger_configuration_event($quiz, string $action, array $previous, array $current): void {
         $event = configuration_updated::create([
             'context' => \context_module::instance($quiz->coursemodule),
             'objectid' => $quiz->id,
-            'other' => ['timeopen' => $start, 'timeclose' => $end],
+            'other' => ['action' => $action, 'previous' => $previous, 'current' => $current],
         ]);
         $event->trigger();
     }

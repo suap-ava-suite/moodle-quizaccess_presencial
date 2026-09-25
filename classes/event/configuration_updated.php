@@ -48,6 +48,12 @@ final class configuration_updated extends \core\event\base {
      * @return string Event description.
      */
     public function get_description(): string {
-        return "The in-person release configuration for quiz '{$this->objectid}' was updated.";
+        $action = match ($this->other['action'] ?? null) {
+            'enabled' => 'enabled',
+            'disabled' => 'disabled',
+            'period_changed' => 'updated',
+            default => 'updated',
+        };
+        return "The in-person release configuration for quiz '{$this->objectid}' was {$action}.";
     }
 }

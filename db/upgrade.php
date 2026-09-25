@@ -47,5 +47,15 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026092200, 'quizaccess', 'presencial');
     }
+    if ($oldversion < 2026092400) {
+        $table = new xmldb_table('quizaccess_presencial');
+        $field = new xmldb_field('enabled', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'quizid');
+
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $DB->set_field('quizaccess_presencial', 'enabled', 1);
+        upgrade_plugin_savepoint(true, 2026092400, 'quizaccess', 'presencial');
+    }
     return true;
 }
