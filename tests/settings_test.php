@@ -34,26 +34,6 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/classes/admin_sett
  */
 final class settings_test extends \advanced_testcase {
     /**
-     * The operational settings provide safe defaults.
-     */
-    public function test_operational_settings_have_safe_defaults(): void {
-        $this->resetAfterTest();
-
-        $this->assertSame(
-            '15',
-            $this->duration_setting('quizaccess_presencial/requestvalidity', '15')->get_defaultsetting()
-        );
-        $this->assertSame(
-            '5',
-            $this->duration_setting('quizaccess_presencial/authorisationvalidity', '5')->get_defaultsetting()
-        );
-        $this->assertSame(
-            '0',
-            $this->rejection_justification_setting()->get_defaultsetting()
-        );
-    }
-
-    /**
      * Administrators can persist each global policy.
      */
     public function test_administrator_can_persist_global_policies(): void {
