@@ -32,11 +32,13 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/classes/admin_sett
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @coversNothing
  */
-final class settings_defaults_test extends \basic_testcase {
+final class settings_defaults_test extends \advanced_testcase {
     /**
      * The operational settings provide safe defaults.
      */
     public function test_operational_settings_have_safe_defaults(): void {
+        $this->resetAfterTest();
+
         $this->assertSame(
             '15',
             (new positive_integer('quizaccess_presencial/requestvalidity', '', '', '15'))->get_defaultsetting()

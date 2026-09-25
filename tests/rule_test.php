@@ -267,7 +267,7 @@ final class rule_test extends \advanced_testcase {
 
         global $DB;
 
-        // moodleform_mod::get_current() contains only the native quiz record.
+        // Moodleform_mod::get_current() contains only the native quiz record.
         $current = $DB->get_record('quiz', ['id' => $quiz->id], '*', MUST_EXIST);
         $current->coursemodule = $quiz->coursemodule;
         $this->assertFalse(property_exists($current, 'presencial_enabled'));
@@ -372,6 +372,8 @@ final class rule_test extends \advanced_testcase {
     /**
      * Create a quiz record suitable for the rule lifecycle hooks.
      *
+      * @param int|null $timeopen Native quiz availability start.
+      * @param int|null $timeclose Native quiz availability end.
      * @return \stdClass Quiz record.
      */
     private function create_quiz(?int $timeopen = null, ?int $timeclose = null): \stdClass {
@@ -408,6 +410,7 @@ final class rule_test extends \advanced_testcase {
      * @param int $end Authorization period end.
      * @param int $quizstart Native quiz availability start.
      * @param int $quizend Native quiz availability end.
+      * @param bool $isnew Whether the quiz is being created.
      * @return array Validation errors indexed by form field.
      */
     private function validate_configuration(
@@ -420,7 +423,7 @@ final class rule_test extends \advanced_testcase {
     ): array {
         $form = $this->createMock(\mod_quiz_mod_form::class);
         $form->method('get_context')->willReturn(\context_module::instance($quiz->coursemodule));
-        $form->method('get_instance')->willReturn($isnew ? null : $quiz);
+        $form->method('get_instance')->willReturn($isnew ? null : $quiz->id);
         $form->method('get_current')->willReturn($isnew ? null : $quiz);
         return \quizaccess_presencial::validate_settings_form_fields(
             [],

@@ -101,7 +101,7 @@ class quizaccess_presencial extends access_rule_base {
         $instance = $quizform->get_instance();
         // The form's current record only contains fields from {quiz}.
         $configuration = $instance
-            ? $DB->get_record('quizaccess_presencial', ['quizid' => $instance->id])
+            ? $DB->get_record('quizaccess_presencial', ['quizid' => $instance])
             : null;
         $start = (int) ($data['presencial_timeopen'] ?? 0);
         $end = (int) ($data['presencial_timeclose'] ?? 0);
