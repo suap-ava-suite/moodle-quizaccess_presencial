@@ -101,6 +101,24 @@ final class rule_test extends \advanced_testcase {
     }
 
     /**
+     * Test that an initial configuration preserves submitted custom bounds.
+     */
+    public function test_initial_configuration_preserves_submitted_custom_authorization_period(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+        $start = $quiz->timeopen + HOURSECS;
+        $end = $quiz->timeclose - HOURSECS;
+        $this->enable_configuration($quiz, $start, $end);
+
+        \quizaccess_presencial::save_settings($quiz);
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEquals($start, $settings->presencial_timeopen);
+        $this->assertEquals($end, $settings->presencial_timeclose);
+    }
+
+    /**
      * Test that disabling and re-enabling the rule preserves a custom period.
      */
     public function test_disabling_and_reenabling_configuration_preserves_the_authorization_period(): void {
