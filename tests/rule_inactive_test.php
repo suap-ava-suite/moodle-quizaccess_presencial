@@ -14,18 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace quizaccess_presencial;
+
+use mod_quiz\quiz_settings;
+
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
+
 /**
- * Version information for the Presencial quiz access rule.
+ * Tests for the inactive Presencial access rule.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers     \quizaccess_presencial
  */
+final class rule_inactive_test extends \basic_testcase {
+    /**
+     * The rule is inactive until a quiz explicitly enables it.
+     */
+    public function test_rule_is_inactive_without_configuration(): void {
+        $quizsettings = $this->createStub(quiz_settings::class);
+        $quizsettings->method('get_quiz')->willReturn((object) ['presencial_enabled' => null]);
 
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.2.0';
-$plugin->version = 2026092400;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+        $this->assertNull(\quizaccess_presencial::make($quizsettings, time(), false));
+    }
+}

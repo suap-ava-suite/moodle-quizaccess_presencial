@@ -24,6 +24,15 @@
 
 $string['authorisationvalidity'] = 'Attempt authorisation validity';
 $string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
+$string['authorizationperiodavailability'] = 'The authorization period must be contained within the quiz availability.';
+$string['authorizationperiodend'] = 'Authorization period ends';
+$string['authorizationperiodendrequired'] = 'Set when the authorization period ends.';
+$string['authorizationperiodfuture'] = 'The authorization period must end in the future.';
+$string['authorizationperiodordered'] = 'The authorization period must end after it starts.';
+$string['authorizationperiodstart'] = 'Authorization period starts';
+$string['authorizationperiodstartrequired'] = 'Set when the authorization period starts.';
+$string['enable'] = 'Enable in-person release';
+$string['eventconfigurationupdated'] = 'In-person release configuration updated';
 $string['pluginname'] = 'In-person release';
 $string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
 $string['rejectionjustificationrequired'] = 'Require a rejection justification';
