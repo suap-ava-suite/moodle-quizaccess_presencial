@@ -91,12 +91,18 @@ class quizaccess_presencial extends access_rule_base {
         $files,
         \mod_quiz_mod_form $quizform,
     ): array {
+        global $DB;
+
         if (!has_capability('mod/quiz:manage', $quizform->get_context())) {
             return $errors;
         }
 
         $enabled = !empty($data['presencial_enabled']);
-        $current = $quizform->get_current();
+        $instance = $quizform->get_instance();
+        // The form's current record only contains fields from {quiz}.
+        $configuration = $instance
+            ? $DB->get_record('quizaccess_presencial', ['quizid' => $instance->id])
+            : null;
         $start = (int) ($data['presencial_timeopen'] ?? 0);
         $end = (int) ($data['presencial_timeclose'] ?? 0);
         if ($enabled && empty($quizform->get_instance())) {
@@ -108,9 +114,9 @@ class quizaccess_presencial extends access_rule_base {
             );
         }
         $requirefuture = $enabled && (
-            empty($current->presencial_enabled) ||
-            $start !== (int) ($current->presencial_timeopen ?? 0) ||
-            $end !== (int) ($current->presencial_timeclose ?? 0)
+            empty($configuration->enabled) ||
+            $start !== (int) ($configuration->timeopen ?? 0) ||
+            $end !== (int) ($configuration->timeclose ?? 0)
         );
         $perioderrors = authorization_period::validate(
             $enabled,

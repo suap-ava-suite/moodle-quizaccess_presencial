@@ -265,15 +265,21 @@ final class rule_test extends \advanced_testcase {
         $this->enable_configuration($quiz, $start, $end);
         \quizaccess_presencial::save_settings($quiz);
 
-        $settings = quiz_settings::create($quiz->id)->get_quiz();
-        $settings->coursemodule = $quiz->coursemodule;
+        global $DB;
+
+        // moodleform_mod::get_current() contains only the native quiz record.
+        $current = $DB->get_record('quiz', ['id' => $quiz->id], '*', MUST_EXIST);
+        $current->coursemodule = $quiz->coursemodule;
+        $this->assertFalse(property_exists($current, 'presencial_enabled'));
+        $this->assertFalse(property_exists($current, 'presencial_timeopen'));
+        $this->assertFalse(property_exists($current, 'presencial_timeclose'));
 
         $errors = $this->validate_configuration(
-            $settings,
+            $current,
             $start,
             $end,
-            $settings->timeopen,
-            $settings->timeclose,
+            $current->timeopen,
+            $current->timeclose,
         );
 
         $this->assertEmpty($errors);
