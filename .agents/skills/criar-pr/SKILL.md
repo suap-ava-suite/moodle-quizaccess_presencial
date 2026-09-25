@@ -46,7 +46,7 @@ Antes de criar o PR, consulte novamente se já existe um PR aberto para essa ori
 Vincule a issue na descrição:
 
 - Quando o PR resolver a issue e tiver como destino a branch padrão, use `Closes #N`; para outro repositório, `Closes proprietario/repositorio#N`.
-- Para entrega parcial ou destino diferente da branch padrão, inclua `Refs proprietario/repositorio#N` ou o link completo da issue. Isso registra a referência, sem prometer fechamento automático nem confundi-la com o vínculo na seção Development. Se precisar desse vínculo formal, use uma operação disponível para criá-lo e verifique o resultado; caso contrário, informe a pendência.
+- Para entrega parcial ou destino diferente da branch padrão, inclua `Refs proprietario/repositorio#N` ou o link completo da issue. Isso registra a referência sem prometer fechamento automático. Como essa referência não cria o vínculo formal, tente vincular o PR à issue pela operação disponível na seção Development do GitHub ou por um conector e verifique o resultado. Se não houver meio de criar o vínculo, informe essa pendência.
 
 As palavras-chave de fechamento só são interpretadas em PRs destinados à branch padrão. Consulte a [documentação do GitHub](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) se houver dúvida sobre o vínculo.
 
