@@ -41,6 +41,18 @@ moodle-plugin-ci phpunit --fail-on-warning
 moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
 ```
 
+## Colaboração: criar um pull request
+
+A skill [criar-pr](.agents/skills/criar-pr/SKILL.md) acompanha este repositório em `.agents/skills/criar-pr/`. Abra o projeto no Codex e acione-a com a issue e o escopo da mudança:
+
+```text
+$criar-pr Abra um PR para a issue #22 com as alterações da skill criar-pr.
+```
+
+Você pode indicar outra branch de destino no pedido. A skill verifica se pode reutilizar a branch atual, seleciona as alterações pertinentes, faz commit e push, abre ou atualiza o PR e o atribui ao autor. Ela registra a issue na descrição e usa fechamento automático quando aplicável.
+
+É necessário acesso Git ao remoto para push e acesso autenticado ao GitHub pelo conector do ambiente ou pela CLI `gh`. Se a skill não aparecer na lista, peça explicitamente ao agente que leia `.agents/skills/criar-pr/SKILL.md` e execute suas instruções. Em caso de falha, ela informa o que concluiu e o que falta; peça para retomar o mesmo PR após resolver o impedimento.
+
 ## Privacidade
 
 O plugin declara um `null_provider` porque esta versão não armazena nem transmite dados pessoais. Quando uma entrega futura introduzir persistência ou integração externa, o provider deverá ser atualizado para declarar e atender esses dados pela Privacy API do Moodle.
