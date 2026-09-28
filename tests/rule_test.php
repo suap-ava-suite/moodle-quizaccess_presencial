@@ -372,8 +372,8 @@ final class rule_test extends \advanced_testcase {
     /**
      * Create a quiz record suitable for the rule lifecycle hooks.
      *
-      * @param int|null $timeopen Native quiz availability start.
-      * @param int|null $timeclose Native quiz availability end.
+     * @param int|null $timeopen Native quiz availability start.
+     * @param int|null $timeclose Native quiz availability end.
      * @return \stdClass Quiz record.
      */
     private function create_quiz(?int $timeopen = null, ?int $timeclose = null): \stdClass {
@@ -410,7 +410,7 @@ final class rule_test extends \advanced_testcase {
      * @param int $end Authorization period end.
      * @param int $quizstart Native quiz availability start.
      * @param int $quizend Native quiz availability end.
-      * @param bool $isnew Whether the quiz is being created.
+     * @param bool $isnew Whether the quiz is being created.
      * @return array Validation errors indexed by form field.
      */
     private function validate_configuration(

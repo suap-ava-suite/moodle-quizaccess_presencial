@@ -55,11 +55,12 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     When I add a "quiz" activity to course "Curso 1" section 1
     And I set the following fields to these values:
       | Name                       | Questionário 4            |
+      | ID number                  | quiz4                     |
       | Open the quiz              | ## 1 January 2030 08:00 ## |
       | Close the quiz             | ## 2 January 2030 08:00 ## |
       | Enable in-person release   | Yes                       |
     And I press "Save and return to course"
-    And I am on the "Questionário 4" "Activity editing" page
+    And I am on the "quiz4" "Activity editing" page
     Then the following fields match these values:
       | Authorization period starts | ## 1 January 2030 08:00 ## |
       | Authorization period ends   | ## 2 January 2030 08:00 ## |
@@ -69,13 +70,14 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     When I add a "quiz" activity to course "Curso 1" section 1
     And I set the following fields to these values:
       | Name                       | Questionário 5             |
+      | ID number                  | quiz5                      |
       | Open the quiz              | ## 1 January 2030 08:00 ## |
       | Close the quiz             | ## 2 January 2030 08:00 ## |
       | Enable in-person release   | Yes                        |
       | Authorization period starts | ## 1 January 2030 10:00 ## |
       | Authorization period ends   | ## 1 January 2030 20:00 ## |
     And I press "Save and return to course"
-    And I am on the "Questionário 5" "Activity editing" page
+    And I am on the "quiz5" "Activity editing" page
     Then the following fields match these values:
       | Authorization period starts | ## 1 January 2030 10:00 ## |
       | Authorization period ends   | ## 1 January 2030 20:00 ## |
