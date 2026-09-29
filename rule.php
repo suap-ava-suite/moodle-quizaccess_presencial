@@ -113,13 +113,17 @@ class quizaccess_presencial extends access_rule_base {
                 (int) ($data['timeclose'] ?? 0),
             );
         }
+        if (!$enabled && $configuration) {
+            $start = (int) $configuration->timeopen;
+            $end = (int) $configuration->timeclose;
+        }
         $requirefuture = $enabled && (
             empty($configuration->enabled) ||
             $start !== (int) ($configuration->timeopen ?? 0) ||
             $end !== (int) ($configuration->timeclose ?? 0)
         );
         $perioderrors = authorization_period::validate(
-            $enabled,
+            $enabled || (bool) $configuration,
             $start,
             $end,
             (int) ($data['timeopen'] ?? 0),

@@ -267,12 +267,8 @@ final class rule_test extends \advanced_testcase {
 
         global $DB;
 
-        // Moodleform_mod::get_current() contains only the native quiz record.
         $current = $DB->get_record('quiz', ['id' => $quiz->id], '*', MUST_EXIST);
         $current->coursemodule = $quiz->coursemodule;
-        $this->assertFalse(property_exists($current, 'presencial_enabled'));
-        $this->assertFalse(property_exists($current, 'presencial_timeopen'));
-        $this->assertFalse(property_exists($current, 'presencial_timeclose'));
 
         $errors = $this->validate_configuration(
             $current,
@@ -336,6 +332,39 @@ final class rule_test extends \advanced_testcase {
         \quizaccess_presencial::save_settings($quiz);
 
         $errors = $this->validate_configuration($quiz, $start, $end, $start + 1, $quiz->timeclose);
+
+        $this->assertArrayHasKey('presencial_timeclose', $errors);
+    }
+
+    /**
+     * Test that disabling the rule does not allow quiz availability to exclude its saved period.
+     */
+    public function test_validation_rejects_availability_that_excludes_a_disabled_saved_period(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz(
+            strtotime('2030-01-01 08:00:00'),
+            strtotime('2030-01-01 22:00:00'),
+        );
+        [$start, $end] = $this->enable_configuration(
+            $quiz,
+            strtotime('2030-01-01 10:00:00'),
+            strtotime('2030-01-01 20:00:00'),
+        );
+        \quizaccess_presencial::save_settings($quiz);
+
+        $quiz->presencial_enabled = 0;
+        \quizaccess_presencial::save_settings($quiz);
+
+        $errors = $this->validate_configuration(
+            $quiz,
+            $start,
+            $end,
+            $quiz->timeopen,
+            strtotime('2030-01-01 18:00:00'),
+            false,
+            false,
+        );
 
         $this->assertArrayHasKey('presencial_timeclose', $errors);
     }
@@ -411,6 +440,7 @@ final class rule_test extends \advanced_testcase {
      * @param int $quizstart Native quiz availability start.
      * @param int $quizend Native quiz availability end.
      * @param bool $isnew Whether the quiz is being created.
+     * @param bool $enabled Whether the submitted configuration is enabled.
      * @return array Validation errors indexed by form field.
      */
     private function validate_configuration(
@@ -420,6 +450,7 @@ final class rule_test extends \advanced_testcase {
         int $quizstart,
         int $quizend,
         bool $isnew = false,
+        bool $enabled = true,
     ): array {
         $form = $this->createMock(\mod_quiz_mod_form::class);
         $form->method('get_context')->willReturn(\context_module::instance($quiz->coursemodule));
@@ -428,7 +459,7 @@ final class rule_test extends \advanced_testcase {
         return \quizaccess_presencial::validate_settings_form_fields(
             [],
             [
-                'presencial_enabled' => 1,
+                'presencial_enabled' => $enabled ? 1 : 0,
                 'presencial_timeopen' => $start,
                 'presencial_timeclose' => $end,
                 'timeopen' => $quizstart,

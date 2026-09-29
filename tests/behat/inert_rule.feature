@@ -100,3 +100,23 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     And I press "Save and return to course"
     Then I should see "Set when the authorization period starts."
     And I should see "Set when the authorization period ends."
+
+  Scenario Outline: Professor não salva uma edição com período de autorização inválido
+    Given the following "activities" exist:
+      | activity | name                      | course | idnumber    | timeopen              | timeclose             | presencial_enabled | presencial_timeopen       | presencial_timeclose      |
+      | quiz     | Questionário inválido     | C1     | quizinvalid | ## 1 January 2030 08:00 ## | ## 1 January 2030 22:00 ## | 1                  | ## 1 January 2030 10:00 ## | ## 1 January 2030 20:00 ## |
+    And I am on the "quizinvalid" "Activity editing" page logged in as "teacher1"
+    When I set the following fields to these values:
+      | Authorization period starts | <start> |
+      | Authorization period ends   | <end>   |
+    And I press "Save and return to course"
+    Then I should see "<error>"
+    When I am on the "quizinvalid" "Activity editing" page
+    Then the following fields match these values:
+      | Authorization period starts | ## 1 January 2030 10:00 ## |
+      | Authorization period ends   | ## 1 January 2030 20:00 ## |
+
+    Examples:
+      | start                         | end                           | error                                                            |
+      | ## 1 January 2030 21:00 ##    | ## 1 January 2030 19:00 ##   | The authorization period must end after it starts.               |
+      | ## 1 January 2030 10:00 ##    | ## 1 January 2030 23:00 ##   | The authorization period must be contained within the quiz availability. |
