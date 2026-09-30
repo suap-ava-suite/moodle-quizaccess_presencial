@@ -129,17 +129,10 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
 
   Scenario: Professor ajusta um período expirado desabilitado antes de reduzir o fechamento
     Given the following "activities" exist:
-      | activity | name                                    | course | idnumber      | timeopen                    | timeclose                   |
-      | quiz     | Questionário com período expirado salvo | C1     | quizexpiredsaved | ## 1 January 2020 08:00 ## | ## 1 January 2020 22:00 ## |
+      | activity | name                                    | course | idnumber         | timeopen                    | timeclose                   | presencial_enabled | presencial_timeopen             | presencial_timeclose            |
+      | quiz     | Questionário com período expirado salvo | C1     | quizexpiredsaved | ## 1 January 2020 08:00 ## | ## 1 January 2020 22:00 ## | 1                  | ## 1 January 2020 10:00 ## | ## 1 January 2020 20:00 ## |
     And I am on the "quizexpiredsaved" "Activity editing" page logged in as "teacher1"
-    When I set the following fields to these values:
-      | Enable in-person release    | Yes                       |
-      | Authorization period starts | ## 1 January 2020 10:00 ## |
-      | Authorization period ends   | ## 1 January 2020 20:00 ## |
-    And I press "Save and return to course"
-    Then I should see "Questionário com período expirado salvo"
-    When I am on the "quizexpiredsaved" "Activity editing" page
-    And I set the field "Enable in-person release" to "No"
+    When I set the field "Enable in-person release" to "No"
     And I press "Save and return to course"
     Then I should see "Questionário com período expirado salvo"
     When I am on the "quizexpiredsaved" "Activity editing" page
@@ -158,6 +151,12 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     When I set the field "Close the quiz" to "## 1 January 2020 18:00 ##"
     And I press "Save and return to course"
     Then I should see "Questionário com período expirado salvo"
+    When I am on the "quizexpiredsaved" "Activity editing" page
+    Then the following fields match these values:
+      | Enable in-person release    | No                        |
+      | Close the quiz              | ## 1 January 2020 18:00 ## |
+      | Authorization period starts | ## 1 January 2020 10:00 ## |
+      | Authorization period ends   | ## 1 January 2020 18:00 ## |
 
   Scenario Outline: Professor não salva uma edição com período de autorização inválido
     Given the following "activities" exist:
