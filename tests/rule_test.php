@@ -265,9 +265,7 @@ final class rule_test extends \advanced_testcase {
         $this->enable_configuration($quiz, $start, $end);
         \quizaccess_presencial::save_settings($quiz);
 
-        global $DB;
-
-        $current = $DB->get_record('quiz', ['id' => $quiz->id], '*', MUST_EXIST);
+        $current = quiz_settings::create($quiz->id)->get_quiz();
         $current->coursemodule = $quiz->coursemodule;
 
         $errors = $this->validate_configuration(
@@ -367,6 +365,116 @@ final class rule_test extends \advanced_testcase {
         );
 
         $this->assertArrayHasKey('presencial_timeclose', $errors);
+    }
+
+    /**
+     * Test that a disabled configuration can be adjusted before quiz availability is reduced.
+     */
+    public function test_disabled_configuration_can_be_adjusted_before_quiz_close_is_reduced(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz(
+            strtotime('2020-01-01 08:00:00'),
+            strtotime('2020-01-01 22:00:00'),
+        );
+        $start = strtotime('2020-01-01 10:00:00');
+        $originalend = strtotime('2020-01-01 20:00:00');
+        $adjustedend = strtotime('2020-01-01 18:00:00');
+        $this->enable_configuration($quiz, $start, $originalend);
+        \quizaccess_presencial::save_settings($quiz);
+
+        $quiz->presencial_enabled = 0;
+        \quizaccess_presencial::save_settings($quiz);
+
+        $missingboundserrors = $this->validate_configuration(
+            $quiz,
+            0,
+            0,
+            $quiz->timeopen,
+            $quiz->timeclose,
+            false,
+            false,
+        );
+        $orderedperioderrors = $this->validate_configuration(
+            $quiz,
+            $originalend,
+            $adjustedend,
+            $quiz->timeopen,
+            $quiz->timeclose,
+            false,
+            false,
+        );
+        $outsideavailabilityerrors = $this->validate_configuration(
+            $quiz,
+            $start,
+            strtotime('2020-01-01 23:00:00'),
+            $quiz->timeopen,
+            $quiz->timeclose,
+            false,
+            false,
+        );
+        $this->assertArrayHasKey('presencial_timeopen', $missingboundserrors);
+        $this->assertArrayHasKey('presencial_timeclose', $missingboundserrors);
+        $this->assertArrayHasKey('presencial_timeclose', $orderedperioderrors);
+        $this->assertArrayHasKey('presencial_timeclose', $outsideavailabilityerrors);
+
+        $errors = $this->validate_configuration(
+            $quiz,
+            $start,
+            $adjustedend,
+            $quiz->timeopen,
+            $adjustedend,
+            false,
+            false,
+        );
+        $this->assertEmpty($errors);
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $settings->coursemodule = $quiz->coursemodule;
+        $settings->presencial_enabled = 0;
+        $settings->presencial_timeopen = $start;
+        $settings->presencial_timeclose = $adjustedend;
+        \quizaccess_presencial::save_settings($settings);
+
+        $savedsettings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEmpty($savedsettings->presencial_enabled);
+        $this->assertEquals($start, $savedsettings->presencial_timeopen);
+        $this->assertEquals($adjustedend, $savedsettings->presencial_timeclose);
+
+        $errors = $this->validate_configuration(
+            $quiz,
+            $start,
+            $adjustedend,
+            $quiz->timeopen,
+            $adjustedend,
+            false,
+            false,
+        );
+        $this->assertEmpty($errors);
+    }
+
+    /**
+     * Test that saving a disabled unconfigured rule does not persist submitted bounds.
+     */
+    public function test_saving_a_disabled_unconfigured_rule_does_not_persist_bounds(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz(
+            strtotime('2020-01-01 08:00:00'),
+            strtotime('2020-01-01 22:00:00'),
+        );
+        $quiz->presencial_enabled = 0;
+        $quiz->presencial_timeopen = strtotime('2020-01-01 10:00:00');
+        $quiz->presencial_timeclose = strtotime('2020-01-01 18:00:00');
+        $sink = $this->redirectEvents();
+
+        \quizaccess_presencial::save_settings($quiz);
+
+        $settings = quiz_settings::create($quiz->id)->get_quiz();
+        $this->assertEmpty($settings->presencial_enabled);
+        $this->assertEquals($quiz->timeopen, $settings->presencial_timeopen);
+        $this->assertEquals($quiz->timeclose, $settings->presencial_timeclose);
+        $this->assertEmpty($sink->get_events());
     }
 
     /**

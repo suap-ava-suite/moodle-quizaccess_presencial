@@ -101,6 +101,64 @@ Feature: Manter o fluxo nativo de tentativas quando a Liberação Presencial nã
     Then I should see "Set when the authorization period starts."
     And I should see "Set when the authorization period ends."
 
+  Scenario: Professor não reduz o fechamento depois de desabilitar a Liberação Presencial
+    Given the following "activities" exist:
+      | activity | name                         | course | idnumber | timeopen                    | timeclose                   |
+      | quiz     | Questionário com período salvo | C1     | quizsaved | ## 1 January 2030 08:00 ## | ## 1 January 2030 22:00 ## |
+    And I am on the "quizsaved" "Activity editing" page logged in as "teacher1"
+    When I set the following fields to these values:
+      | Enable in-person release   | Yes                       |
+      | Authorization period starts | ## 1 January 2030 10:00 ## |
+      | Authorization period ends   | ## 1 January 2030 20:00 ## |
+    And I press "Save and return to course"
+    Then I should see "Questionário com período salvo"
+    When I am on the "quizsaved" "Activity editing" page
+    And I set the field "Enable in-person release" to "No"
+    And I press "Save and return to course"
+    Then I should see "Questionário com período salvo"
+    When I am on the "quizsaved" "Activity editing" page
+    And I set the field "Close the quiz" to "## 1 January 2030 18:00 ##"
+    And I press "Save and return to course"
+    Then I should see "The authorization period must be contained within the quiz availability."
+    When I am on the "quizsaved" "Activity editing" page
+    Then the following fields match these values:
+      | Enable in-person release   | No                        |
+      | Close the quiz             | ## 1 January 2030 22:00 ## |
+      | Authorization period starts | ## 1 January 2030 10:00 ## |
+      | Authorization period ends   | ## 1 January 2030 20:00 ## |
+
+  Scenario: Professor ajusta um período expirado desabilitado antes de reduzir o fechamento
+    Given the following "activities" exist:
+      | activity | name                                    | course | idnumber      | timeopen                    | timeclose                   |
+      | quiz     | Questionário com período expirado salvo | C1     | quizexpiredsaved | ## 1 January 2020 08:00 ## | ## 1 January 2020 22:00 ## |
+    And I am on the "quizexpiredsaved" "Activity editing" page logged in as "teacher1"
+    When I set the following fields to these values:
+      | Enable in-person release    | Yes                       |
+      | Authorization period starts | ## 1 January 2020 10:00 ## |
+      | Authorization period ends   | ## 1 January 2020 20:00 ## |
+    And I press "Save and return to course"
+    Then I should see "Questionário com período expirado salvo"
+    When I am on the "quizexpiredsaved" "Activity editing" page
+    And I set the field "Enable in-person release" to "No"
+    And I press "Save and return to course"
+    Then I should see "Questionário com período expirado salvo"
+    When I am on the "quizexpiredsaved" "Activity editing" page
+    Then I should see "Authorization period starts"
+    And I should see "Authorization period ends"
+    When I set the following fields to these values:
+      | Authorization period starts | ## 1 January 2020 10:00 ## |
+      | Authorization period ends   | ## 1 January 2020 18:00 ## |
+    And I press "Save and return to course"
+    Then I should see "Questionário com período expirado salvo"
+    When I am on the "quizexpiredsaved" "Activity editing" page
+    Then the following fields match these values:
+      | Enable in-person release    | No                        |
+      | Authorization period starts | ## 1 January 2020 10:00 ## |
+      | Authorization period ends   | ## 1 January 2020 18:00 ## |
+    When I set the field "Close the quiz" to "## 1 January 2020 18:00 ##"
+    And I press "Save and return to course"
+    Then I should see "Questionário com período expirado salvo"
+
   Scenario Outline: Professor não salva uma edição com período de autorização inválido
     Given the following "activities" exist:
       | activity | name                      | course | idnumber    | timeopen              | timeclose             | presencial_enabled | presencial_timeopen       | presencial_timeclose      |

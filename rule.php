@@ -53,6 +53,8 @@ class quizaccess_presencial extends access_rule_base {
      * @param \MoodleQuickForm $mform Wrapped MoodleQuickForm.
      */
     public static function add_settings_form_fields(\mod_quiz_mod_form $quizform, \MoodleQuickForm $mform): void {
+        global $DB;
+
         if (!has_capability('mod/quiz:manage', $quizform->get_context())) {
             return;
         }
@@ -72,8 +74,12 @@ class quizaccess_presencial extends access_rule_base {
             get_string('authorizationperiodend', 'quizaccess_presencial'),
             ['optional' => true],
         );
-        $mform->hideIf('presencial_timeopen', 'presencial_enabled', 'eq', 0);
-        $mform->hideIf('presencial_timeclose', 'presencial_enabled', 'eq', 0);
+        $instance = $quizform->get_instance();
+        $hasconfiguration = $instance && $DB->record_exists('quizaccess_presencial', ['quizid' => $instance]);
+        if (!$hasconfiguration) {
+            $mform->hideIf('presencial_timeopen', 'presencial_enabled', 'eq', 0);
+            $mform->hideIf('presencial_timeclose', 'presencial_enabled', 'eq', 0);
+        }
     }
 
     /**
@@ -113,10 +119,6 @@ class quizaccess_presencial extends access_rule_base {
                 (int) ($data['timeclose'] ?? 0),
             );
         }
-        if (!$enabled && $configuration) {
-            $start = (int) $configuration->timeopen;
-            $end = (int) $configuration->timeclose;
-        }
         $requirefuture = $enabled && (
             empty($configuration->enabled) ||
             $start !== (int) ($configuration->timeopen ?? 0) ||
@@ -152,18 +154,31 @@ class quizaccess_presencial extends access_rule_base {
 
         $existing = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id]) ?: null;
         if (empty($quiz->presencial_enabled)) {
-            if ($existing && !empty($existing->enabled)) {
-                $previous = self::configuration_state($existing);
-                $existing->enabled = 0;
-                $existing->timemodified = time();
-                $DB->update_record('quizaccess_presencial', $existing);
-                self::trigger_configuration_event(
-                    $quiz,
-                    'disabled',
-                    $previous,
-                    self::configuration_state($existing),
-                );
+            if (!$existing) {
+                return;
             }
+
+            $previous = self::configuration_state($existing);
+            $existing->enabled = 0;
+            $existing->timeopen = isset($quiz->presencial_timeopen)
+                ? (int) $quiz->presencial_timeopen
+                : (int) $existing->timeopen;
+            $existing->timeclose = isset($quiz->presencial_timeclose)
+                ? (int) $quiz->presencial_timeclose
+                : (int) $existing->timeclose;
+            $current = self::configuration_state($existing);
+            if ($previous === $current) {
+                return;
+            }
+
+            $existing->timemodified = time();
+            $DB->update_record('quizaccess_presencial', $existing);
+            self::trigger_configuration_event(
+                $quiz,
+                $previous['enabled'] ? 'disabled' : 'period_changed',
+                $previous,
+                $current,
+            );
             return;
         }
 
