@@ -38,6 +38,56 @@ Nesta etapa, a regra ainda não impede nem autoriza o início de novas tentativa
 
 ## Testes
 
+### Moodle local com Docker Compose
+
+Com Docker e Docker Compose disponíveis, inicie o ambiente na raiz deste repositório:
+
+```bash
+docker compose up -d --build
+docker compose logs -f moodle
+```
+
+A primeira inicialização baixa o Moodle 4.5.12 e instala automaticamente o site e o plugin,
+usando PHP 8.3 e PostgreSQL 15. Quando a instalação terminar, acesse
+<http://localhost:8085> com o usuário `admin` e a senha `PresencialLocal_2026!`.
+O serviço fica disponível somente na máquina local e não envia e-mails.
+
+O código deste repositório é montado diretamente no Moodle. Alterações no plugin ficam
+disponíveis sem reconstruir a imagem; depois de uma mudança que exija atualização ou
+limpeza de cache, execute:
+
+```bash
+docker compose restart moodle
+```
+
+Para usar outra porta ou senha administrativa na primeira instalação:
+
+```bash
+MOODLE_PORT=8086 MOODLE_ADMIN_PASSWORD='OutraSenha_2026!' docker compose up -d --build
+```
+
+Mantenha a mesma porta nos comandos seguintes. Alterar a variável de senha depois da
+instalação não altera a senha da conta existente.
+
+No navegador, é possível testar as configurações administrativas, a ativação por
+Questionário, o preenchimento e a validação das datas, a preservação do período e os logs.
+As configurações globais estão em
+<http://localhost:8085/admin/settings.php?section=modsettingsquizcatpresencial>.
+O início de tentativas continua seguindo o fluxo nativo do Moodle, mesmo com a opção
+habilitada. A instalação usa Português do Brasil (`pt_br`) como idioma padrão e baixa
+automaticamente o pacote de tradução do Moodle.
+
+Para parar o ambiente preservando o banco de dados e os arquivos do site:
+
+```bash
+docker compose down
+```
+
+Os dados ficam nos volumes Docker `database` e `moodledata` deste projeto Compose.
+Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
+
+### Testes automatizados
+
 A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e o cenário de fumaça Behat em PostgreSQL e MariaDB. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash

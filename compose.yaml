@@ -1,0 +1,46 @@
+name: quizaccess-presencial-local
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: moodle
+      POSTGRES_USER: moodle
+      POSTGRES_PASSWORD: moodle-local
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moodle -d moodle"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  moodle:
+    build:
+      context: ./docker
+    ports:
+      - "127.0.0.1:${MOODLE_PORT:-8085}:80"
+    environment:
+      MOODLE_DB_HOST: db
+      MOODLE_DB_NAME: moodle
+      MOODLE_DB_USER: moodle
+      MOODLE_DB_PASSWORD: moodle-local
+      MOODLE_WWWROOT: "http://localhost:${MOODLE_PORT:-8085}"
+      MOODLE_ADMIN_USER: admin
+      MOODLE_ADMIN_PASSWORD: "${MOODLE_ADMIN_PASSWORD:-PresencialLocal_2026!}"
+    volumes:
+      - .:/var/www/html/mod/quiz/accessrule/presencial:ro
+      - moodledata:/var/www/moodledata
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost/login/index.php"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 30
+
+volumes:
+  database:
+  moodledata:
