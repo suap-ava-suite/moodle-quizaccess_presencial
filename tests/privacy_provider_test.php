@@ -92,4 +92,33 @@ final class privacy_provider_test extends \advanced_testcase {
 
         $this->assertEmpty(delegation_manager::list_current($quiz->id));
     }
+
+    /**
+     * Deleting a Quiz removes its delegation data before the module context disappears.
+     */
+    public function test_deleting_quiz_removes_delegation_data(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = self::getDataGenerator()->create_course();
+        $quiz = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_instance([
+            'course' => $course->id,
+            'timeopen' => time() - HOURSECS,
+            'timeclose' => time() + (4 * HOURSECS),
+        ]);
+        $quiz->coursemodule = $quiz->cmid;
+        $quiz->presencial_enabled = 1;
+        $quiz->presencial_timeopen = time() - HOURSECS;
+        $quiz->presencial_timeclose = time() + (2 * HOURSECS);
+        \quizaccess_presencial::save_settings($quiz);
+        $user = self::getDataGenerator()->create_user();
+        delegation_manager::include_users($quiz->id, [$user->id], $GLOBALS['USER']->id);
+
+        course_delete_module($quiz->cmid);
+
+        $this->assertFalse($DB->record_exists('quiz', ['id' => $quiz->id]));
+        $this->assertFalse($DB->record_exists('quizaccess_presencial', ['quizid' => $quiz->id]));
+        $this->assertFalse($DB->record_exists('quizaccess_presencial_delegation', ['quizid' => $quiz->id]));
+    }
 }

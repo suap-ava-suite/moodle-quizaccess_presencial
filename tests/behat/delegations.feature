@@ -39,4 +39,4 @@ Feature: Manage the application team from a quiz
     And I should see "1" occurrences of "Aplicador Um" in the ".presencial-current-applicators" "css_element"
     When I press "Revoke"
     Then I should see "Application delegation revoked."
-    And I should not see "Aplicador Um" in the ".presencial-current-applicators" "css_element"
+    And I should see "None"
