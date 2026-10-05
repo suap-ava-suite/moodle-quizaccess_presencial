@@ -26,13 +26,13 @@ Feature: Manage the application team from a quiz
     And I am on the "quiz1" "Activity editing" page
     And I follow "Manage application team"
     Then I should see "Eligible accounts"
-    When I select "Aplicador Um" from "Eligible accounts"
+    When I select "Aplicador Um" from the "Eligible accounts" select box
     And I press "Include selected accounts"
     Then I should see "Application delegation included."
     And I should see "Aplicador Um" in the ".presencial-current-applicators" "css_element"
     And I should see "1" node occurrences of type "tr" in the ".presencial-current-applicators tbody" "css_element"
     And I should see "Direct inclusion"
-    When I select "Aplicador Um" from "Eligible accounts"
+    When I select "Aplicador Um" from the "Eligible accounts" select box
     And I press "Include selected accounts"
     Then I should see "Application delegation included."
     And I should see "1" node occurrences of type "tr" in the ".presencial-current-applicators tbody" "css_element"

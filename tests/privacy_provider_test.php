@@ -5,6 +5,14 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial;
 
@@ -23,6 +31,7 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers     \quizaccess_presencial\privacy\provider
  */
 final class privacy_provider_test extends \advanced_testcase {
     /**
@@ -64,7 +73,7 @@ final class privacy_provider_test extends \advanced_testcase {
 
         $contextlist = provider::get_contexts_for_userid($user->id);
 
-        $this->assertSame([\context_module::instance($quiz->cmid)->id], $contextlist->get_contextids());
+        $this->assertEquals([(int) \context_module::instance($quiz->cmid)->id], $contextlist->get_contextids());
     }
 
     /**

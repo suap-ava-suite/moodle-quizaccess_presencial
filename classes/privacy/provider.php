@@ -5,6 +5,14 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial\privacy;
 
@@ -15,8 +23,6 @@ use core_privacy\local\request\contextlist;
 use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
-
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Privacy provider for quiz application delegations.
@@ -62,12 +68,15 @@ class provider implements
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
         $contextlist = new contextlist();
-        $contextlist->add_from_sql(self::context_sql('d.userid = :userid OR d.revokedby = :userid2'), [
-            'userid' => $userid,
-            'userid2' => $userid,
-            'modulename' => 'quiz',
-            'contextlevel' => CONTEXT_MODULE,
-        ]);
+        $contextlist->add_from_sql(
+            self::context_sql('d.userid = :userid OR d.revokedby = :userid2'),
+            [
+                'userid' => $userid,
+                'userid2' => $userid,
+                'modulename' => 'quiz',
+                'contextlevel' => CONTEXT_MODULE,
+            ],
+        );
         return $contextlist;
     }
 
@@ -82,11 +91,17 @@ class provider implements
             return;
         }
         $quizid = self::quizid_from_context($context);
-        $userlist->add_from_sql('userid',
-            'SELECT userid FROM {quizaccess_presencial_delegation} WHERE quizid = :quizid', ['quizid' => $quizid]);
-        $userlist->add_from_sql('revokedby',
+        $userlist->add_from_sql(
+            'userid',
+            'SELECT userid FROM {quizaccess_presencial_delegation} WHERE quizid = :quizid',
+            ['quizid' => $quizid],
+        );
+        $userlist->add_from_sql(
+            'revokedby',
             'SELECT revokedby FROM {quizaccess_presencial_delegation}
-              WHERE quizid = :quizid AND revokedby <> 0', ['quizid' => $quizid]);
+              WHERE quizid = :quizid AND revokedby <> 0',
+            ['quizid' => $quizid],
+        );
     }
 
     /**
@@ -177,9 +192,18 @@ class provider implements
         $quizid = self::quizid_from_context($userlist->get_context());
         [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'userid');
         $params['quizid'] = $quizid;
-        $DB->delete_records_select('quizaccess_presencial_delegation', "quizid = :quizid AND userid {$insql}", $params);
-        $DB->set_field_select('quizaccess_presencial_delegation', 'revokedby', 0,
-            "quizid = :quizid AND revokedby {$insql}", $params);
+        $DB->delete_records_select(
+            'quizaccess_presencial_delegation',
+            "quizid = :quizid AND userid {$insql}",
+            $params,
+        );
+        $DB->set_field_select(
+            'quizaccess_presencial_delegation',
+            'revokedby',
+            0,
+            "quizid = :quizid AND revokedby {$insql}",
+            $params,
+        );
     }
 
     /**
@@ -223,5 +247,4 @@ class provider implements
         }
         return (bool) get_coursemodule_from_id('quiz', $context->instanceid, 0, false);
     }
-
 }
