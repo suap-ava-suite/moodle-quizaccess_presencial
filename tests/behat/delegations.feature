@@ -1,0 +1,35 @@
+@quizaccess @quizaccess_presencial @mod_quiz
+Feature: Manage the application team from a quiz
+  To prepare an in-person quiz
+  As a teacher
+  I need to include and revoke eligible Moodle accounts without enrolment changes
+
+  Background:
+    Given the following "users" exist:
+      | username    | firstname  | lastname | email                  |
+      | teacher1    | Professor  | Um       | teacher1@example.com   |
+      | applicator1 | Aplicador  | Um       | applicator1@example.com |
+    And the following "courses" exist:
+      | fullname | shortname | category |
+      | Curso 1  | C1        | 0        |
+    And the following "course enrolments" exist:
+      | user     | course | role           |
+      | teacher1 | C1      | editingteacher |
+    And the following "activities" exist:
+      | activity | name            | course | idnumber | timeopen              | timeclose             |
+      | quiz     | Questionário 1  | C1     | quiz1    | ## 1 January 2030 08:00 ## | ## 2 January 2030 22:00 ## |
+
+  Scenario: Teacher includes and revokes an application account
+    Given I am on the "quiz1" "Activity editing" page logged in as "teacher1"
+    When I set the field "Enable in-person release" to "Yes"
+    And I press "Save and return to course"
+    And I am on the "quiz1" "Activity editing" page
+    And I follow "Manage application team"
+    Then I should see "Eligible accounts"
+    When I select "Aplicador Um" from "Eligible accounts"
+    And I press "Include selected accounts"
+    Then I should see "Application delegation included."
+    And I should see "Aplicador Um"
+    And I should see "Direct inclusion"
+    When I press "Revoke"
+    Then I should see "Application delegation revoked."

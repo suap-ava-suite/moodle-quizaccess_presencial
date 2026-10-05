@@ -74,6 +74,16 @@ class quizaccess_presencial extends access_rule_base {
             get_string('authorizationperiodend', 'quizaccess_presencial'),
             ['optional' => true],
         );
+        $cm = $quizform->get_coursemodule();
+        if ($cm && !empty($cm->id)) {
+            $url = new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $cm->id]);
+            $mform->addElement(
+                'static',
+                'presencial_manageapplicators',
+                '',
+                \html_writer::link($url, get_string('manageapplicators', 'quizaccess_presencial')),
+            );
+        }
         $instance = $quizform->get_instance();
         $hasconfiguration = $instance && $DB->record_exists('quizaccess_presencial', ['quizid' => $instance]);
         if (!$hasconfiguration) {
