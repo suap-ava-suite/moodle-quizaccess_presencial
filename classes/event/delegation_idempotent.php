@@ -15,15 +15,9 @@ namespace quizaccess_presencial\event;
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class delegation_idempotent extends \core\event\base {
-    /**
-     * Initialise event data.
-     */
-    protected function init(): void {
-        $this->data['objecttable'] = 'quizaccess_presencial_delegation';
-        $this->data['crud'] = 'r';
-        $this->data['edulevel'] = self::LEVEL_OTHER;
-    }
+final class delegation_idempotent extends delegation_event {
+    /** CRUD operation represented by this event. */
+    protected const CRUD = 'r';
 
     /**
      * Get the event name.

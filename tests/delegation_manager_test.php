@@ -47,6 +47,8 @@ final class delegation_manager_test extends \advanced_testcase {
             $this->assertInstanceOf(\quizaccess_presencial\event\delegation_created::class, $event);
             $this->assertSame('created', $event->get_data()['other']['action']);
             $this->assertSame('c', $event->get_data()['crud']);
+            $this->assertSame('quizaccess_presencial_delegation', $event->get_data()['objecttable']);
+            $this->assertSame(\core\event\base::LEVEL_OTHER, $event->get_data()['edulevel']);
         }
     }
 
