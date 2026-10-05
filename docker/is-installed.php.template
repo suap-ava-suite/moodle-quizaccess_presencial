@@ -1,0 +1,22 @@
+<?php
+// Check installation state without bootstrapping an uninstalled Moodle site.
+
+$connection = pg_connect(sprintf(
+    'host=%s dbname=%s user=%s password=%s',
+    getenv('MOODLE_DB_HOST'),
+    getenv('MOODLE_DB_NAME'),
+    getenv('MOODLE_DB_USER'),
+    getenv('MOODLE_DB_PASSWORD'),
+));
+if (!$connection) {
+    fwrite(STDERR, "Could not connect to the local Moodle database.\n");
+    exit(2);
+}
+
+$result = pg_query($connection, "SELECT to_regclass('public.mdl_config') IS NOT NULL AS installed");
+if (pg_fetch_result($result, 0, 'installed') !== 't') {
+    exit(1);
+}
+
+$result = pg_query($connection, "SELECT value FROM mdl_config WHERE name = 'version'");
+exit(pg_num_rows($result) === 1 ? 0 : 1);
