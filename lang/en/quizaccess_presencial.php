@@ -47,6 +47,7 @@ $string['ineligibleuser'] = 'One or more selected accounts cannot receive an app
 $string['delegationincluded'] = 'Application delegation included.';
 $string['delegationrevoked'] = 'Application delegation revoked.';
 $string['delegationlocktimeout'] = 'Another application team update is in progress. Please try again.';
+$string['delegationnotfound'] = 'The selected application delegation does not belong to this quiz.';
 $string['delegationorigin_direct'] = 'Direct inclusion';
 $string['delegationorigin_invite'] = 'Invitation';
 $string['delegationorigin_unknown'] = 'Unknown';

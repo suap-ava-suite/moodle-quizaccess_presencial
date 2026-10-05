@@ -40,29 +40,17 @@ final class applicator_selector extends \user_selector_base {
      * @return array Grouped eligible users.
      */
     public function find_users($search): array {
-        global $CFG, $DB;
+        global $DB;
 
+        require_capability('mod/quiz:manage', $this->accesscontext);
         [$wherecondition, $params] = $this->search_sql($search, 'u');
-        $params = array_merge($params, $this->userfieldsparams);
-        $enabledauths = get_enabled_auth_plugins();
-        if (!$enabledauths) {
-            return [];
-        }
-        [$authsql, $authparams] = $DB->get_in_or_equal($enabledauths, SQL_PARAMS_NAMED, 'auth');
-        $params += $authparams;
-        $params['deleted'] = 0;
-        $params['suspended'] = 0;
-        $params['confirmed'] = 1;
-        $params['nologin'] = 'nologin';
+        [$eligibilitycondition, $eligibilityparams] = applicator_eligibility::sql_condition('u');
+        $params = array_merge($params, $this->userfieldsparams, $eligibilityparams);
 
         $fields = 'SELECT u.id, ' . $this->userfieldsselects;
         $from = " FROM {user} u {$this->userfieldsjoin}";
         $where = " WHERE {$wherecondition}
-                         AND u.deleted = :deleted
-                         AND u.suspended = :suspended
-                         AND u.confirmed = :confirmed
-                         AND u.auth <> :nologin
-                         AND u.auth {$authsql}";
+                         AND {$eligibilitycondition}";
         if ($this->exclude) {
             [$excludesql, $excludeparams] = $DB->get_in_or_equal($this->exclude, SQL_PARAMS_NAMED, 'exclude', false);
             $where .= " AND u.id {$excludesql}";

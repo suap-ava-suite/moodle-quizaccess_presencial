@@ -87,12 +87,19 @@ final class delegation_manager_test extends \advanced_testcase {
         $this->assertTrue(delegation_manager::is_active_applicator($quiz->id, $user->id, $now));
 
         $sink = $this->redirectEvents();
-        $this->assertTrue(delegation_manager::revoke($created[$user->id]->id, $GLOBALS['USER']->id, $now + 60));
+        $this->assertTrue(delegation_manager::revoke($quiz->id, $created[$user->id]->id, $GLOBALS['USER']->id, $now + 60));
         $this->assertFalse(delegation_manager::is_active_applicator($quiz->id, $user->id, $now + 60));
+        $this->assertFalse(delegation_manager::revoke(
+            $quiz->id,
+            $created[$user->id]->id,
+            $GLOBALS['USER']->id,
+            $now + 90,
+        ));
         $reincluded = delegation_manager::include_users($quiz->id, [$user->id], $GLOBALS['USER']->id, 'direct', $now + 120);
         $this->assertTrue(delegation_manager::is_active_applicator($quiz->id, $user->id, $now + 120));
 
         $this->assertNotSame((int)$created[$user->id]->id, (int)$reincluded[$user->id]->id);
+        $this->assertCount(2, $sink->get_events());
         $this->assertCount(1, delegation_manager::list_current($quiz->id, $now + 120));
         $this->assertSame('revoked', $sink->get_events()[0]->get_data()['other']['action']);
         $this->assertSame('created', $sink->get_events()[1]->get_data()['other']['action']);
@@ -114,6 +121,27 @@ final class delegation_manager_test extends \advanced_testcase {
         $this->assertNotEmpty($revoked->timerevoked);
         $this->assertSame((int)$user->id, (int)$active->userid);
         $this->assertNull($active->timerevoked);
+    }
+
+    /**
+     * A delegation from another quiz cannot be revoked through this quiz's management page.
+     */
+    public function test_delegation_from_another_quiz_cannot_be_revoked(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_configured_quiz();
+        $otherquiz = $this->create_configured_quiz();
+        $user = self::getDataGenerator()->create_user();
+        $delegation = delegation_manager::include_users($otherquiz->id, [$user->id], $GLOBALS['USER']->id);
+
+        try {
+            delegation_manager::revoke($quiz->id, $delegation[$user->id]->id, $GLOBALS['USER']->id);
+            $this->fail('A delegation from another quiz was revoked.');
+        } catch (\moodle_exception $exception) {
+            $this->assertSame('delegationnotfound', $exception->errorcode);
+        }
+
+        $this->assertTrue(delegation_manager::is_active_applicator($otherquiz->id, $user->id));
     }
 
     /**
@@ -161,13 +189,14 @@ final class delegation_manager_test extends \advanced_testcase {
     public function test_deleted_suspended_unconfirmed_and_non_login_accounts_are_rejected(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
-        set_config('auth', 'manual');
+        set_config('auth', 'manual,webservice');
         $quiz = $this->create_configured_quiz();
         $users = [
             self::getDataGenerator()->create_user(),
             self::getDataGenerator()->create_user(['suspended' => 1]),
             self::getDataGenerator()->create_user(['confirmed' => 0]),
             self::getDataGenerator()->create_user(['auth' => 'nologin']),
+            self::getDataGenerator()->create_user(['auth' => 'webservice']),
             self::getDataGenerator()->create_user(['auth' => 'email']),
         ];
         user_delete_user($users[0]);

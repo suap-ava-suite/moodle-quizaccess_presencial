@@ -125,28 +125,52 @@ final class delegation_manager {
     /**
      * Revoke a delegation immediately.
      *
+     * @param int $quizid Quiz owning the delegation.
      * @param int $delegationid Delegation id.
      * @param int $actorid User performing the operation.
      * @param int|null $now Current timestamp, for deterministic tests.
      * @return bool Whether a current delegation was revoked.
      */
-    public static function revoke(int $delegationid, int $actorid, ?int $now = null): bool {
+    public static function revoke(int $quizid, int $delegationid, int $actorid, ?int $now = null): bool {
         global $DB;
 
         $now ??= time();
-        $delegation = $DB->get_record('quizaccess_presencial_delegation', ['id' => $delegationid], '*', MUST_EXIST);
-        $context = self::quiz_context((int) $delegation->quizid);
+        $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
-        if ($delegation->timerevoked) {
-            return false;
+        $delegation = $DB->get_record('quizaccess_presencial_delegation', [
+            'id' => $delegationid,
+            'quizid' => $quizid,
+        ]);
+        if (!$delegation) {
+            throw new \moodle_exception('delegationnotfound', 'quizaccess_presencial');
         }
 
-        $delegation->timerevoked = $now;
-        $delegation->revokedby = $actorid;
-        $delegation->timemodified = $now;
-        $DB->update_record('quizaccess_presencial_delegation', $delegation);
-        self::trigger_event($delegation, $actorid, 'revoked', $delegation->origin);
-        return true;
+        $lockfactory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
+        $lock = $lockfactory->get_lock("delegation:{$quizid}:{$delegation->userid}", 10);
+        if (!$lock) {
+            throw new \moodle_exception('delegationlocktimeout', 'quizaccess_presencial');
+        }
+        try {
+            $transaction = $DB->start_delegated_transaction();
+            $delegation = $DB->get_record('quizaccess_presencial_delegation', [
+                'id' => $delegationid,
+                'quizid' => $quizid,
+            ], '*', MUST_EXIST);
+            if ($delegation->timerevoked) {
+                $transaction->allow_commit();
+                return false;
+            }
+
+            $delegation->timerevoked = $now;
+            $delegation->revokedby = $actorid;
+            $delegation->timemodified = $now;
+            $DB->update_record('quizaccess_presencial_delegation', $delegation);
+            self::trigger_event($delegation, $actorid, 'revoked', $delegation->origin);
+            $transaction->allow_commit();
+            return true;
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -221,13 +245,7 @@ final class delegation_manager {
      * @return bool Whether the account is eligible.
      */
     public static function is_eligible_user(int $userid): bool {
-        global $CFG, $DB;
-
-        $user = $DB->get_record('user', ['id' => $userid], 'id,deleted,suspended,confirmed,auth');
-        if (!$user || $user->deleted || $user->suspended || !$user->confirmed || $user->id == $CFG->siteguest) {
-            return false;
-        }
-        return $user->auth !== 'nologin' && is_enabled_auth($user->auth);
+        return applicator_eligibility::is_eligible_user($userid);
     }
 
     /**

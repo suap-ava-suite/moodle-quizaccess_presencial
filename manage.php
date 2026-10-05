@@ -56,7 +56,7 @@ if (optional_param('addapplicators', false, PARAM_BOOL)) {
 $revokeid = optional_param('revoke', 0, PARAM_INT);
 if ($revokeid) {
     require_sesskey();
-    delegation_manager::revoke($revokeid, (int) $USER->id);
+    delegation_manager::revoke((int) $quiz->id, $revokeid, (int) $USER->id);
     redirect(
         $url,
         get_string('delegationrevoked', 'quizaccess_presencial'),
@@ -87,6 +87,7 @@ if (!$delegations) {
     echo html_writer::tag('p', get_string('none'));
 } else {
     $table = new html_table();
+    $table->attributes['class'] = 'presencial-current-applicators';
     $table->head = [get_string('fullname'), get_string('delegationorigin', 'quizaccess_presencial'),
         get_string('authorizationperiodstart', 'quizaccess_presencial'),
         get_string('authorizationperiodend', 'quizaccess_presencial'), get_string('actions')];

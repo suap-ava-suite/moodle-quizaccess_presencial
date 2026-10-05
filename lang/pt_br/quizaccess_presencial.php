@@ -48,6 +48,7 @@ $string['ineligibleuser'] = 'Uma ou mais contas selecionadas não podem receber 
 $string['delegationincluded'] = 'Delegação de aplicação incluída.';
 $string['delegationrevoked'] = 'Delegação de aplicação revogada.';
 $string['delegationlocktimeout'] = 'Outra atualização da equipe de aplicação está em andamento. Tente novamente.';
+$string['delegationnotfound'] = 'A Delegação de aplicação selecionada não pertence a este Questionário.';
 $string['delegationorigin_direct'] = 'Inclusão direta';
 $string['delegationorigin_invite'] = 'Convite';
 $string['delegationorigin_unknown'] = 'Origem desconhecida';
