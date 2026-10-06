@@ -14,18 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace quizaccess_presencial\task;
+
 /**
- * Version information for the Presencial quiz access rule.
+ * Materialize expired invitations without duplicating transition events.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+final class expire_invitations extends \core\task\scheduled_task {
+    /**
+     * Get the translated task name.
+     * @return string Task name.
+     */
+    public function get_name(): string {
+        return get_string('taskexpireinvitations', 'quizaccess_presencial');
+    }
 
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.3.0';
-$plugin->version = 2026100600;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+    /** Expire due invitations under their quiz locks. */
+    public function execute(): void {
+        \quizaccess_presencial\local\invitation::expire_due();
+    }
+}
