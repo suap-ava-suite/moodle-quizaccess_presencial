@@ -45,7 +45,8 @@ $PAGE->set_heading(format_string($quiz->name));
 $PAGE->navbar->add(get_string('manageapplicators', 'quizaccess_presencial'));
 
 $selector = new applicator_selector('applicators', ['accesscontext' => $context]);
-if (optional_param('addapplicators', false, PARAM_BOOL)) {
+$submitteddata = data_submitted();
+if (!empty($submitteddata->addapplicators)) {
     require_sesskey();
     $users = $selector->get_selected_users();
     delegation_manager::include_users(
@@ -61,7 +62,7 @@ if (optional_param('addapplicators', false, PARAM_BOOL)) {
     );
 }
 
-$revokeid = optional_param('revoke', 0, PARAM_INT);
+$revokeid = $submitteddata ? clean_param($submitteddata->revoke ?? 0, PARAM_INT) : 0;
 if ($revokeid) {
     require_sesskey();
     delegation_manager::revoke((int) $quiz->id, $revokeid, (int) $USER->id);

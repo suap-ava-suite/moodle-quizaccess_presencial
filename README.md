@@ -34,7 +34,7 @@ Esta entrega fornece o componente instalável, a configuração global, o formul
 
 Ao habilitar **Liberação Presencial** nas configurações de um Questionário, o plugin grava na tabela `quizaccess_presencial` a configuração daquele Questionário e o início e o fim do Período de Autorização. Há somente um registro por Questionário; desabilitar a opção suspende a regra e preserva o período para uma reabilitação posterior. As alterações também geram o evento de configuração correspondente no log do Moodle.
 
-A partir das configurações do Questionário, o Professor pode abrir **Gerenciar equipe de aplicação**, incluir Contas elegíveis pelo seletor padrão do Moodle e revogar Delegações individualmente. Essas operações não criam matrícula nem atribuem papéis no curso. A inclusão repetida é idempotente; uma nova inclusão depois de revogação cria outro registro e preserva o anterior.
+No menu do Questionário, o Professor pode abrir **Gerenciar equipe de aplicação**, incluir Contas elegíveis pelo seletor padrão do Moodle e revogar Delegações individualmente. Essas operações não criam matrícula nem atribuem papéis no curso e exigem uma submissão POST com token de sessão válido. A inclusão repetida é idempotente; uma nova inclusão depois de revogação cria outro registro e preserva o anterior.
 
 Nesta etapa, a regra ainda não impede nem autoriza o início de novas tentativas. Em particular, ela não cria Solicitações de liberação, não emite Autorizações de tentativa e não oferece o fluxo para Professor ou Aplicador decidir essas solicitações. Assim, mesmo quando habilitada e com o período salvo, a Liberação Presencial não altera o fluxo nativo de tentativas do Questionário.
 
