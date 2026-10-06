@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $callbacks = [
     [
-        'hook' => \core\hook\navigation\secondary_extend::class,
-        'callback' => \quizaccess_presencial\hook_callbacks::class . '::extend_secondary_navigation',
+        'hook' => \core\hook\output\before_http_headers::class,
+        'callback' => \quizaccess_presencial\hook_callbacks::class . '::add_quiz_settings_link',
     ],
 ];

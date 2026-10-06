@@ -52,5 +52,4 @@ Feature: Manage the application team from a quiz
   Scenario: Student cannot find the application-team management entry
     Given I am on the "quiz1" "Activity" page logged in as "student1"
     Then I should not see "Manage application team"
-    When I open the application-team management page for "quiz1"
-    Then I should see "Sorry, but you do not currently have permissions to do that"
+    When I try to open the application-team management page for "quiz1" without permission

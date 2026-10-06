@@ -27,9 +27,9 @@ final class hook_callbacks {
     /**
      * Adds the application-team management page to Quiz navigation.
      *
-     * @param \core\hook\navigation\secondary_extend $hook Secondary navigation hook.
+     * @param \core\hook\output\before_http_headers $hook Before output starts.
      */
-    public static function extend_secondary_navigation(\core\hook\navigation\secondary_extend $hook): void {
+    public static function add_quiz_settings_link(\core\hook\output\before_http_headers $hook): void {
         global $PAGE;
 
         $cm = $PAGE->cm;
@@ -42,7 +42,12 @@ final class hook_callbacks {
             return;
         }
 
-        $hook->get_secondaryview()->add(
+        $modulesettings = $PAGE->settingsnav->find('modulesettings', \navigation_node::TYPE_SETTING);
+        if (!$modulesettings || $modulesettings->get('quizaccess_presencial_manageapplicators', \navigation_node::TYPE_SETTING)) {
+            return;
+        }
+
+        $modulesettings->add(
             get_string('manageapplicators', 'quizaccess_presencial'),
             new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $cm->id]),
             \navigation_node::TYPE_SETTING,

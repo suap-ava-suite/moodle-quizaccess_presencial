@@ -23,15 +23,24 @@
  */
 class behat_quizaccess_presencial extends behat_base {
     /**
-     * Opens the application-team management page for a Quiz.
+     * Verifies that direct access to the application-team management page is denied.
      *
-     * @When I open the application-team management page for :quizidnumber
+     * @When I try to open the application-team management page for :quizidnumber without permission
      * @param string $quizidnumber Quiz activity idnumber.
      */
-    public function i_open_the_application_team_management_page_for(string $quizidnumber): void {
-        $cm = get_coursemodule_from_idnumber('quiz', $quizidnumber, 0, false, MUST_EXIST);
+    public function i_try_to_open_the_application_team_management_page_for_without_permission(string $quizidnumber): void {
+        $cm = $this->get_cm_by_activity_name('quiz', $quizidnumber);
         $url = new moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $cm->id]);
+        $previousurl = $this->getSession()->getCurrentUrl();
         $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
+
+        $error = $this->getSession()->getPage()->find('css', '[data-rel="fatalerror"]');
+        if (!$error || !str_contains($error->getText(), 'Sorry, but you do not currently have permissions to do that')) {
+            throw new \Exception('Direct access to the application-team management page was not denied.');
+        }
+
+        // Leave the expected error page before Moodle's automatic exception check runs.
+        $this->getSession()->visit($previousurl);
     }
 
     /**
@@ -48,11 +57,14 @@ class behat_quizaccess_presencial extends behat_base {
             throw new \coding_exception('The management form must expose its selected account and session token.');
         }
 
-        $url = new moodle_url($form->getAttribute('action'), [
+        $params = [
             'addapplicators' => 1,
-            'applicators[]' => $selectedaccount->getValue(),
             'sesskey' => $sesskeyinput->getValue(),
-        ]);
+        ];
+        foreach ($selectedaccount->getValue() as $index => $userid) {
+            $params['applicators[' . $index . ']'] = $userid;
+        }
+        $url = new moodle_url($form->getAttribute('action'), $params);
         $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
     }
 
