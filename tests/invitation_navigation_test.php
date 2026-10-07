@@ -16,6 +16,7 @@
 
 namespace quizaccess_presencial;
 
+#[\PHPUnit\Framework\Attributes\CoversClass(hook_callbacks::class)]
 /**
  * Invitation navigation through Moodle's complete header render integration.
  *
@@ -33,6 +34,7 @@ final class invitation_navigation_test extends \advanced_testcase {
      * @param string $role Course role.
      * @param bool $expected Whether the Invitation link should be rendered.
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('navigation_provider')]
     public function test_rendered_activity_navigation(string $activity, string $role, bool $expected): void {
         global $PAGE, $OUTPUT;
 

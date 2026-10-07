@@ -59,7 +59,7 @@ class behat_quizaccess_presencial extends behat_base {
      * @Given /^I remember the generated invitation link$/
      */
     public function i_remember_the_generated_invitation_link(): void {
-        $this->previouslink = $this->find_field('Invitation link')->getValue();
+        $this->previouslink = $this->find_field('Invitation link')->getAttribute('value');
     }
 
     /**
@@ -68,9 +68,45 @@ class behat_quizaccess_presencial extends behat_base {
      * @Then /^the generated invitation link should differ from the previous link$/
      */
     public function the_generated_invitation_link_should_differ(): void {
-        $currentlink = $this->find_field('Invitation link')->getValue();
+        $currentlink = $this->find_field('Invitation link')->getAttribute('value');
         if ($this->previouslink === null || !$currentlink || $currentlink === $this->previouslink) {
             throw new ExpectationException('The regenerated invitation must have a different link.', $this->getSession());
+        }
+    }
+
+    /**
+     * Require the expected Moodle permission error and no invitation management controls.
+     *
+     * @Then /^accessing invitation management for "([^"]+)" should be denied$/
+     * @param string $quizname Quiz name.
+     */
+    public function invitation_management_should_be_denied(string $quizname): void {
+        $denied = false;
+        try {
+            $this->execute('behat_navigation::i_am_on_page_instance', [$quizname, 'quizaccess_presencial > Invitation']);
+        } catch (\Exception $exception) {
+            if (!preg_match('/(?:^|\n)Error code: nopermissions(?:\n|$)/', $exception->getMessage())) {
+                throw $exception;
+            }
+            $page = $this->getSession()->getPage();
+            $error = $page->find('css', '[data-rel="fatalerror"]');
+            if (
+                !$error ||
+                !str_contains($error->getText(), 'Sorry, but you do not currently have permissions to do that') ||
+                $page->findButton('Generate invitation') ||
+                $page->findButton('Regenerate invitation') ||
+                $page->findButton('Disable invitation') ||
+                $page->findField('Invitation link')
+            ) {
+                throw new ExpectationException('Expected a permission error without invitation controls.', $this->getSession());
+            }
+            $denied = true;
+        } finally {
+            // Leave the verified error response before Moodle checks the next step for unexpected exceptions.
+            $this->execute('behat_navigation::i_am_on_page_instance', [$quizname, 'mod_quiz > View']);
+        }
+        if (!$denied) {
+            throw new ExpectationException('Invitation management allowed an unauthorised user.', $this->getSession());
         }
     }
 

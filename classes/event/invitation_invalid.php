@@ -24,7 +24,9 @@ namespace quizaccess_presencial\event;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invitation_invalid extends \core\event\base {
-    /** Initialise event data. */
+    /**
+     * Initialise event data.
+     */
     protected function init(): void {
         $this->data['crud'] = 'r';
         $this->data['edulevel'] = self::LEVEL_OTHER;

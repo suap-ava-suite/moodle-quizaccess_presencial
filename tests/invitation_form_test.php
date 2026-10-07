@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->libdir . '/formslib.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(invitation::class)]
 /**
  * Invitation actions at Moodle's public form submission boundary.
  *

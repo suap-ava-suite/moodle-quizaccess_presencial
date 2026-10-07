@@ -32,7 +32,9 @@ final class expire_invitations extends \core\task\scheduled_task {
         return get_string('taskexpireinvitations', 'quizaccess_presencial');
     }
 
-    /** Expire due invitations under their quiz locks. */
+    /**
+     * Expire due invitations under their quiz locks.
+     */
     public function execute(): void {
         \quizaccess_presencial\local\invitation::expire_due();
     }

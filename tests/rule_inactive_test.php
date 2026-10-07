@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(\quizaccess_presencial::class)]
 /**
  * Tests for the inactive Presencial access rule.
  *

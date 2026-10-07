@@ -43,6 +43,7 @@ Feature: Manage the in-person release invitation
     Then I should see "Invitation link copied."
     And the "readonly" attribute of "#presencial-invitation-link" "css_element" should be set
 
+  @javascript
   Scenario: Disable an invitation and generate a replacement
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
     And I navigate to "Invitation" in current page administration
@@ -61,9 +62,7 @@ Feature: Manage the in-person release invitation
   Scenario: A student cannot access invitation management
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
     Then "Invitation" "link" should not exist in current page administration
-    When I am on the "Quiz 1" "quizaccess_presencial > Invitation" page
-    Then I should see "Sorry, but you do not currently have permissions to do that"
-    And "Generate invitation" "button" should not exist
+    And accessing invitation management for "Quiz 1" should be denied
 
   Scenario: An expired invitation stays secret and requires a replacement
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"

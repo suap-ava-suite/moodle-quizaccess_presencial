@@ -45,8 +45,13 @@ class hook_callbacks {
             return;
         }
         $url = new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $page->cm->id]);
-        $node = $settings->add(get_string('invitationmanage', 'quizaccess_presencial'), $url,
-            \navigation_node::TYPE_SETTING, null, 'quizaccess_presencial_invitation');
+        $node = $settings->add(
+            get_string('invitationmanage', 'quizaccess_presencial'),
+            $url,
+            \navigation_node::TYPE_SETTING,
+            null,
+            'quizaccess_presencial_invitation'
+        );
         $node->set_force_into_more_menu(true);
         if ($page->url->compare($url, URL_MATCH_EXACT)) {
             $node->make_active();

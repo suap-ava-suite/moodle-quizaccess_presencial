@@ -42,8 +42,8 @@ use quizaccess_presencial\local\invitation;
  */
 class provider implements
     \core_privacy\local\metadata\provider,
-    \core_privacy\local\request\plugin\provider,
-    \core_privacy\local\request\core_userlist_provider {
+    \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\plugin\provider {
     /**
      * Describe the invitation creator and lifecycle data.
      *
@@ -99,9 +99,11 @@ class provider implements
         if (!$quizid) {
             return;
         }
-        $userlist->add_from_sql('createdby',
+        $userlist->add_from_sql(
+            'createdby',
             'SELECT createdby FROM {quizaccess_presencial_invite} WHERE quizid = :quizid AND createdby > 0',
-            ['quizid' => $quizid]);
+            ['quizid' => $quizid]
+        );
     }
 
     /**

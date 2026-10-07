@@ -190,8 +190,10 @@ final class invitation {
         $cm = get_coursemodule_from_id('quiz', $cmid, 0, false, MUST_EXIST);
         quiz_lock::execute($cm->instance, function () use ($cm, $userids, $DB): void {
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
-            if (!$record || ($userids !== null && ((int) $record->createdby <= 0
-                    || !in_array((int) $record->createdby, $userids, true)))) {
+            if (
+                !$record || ($userids !== null && ((int) $record->createdby <= 0
+                    || !in_array((int) $record->createdby, $userids, true)))
+            ) {
                 return;
             }
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
@@ -219,9 +221,13 @@ final class invitation {
     public static function expire_due(): void {
         global $DB;
 
-        $records = $DB->get_recordset_select('quizaccess_presencial_invite',
+        $records = $DB->get_recordset_select(
+            'quizaccess_presencial_invite',
             'state = :state AND timeexpires <= :now',
-            ['state' => 'active', 'now' => \core\di::get(\core\clock::class)->time()], '', 'id,quizid');
+            ['state' => 'active', 'now' => \core\di::get(\core\clock::class)->time()],
+            '',
+            'id,quizid'
+        );
         try {
             foreach ($records as $record) {
                 $cm = get_coursemodule_from_instance('quiz', $record->quizid);
@@ -309,13 +315,22 @@ final class invitation {
     private static function can_issue(\stdClass $cm, ?\stdClass $configuration): bool {
         global $DB;
 
-        if (!$configuration || !$configuration->enabled
-                || $configuration->timeclose <= \core\di::get(\core\clock::class)->time()) {
+        if (
+            !$configuration || !$configuration->enabled
+                || $configuration->timeclose <= \core\di::get(\core\clock::class)->time()
+        ) {
             return false;
         }
         $quiz = $DB->get_record('quiz', ['id' => $cm->instance], 'id,timeopen,timeclose', MUST_EXIST);
-        return !authorization_period::validate(true, (int) $configuration->timeopen, (int) $configuration->timeclose,
-            (int) $quiz->timeopen, (int) $quiz->timeclose, \core\di::get(\core\clock::class)->time(), false);
+        return !authorization_period::validate(
+            true,
+            (int) $configuration->timeopen,
+            (int) $configuration->timeclose,
+            (int) $quiz->timeopen,
+            (int) $quiz->timeclose,
+            \core\di::get(\core\clock::class)->time(),
+            false
+        );
     }
 
     /**

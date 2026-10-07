@@ -55,8 +55,12 @@ if ($data = $form->get_data()) {
         $issued = invitation::generate($cm->id, $data->generation);
     } else if (!empty($data->disable)) {
         invitation::disable($cm->id, $data->generation);
-        redirect($url, get_string('invitationdisabled', 'quizaccess_presencial'), null,
-            \core\output\notification::NOTIFY_SUCCESS);
+        redirect(
+            $url,
+            get_string('invitationdisabled', 'quizaccess_presencial'),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
 }
 
@@ -79,8 +83,11 @@ if ($issued !== null) {
 } else {
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
         'state' => get_string('invitationstate_' . $status['state'], 'quizaccess_presencial'),
-        'expires' => $status['timeexpires'] ? get_string('invitationexpires', 'quizaccess_presencial',
-            userdate($status['timeexpires'])) : '',
+        'expires' => $status['timeexpires'] ? get_string(
+            'invitationexpires',
+            'quizaccess_presencial',
+            userdate($status['timeexpires'])
+        ) : '',
         'unavailable' => !$status['canissue'],
     ]);
     $form->display();

@@ -18,8 +18,7 @@ namespace quizaccess_presencial\privacy;
 
 use core_privacy\local\metadata\collection;
 
-defined('MOODLE_INTERNAL') || die();
-
+#[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 /**
  * Invitation metadata without Moodle database state.
  *
@@ -29,7 +28,9 @@ defined('MOODLE_INTERNAL') || die();
  * @covers     \quizaccess_presencial\privacy\provider
  */
 final class metadata_test extends \basic_testcase {
-    /** The registry describes the creator and invitation lifecycle data. */
+    /**
+     * The registry describes the creator and invitation lifecycle data.
+     */
     public function test_metadata_describes_invitation_personal_data(): void {
         $collection = provider::get_metadata(new collection('quizaccess_presencial'));
         $items = $collection->get_collection();

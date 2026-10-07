@@ -23,19 +23,12 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
 if (PHP_SAPI !== 'cli' || !in_array(count($argv), [4, 5], true)) {
     die;
 }
 
-$autoload = $argv[1] . '/vendor/autoload.php';
-if (!file_exists($autoload)) {
-    // Moodle 5.1 keeps Composer outside its public document root.
-    $autoload = dirname($argv[1]) . '/vendor/autoload.php';
-}
-require($autoload);
-// Utility bootstrap selects the isolated PHPUnit database without resetting the parent's data.
-define('PHPUNIT_UTIL', true);
-require($argv[1] . '/lib/phpunit/bootstrap.php');
 \advanced_testcase::setUser((int) $argv[3]);
 fwrite(STDOUT, "READY\n");
 fflush(STDOUT);

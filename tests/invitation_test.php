@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(invitation::class)]
 /**
  * Public invitation operations against Moodle persistence.
  *
@@ -66,7 +67,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertStringNotContainsString($issued['token'], json_encode($events[0]->get_data()));
     }
 
-    /** Regeneration atomically replaces the secret and refuses stale management forms. */
+    /**
+     * Regeneration atomically replaces the secret and refuses stale management forms.
+     */
     public function test_regeneration_rejects_previous_token_and_stale_generation(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -89,7 +92,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $second['token']));
     }
 
-    /** Disabling is idempotent; only explicitly regenerating restores link access. */
+    /**
+     * Disabling is idempotent; only explicitly regenerating restores link access.
+     */
     public function test_disabling_requires_regeneration_and_logs_once(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -102,8 +107,10 @@ final class invitation_test extends \advanced_testcase {
 
         $this->assertSame('disabled', invitation::get_status($quiz->cmid)['state']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
-        $transitions = array_filter($sink->get_events(),
-            fn($event) => $event instanceof \quizaccess_presencial\event\invitation_updated);
+        $transitions = array_filter(
+            $sink->get_events(),
+            fn($event) => $event instanceof \quizaccess_presencial\event\invitation_updated
+        );
         $this->assertCount(1, $transitions);
         $this->assertSame('disabled', reset($transitions)->get_data()['other']['action']);
         $replacement = invitation::generate($quiz->cmid, 1);
@@ -111,7 +118,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
     }
 
-    /** Expected stale-form refusal does not roll back an enclosing Moodle transaction. */
+    /**
+     * Expected stale-form refusal does not roll back an enclosing Moodle transaction.
+     */
     public function test_stale_form_preserves_an_outer_transaction(): void {
         global $DB;
 
@@ -131,7 +140,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertSame(1, invitation::get_status($quiz->cmid)['generation']);
     }
 
-    /** Expiry at the exact boundary is synchronous and the scheduled task is idempotent. */
+    /**
+     * Expiry at the exact boundary is synchronous and the scheduled task is idempotent.
+     */
     public function test_expiry_is_immediate_and_scheduled_processing_is_idempotent(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -156,7 +167,9 @@ final class invitation_test extends \advanced_testcase {
         invitation::generate($quiz->cmid, 1);
     }
 
-    /** Task processing expires an unused link, without a prior validation request. */
+    /**
+     * Task processing expires an unused link, without a prior validation request.
+     */
     public function test_scheduled_task_expires_an_unused_invitation(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -172,7 +185,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertSame('expired', invitation::get_status($quiz->cmid)['state']);
     }
 
-    /** Shortening irreversibly caps expiry; extending the period requires a new secret. */
+    /**
+     * Shortening irreversibly caps expiry; extending the period requires a new secret.
+     */
     public function test_period_reduction_and_extension_do_not_resurrect_the_invitation(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -192,7 +207,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
     }
 
-    /** Extending an already ended period before cron runs cannot revive an old invitation. */
+    /**
+     * Extending an already ended period before cron runs cannot revive an old invitation.
+     */
     public function test_extension_before_expiry_processing_cannot_resurrect_a_secret(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -207,7 +224,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertSame('expired', invitation::get_status($quiz->cmid)['state']);
     }
 
-    /** Re-enabling the rule preserves configuration but cannot restore an old invitation. */
+    /**
+     * Re-enabling the rule preserves configuration but cannot restore an old invitation.
+     */
     public function test_rule_disable_and_reenable_require_regeneration(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -226,7 +245,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
     }
 
-    /** User-facing validation never returns data or records a submitted secret. */
+    /**
+     * User-facing validation never returns data or records a submitted secret.
+     */
     public function test_invalid_inputs_have_a_uniform_result_and_secret_free_events(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -247,7 +268,9 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
     }
 
-    /** Quiz management capability is checked in each module, not just the course. */
+    /**
+     * Quiz management capability is checked in each module, not just the course.
+     */
     public function test_management_requires_capability_in_the_target_module(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -261,11 +284,13 @@ final class invitation_test extends \advanced_testcase {
         $this->setUser($teacher);
         $this->assertSame('active', invitation::get_status($quiz->cmid)['state']);
 
-        foreach ([
+        foreach (
+            [
             fn() => invitation::get_status($other->cmid),
             fn() => invitation::generate($other->cmid, 0),
             fn() => invitation::disable($other->cmid, 0),
-        ] as $operation) {
+            ] as $operation
+        ) {
             try {
                 $operation();
                 $this->fail('Management requires permission in the target quiz.');
@@ -276,10 +301,10 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
     }
 
-    /** Concurrent first-generation requests yield one usable token and one stale-form rejection. */
+    /**
+     * Concurrent first-generation requests yield one usable token and one stale-form rejection.
+     */
     public function test_concurrent_generation_preserves_one_current_invitation(): void {
-        global $CFG, $USER;
-
         $this->resetAfterTest();
         $this->preventResetByRollback();
         $this->setAdminUser();
@@ -287,10 +312,11 @@ final class invitation_test extends \advanced_testcase {
         $workers = [];
         try {
             for ($i = 0; $i < 2; $i++) {
-                $process = proc_open([
-                    PHP_BINARY, '-d', 'max_input_vars=5000',
-                    __DIR__ . '/fixtures/invitation_worker.php', $CFG->dirroot, $quiz->cmid, $USER->id,
-                ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+                $process = proc_open(
+                    $this->worker_command($quiz),
+                    [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                    $pipes
+                );
                 $this->assertIsResource($process);
                 $workers[] = ['process' => $process, 'pipes' => $pipes];
                 stream_set_timeout($pipes[1], 30);
@@ -329,19 +355,22 @@ final class invitation_test extends \advanced_testcase {
         }
     }
 
-    /** A waiting process cannot prevent further invitation operations in the transaction owning the quiz. */
+    /**
+     * A waiting process cannot prevent further invitation operations in the transaction owning the quiz.
+     */
     public function test_concurrent_status_does_not_deadlock_an_outer_transaction(): void {
-        global $CFG, $DB, $USER;
+        global $DB;
 
         $this->resetAfterTest();
         $this->preventResetByRollback();
         $this->setAdminUser();
         $quiz = $this->configured_quiz();
         $first = invitation::generate($quiz->cmid, 0);
-        $process = proc_open([
-            PHP_BINARY, '-d', 'max_input_vars=5000',
-            __DIR__ . '/fixtures/invitation_worker.php', $CFG->dirroot, $quiz->cmid, $USER->id, 'status',
-        ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $process = proc_open(
+            $this->worker_command($quiz, 'status'),
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes
+        );
         $this->assertIsResource($process);
         $transaction = null;
         try {
@@ -380,7 +409,9 @@ final class invitation_test extends \advanced_testcase {
         }
     }
 
-    /** Deleting quiz plugin settings also invalidates its current invitation. */
+    /**
+     * Deleting quiz plugin settings also invalidates its current invitation.
+     */
     public function test_quiz_deletion_removes_the_invitation(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -389,6 +420,32 @@ final class invitation_test extends \advanced_testcase {
         \quizaccess_presencial::delete_settings($quiz);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertSame('none', invitation::get_status($quiz->cmid)['state']);
+    }
+
+    /**
+     * Bootstrap an independent Moodle PHPUnit connection before loading the internal worker fixture.
+     *
+     * @param \stdClass $quiz Configured quiz.
+     * @param string $mode Public invitation operation to exercise.
+     * @return array Command arguments for the child PHP process.
+     */
+    private function worker_command(\stdClass $quiz, string $mode = 'generate'): array {
+        global $CFG, $USER;
+
+        $bootstrap = <<<'PHP'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            // Moodle 5.1 keeps Composer outside its public document root.
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        // Select the isolated PHPUnit database without resetting the parent's data.
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/invitation_worker.php');
+        PHP;
+
+        return [PHP_BINARY, '-d', 'max_input_vars=5000', '-r', $bootstrap, $CFG->dirroot, $quiz->cmid, $USER->id, $mode];
     }
 
     /**

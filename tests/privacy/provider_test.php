@@ -29,6 +29,9 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 
+#[\PHPUnit\Framework\Attributes\Group('quizaccess_presencial')]
+#[\PHPUnit\Framework\Attributes\Group('core_privacy')]
+#[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 /**
  * Privacy API behaviour for the current invitation.
  *
@@ -170,7 +173,10 @@ final class provider_test extends provider_testcase {
         provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
         provider::delete_data_for_users(new approved_userlist(
-            \context_course::instance($quiz->course), 'quizaccess_presencial', [$replacement->id]));
+            \context_course::instance($quiz->course),
+            'quizaccess_presencial',
+            [$replacement->id]
+        ));
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
 
         provider::delete_data_for_users(new approved_userlist($context, 'quizaccess_presencial', [
@@ -207,11 +213,13 @@ final class provider_test extends provider_testcase {
         $issued = invitation::generate($quiz->cmid, 0);
         $otherissued = invitation::generate($other->cmid, 0);
 
-        foreach ([
+        foreach (
+            [
             \context_system::instance(),
             \context_course::instance($quiz->course),
             \context_module::instance($forum->cmid),
-        ] as $unrelated) {
+            ] as $unrelated
+        ) {
             $users = new userlist($unrelated, 'quizaccess_presencial');
             provider::get_users_in_context($users);
             $this->assertEmpty($users->get_userids());
@@ -237,7 +245,9 @@ final class provider_test extends provider_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
     }
 
-    /** Context erasure cannot make a pre-erasure form target the replacement invitation. */
+    /**
+     * Context erasure cannot make a pre-erasure form target the replacement invitation.
+     */
     public function test_context_erasure_rejects_old_disable_and_regenerate_forms(): void {
         $this->resetAfterTest();
         $creator = self::getDataGenerator()->create_user();
@@ -271,6 +281,7 @@ final class provider_test extends provider_testcase {
      * @param string $scope Approved erasure scope.
      * @param string $state Initial invitation state.
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('erasure_provider')]
     public function test_erasure_audits_only_live_invitations(string $scope, string $state): void {
         global $DB, $USER;
 

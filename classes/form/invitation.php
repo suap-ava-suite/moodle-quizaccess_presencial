@@ -42,8 +42,11 @@ class invitation extends \moodleform {
             $actions[] = $mform->createElement('submit', 'generate', get_string($label, 'quizaccess_presencial'));
         }
         if ($status['state'] === 'active') {
-            $actions[] = $mform->createElement('submit', 'disable',
-                get_string('invitationdisable', 'quizaccess_presencial'));
+            $actions[] = $mform->createElement(
+                'submit',
+                'disable',
+                get_string('invitationdisable', 'quizaccess_presencial')
+            );
         }
         if ($actions) {
             $mform->addGroup($actions, 'actions', '', ' ', false);
