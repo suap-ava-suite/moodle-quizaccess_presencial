@@ -24,9 +24,6 @@ namespace quizaccess_presencial\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class quiz_lock {
-    /** @var array<int, bool> Quiz locks held by this request. */
-    private static array $held = [];
-
     /**
      * Run an operation atomically, including when the caller owns an outer transaction.
      *
@@ -37,29 +34,16 @@ final class quiz_lock {
     public static function execute(int $quizid, callable $operation): mixed {
         global $DB;
 
-        if (isset(self::$held[$quizid])) {
-            return $operation();
-        }
-        $factory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
-        $lock = $factory->get_lock('quiz:' . $quizid, 10);
-        if (!$lock) {
-            throw new \moodle_exception('locktimeout');
-        }
+        $transaction = $DB->start_delegated_transaction();
         try {
-            self::$held[$quizid] = true;
-            $transaction = $DB->start_delegated_transaction();
-            try {
-                // Keep the row lock until the outer Moodle transaction commits, on both supported databases.
-                $DB->get_records_sql('SELECT id FROM {quiz} WHERE id = :id FOR UPDATE', ['id' => $quizid]);
-                $result = $operation();
-                $transaction->allow_commit();
-                return $result;
-            } catch (\Throwable $exception) {
-                $transaction->rollback($exception);
-            }
-        } finally {
-            unset(self::$held[$quizid]);
-            $lock->release();
+            // PostgreSQL and MariaDB retain this lock until the outermost delegated transaction ends.
+            // Re-entering on the same connection is safe; no separately released Lock API lock can block it.
+            $DB->get_records_sql('SELECT id FROM {quiz} WHERE id = :id FOR UPDATE', ['id' => $quizid]);
+            $result = $operation();
+            $transaction->allow_commit();
+            return $result;
+        } catch (\Throwable $exception) {
+            $transaction->rollback($exception);
         }
     }
 }

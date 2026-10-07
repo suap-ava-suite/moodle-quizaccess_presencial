@@ -228,13 +228,110 @@ final class provider_test extends provider_testcase {
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertTrue(invitation::validate($other->cmid, $otherissued['token']));
         $this->assertEquals([$othercontext->id], provider::get_contexts_for_userid($creator->id)->get_contextids());
-        $this->assertSame(0, invitation::get_status($quiz->cmid)['generation']);
+        $this->assertSame(1, invitation::get_status($quiz->cmid)['generation']);
         $this->export_context_data_for_user($creator->id, $context, 'quizaccess_presencial');
         $this->assertFalse(writer::with_context($context)->has_any_data());
-        $replacement = invitation::generate($quiz->cmid, 0);
-        $this->assertSame(1, $replacement['generation']);
+        $replacement = invitation::generate($quiz->cmid, 1);
+        $this->assertSame(2, $replacement['generation']);
         $this->assertSame($issued['timeexpires'], $replacement['timeexpires']);
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
+    }
+
+    /** Context erasure cannot make a pre-erasure form target the replacement invitation. */
+    public function test_context_erasure_rejects_old_disable_and_regenerate_forms(): void {
+        $this->resetAfterTest();
+        $creator = self::getDataGenerator()->create_user();
+        $quiz = $this->configured_quiz([$creator]);
+        $context = \context_module::instance($quiz->cmid);
+        $this->setUser($creator);
+        $first = invitation::generate($quiz->cmid, 0);
+
+        provider::delete_data_for_all_users_in_context($context);
+        $erased = invitation::get_status($quiz->cmid);
+        $replacement = invitation::generate($quiz->cmid, $erased['generation']);
+        $current = invitation::get_status($quiz->cmid);
+
+        foreach (['disable', 'generate'] as $action) {
+            try {
+                invitation::$action($quiz->cmid, $first['generation']);
+                $this->fail('A pre-erasure form must not alter the replacement invitation.');
+            } catch (\moodle_exception $exception) {
+                $this->assertSame('invitationstale', $exception->errorcode);
+            }
+            $this->assertSame($current, invitation::get_status($quiz->cmid));
+            $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
+            $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
+        }
+    }
+
+    /**
+     * Privacy audits a live invalidation once and does not re-audit an already invalid invitation.
+     *
+     * @dataProvider erasure_provider
+     * @param string $scope Approved erasure scope.
+     * @param string $state Initial invitation state.
+     */
+    public function test_erasure_audits_only_live_invitations(string $scope, string $state): void {
+        global $DB, $USER;
+
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(strtotime('2030-01-01 09:00:00 UTC'));
+        $creator = self::getDataGenerator()->create_user();
+        $quiz = $this->configured_quiz([$creator]);
+        $context = \context_module::instance($quiz->cmid);
+        $this->setUser($creator);
+        $issued = invitation::generate($quiz->cmid, 0);
+        $hash = $DB->get_field('quizaccess_presencial_invite', 'tokenhash', ['quizid' => $quiz->id], MUST_EXIST);
+        if ($state === 'disabled') {
+            invitation::disable($quiz->cmid, 1);
+        } else if ($state === 'expired' || $state === 'due') {
+            $clock->set_to($issued['timeexpires']);
+            if ($state === 'expired') {
+                (new \quizaccess_presencial\task\expire_invitations())->execute();
+            }
+        }
+        $this->setAdminUser();
+        $sink = $this->redirectEvents();
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            if ($scope === 'context') {
+                provider::delete_data_for_all_users_in_context($context);
+            } else if ($scope === 'batch') {
+                provider::delete_data_for_users(new approved_userlist($context, 'quizaccess_presencial', [$creator->id]));
+            } else {
+                provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
+            }
+        }
+
+        $events = $sink->get_events();
+        $this->assertCount(in_array($state, ['active', 'due'], true) ? 1 : 0, $events);
+        if ($state === 'active' || $state === 'due') {
+            $this->assertInstanceOf(\quizaccess_presencial\event\invitation_updated::class, $events[0]);
+            $data = $events[0]->get_data();
+            $this->assertSame($state === 'active' ? 'disabled' : 'expired', $data['other']['action']);
+            $this->assertEquals($context->id, $data['contextid']);
+            $this->assertEquals($quiz->id, $data['objectid']);
+            $this->assertEquals($USER->id, $data['userid']);
+            $this->assertEqualsCanonicalizing(['action', 'generation', 'timeexpires'], array_keys($data['other']));
+            $this->assertStringNotContainsString($issued['token'], json_encode($data));
+            $this->assertStringNotContainsString($hash, json_encode($data));
+            $this->assertStringNotContainsString('token=', json_encode($data));
+        }
+        $this->assertEmpty(provider::get_contexts_for_userid($creator->id)->get_contextids());
+        $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
+     * Erasure scopes, materialized states, and an expiration not yet processed by the task.
+     * @return array
+     */
+    public static function erasure_provider(): array {
+        $cases = [];
+        foreach (['individual', 'batch', 'context'] as $scope) {
+            foreach (['active', 'disabled', 'expired', 'due'] as $state) {
+                $cases[$scope . ' ' . $state] = [$scope, $state];
+            }
+        }
+        return $cases;
     }
 
     /**

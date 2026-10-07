@@ -175,6 +175,44 @@ final class invitation {
     }
 
     /**
+     * Erase approved creator data while retaining only the nonpersonal generation marker.
+     *
+     * The Privacy API supplies the approved quiz context and, for user erasure, the approved creators.
+     * This is not a management action and does not require the erased user's management capability.
+     *
+     * @param int $cmid Quiz course module.
+     * @param array|null $userids Approved creators, or null for all users in the quiz context.
+     * @return void
+     */
+    public static function erase_user_data(int $cmid, ?array $userids = null): void {
+        global $DB;
+
+        $cm = get_coursemodule_from_id('quiz', $cmid, 0, false, MUST_EXIST);
+        quiz_lock::execute($cm->instance, function () use ($cm, $userids, $DB): void {
+            $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
+            if (!$record || ($userids !== null && ((int) $record->createdby <= 0
+                    || !in_array((int) $record->createdby, $userids, true)))) {
+                return;
+            }
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
+            self::reconcile($cm, $record, $configuration ?: null);
+            if ($record->state === 'active' && self::can_issue($cm, $configuration ?: null)) {
+                self::end_invitation($cm, $record, 'disabled');
+            }
+            // Keep the marker even for context-wide erasure so an old form cannot target a later invitation.
+            $record->createdby = 0;
+            $record->tokenhash = '';
+            if ($record->state === 'active') {
+                $record->state = 'disabled';
+            }
+            $record->timecreated = 0;
+            $record->timemodified = 0;
+            $record->timeexpires = 0;
+            $DB->update_record('quizaccess_presencial_invite', $record);
+        });
+    }
+
+    /**
      * Materialize due expirations; synchronous validation uses the same transition.
      * @return void
      */

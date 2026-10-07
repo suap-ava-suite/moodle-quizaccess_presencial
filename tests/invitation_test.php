@@ -329,6 +329,57 @@ final class invitation_test extends \advanced_testcase {
         }
     }
 
+    /** A waiting process cannot prevent further invitation operations in the transaction owning the quiz. */
+    public function test_concurrent_status_does_not_deadlock_an_outer_transaction(): void {
+        global $CFG, $DB, $USER;
+
+        $this->resetAfterTest();
+        $this->preventResetByRollback();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $first = invitation::generate($quiz->cmid, 0);
+        $process = proc_open([
+            PHP_BINARY, '-d', 'max_input_vars=5000',
+            __DIR__ . '/fixtures/invitation_worker.php', $CFG->dirroot, $quiz->cmid, $USER->id, 'status',
+        ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            $this->assertSame("READY\n", fgets($pipes[1]));
+            $transaction = $DB->start_delegated_transaction();
+            $second = invitation::generate($quiz->cmid, 1);
+            fwrite($pipes[0], "GO\n");
+            fflush($pipes[0]);
+            $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
+
+            // The independent request must wait for the outer commit, not return the old generation.
+            $read = [$pipes[1]];
+            $write = $except = [];
+            $this->assertSame(0, stream_select($read, $write, $except, 1));
+            $this->assertSame(2, invitation::get_status($quiz->cmid)['generation']);
+            $this->assertTrue(invitation::validate($quiz->cmid, $second['token']));
+            $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
+            $transaction->allow_commit();
+            $transaction = null;
+
+            $result = json_decode(stream_get_contents($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame(['state' => 'active', 'generation' => 2], $result);
+            $this->assertSame('', stream_get_contents($pipes[2]));
+        } catch (\Throwable $exception) {
+            if ($transaction !== null) {
+                $transaction->rollback($exception);
+            }
+            throw $exception;
+        } finally {
+            proc_terminate($process);
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            proc_close($process);
+        }
+    }
+
     /** Deleting quiz plugin settings also invalidates its current invitation. */
     public function test_quiz_deletion_removes_the_invitation(): void {
         $this->resetAfterTest();

@@ -73,4 +73,25 @@ class behat_quizaccess_presencial extends behat_base {
             throw new ExpectationException('The regenerated invitation must have a different link.', $this->getSession());
         }
     }
+
+    /**
+     * Arrange elapsed time through Moodle's clock and public expiry task, without editing invitation storage.
+     *
+     * @Given /^the generated invitation for "([^"]+)" has expired$/
+     * @param string $quizname Quiz name.
+     */
+    public function the_generated_invitation_has_expired(string $quizname): void {
+        global $CFG, $DB;
+
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        require_once($CFG->libdir . '/testing/classes/frozen_clock.php');
+        $clock = \core\di::get(\core\clock::class);
+        try {
+            \core\di::set(\core\clock::class, new \frozen_clock((int) $quiz->presencial_timeclose));
+            (new \quizaccess_presencial\task\expire_invitations())->execute();
+        } finally {
+            \core\di::set(\core\clock::class, $clock);
+        }
+    }
 }

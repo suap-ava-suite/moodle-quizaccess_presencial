@@ -65,6 +65,22 @@ Feature: Manage the in-person release invitation
     Then I should see "Sorry, but you do not currently have permissions to do that"
     And "Generate invitation" "button" should not exist
 
+  Scenario: An expired invitation stays secret and requires a replacement
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Invitation" in current page administration
+    And I press "Generate invitation"
+    And I remember the generated invitation link
+    And the generated invitation for "Quiz 1" has expired
+    When I follow "Return to invitation management"
+    Then I should see "The invitation has expired."
+    And "Invitation link" "field" should not exist
+    And "Disable invitation" "button" should not exist
+    When I press "Regenerate invitation"
+    Then the generated invitation link should differ from the previous link
+    When I follow "Return to invitation management"
+    Then I should see "The invitation is active."
+    And "Invitation link" "field" should not exist
+
   Scenario: An expired authorization period does not allow issuing invitations
     Given the following "activities" exist:
       | activity | name         | course | idnumber    | presencial_enabled | presencial_timeopen       | presencial_timeclose      |

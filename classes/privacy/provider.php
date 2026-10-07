@@ -31,7 +31,7 @@ use core_privacy\local\request\contextlist;
 use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
-use quizaccess_presencial\local\quiz_lock;
+use quizaccess_presencial\local\invitation;
 
 /**
  * Describe and remove personal data associated with the current invitation.
@@ -140,21 +140,17 @@ class provider implements
     }
 
     /**
-     * Remove invitations for all users within the requested quiz context.
+     * Erase creator data for all users within the requested quiz context.
      *
      * @param \context $context Requested context.
      * @return void
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
-        global $DB;
-
         $quizid = self::quizid_for_context($context);
         if (!$quizid) {
             return;
         }
-        quiz_lock::execute($quizid, function () use ($quizid, $DB): void {
-            $DB->delete_records('quizaccess_presencial_invite', ['quizid' => $quizid]);
-        });
+        invitation::erase_user_data($context->instanceid);
     }
 
     /**
@@ -191,29 +187,11 @@ class provider implements
      * @return void
      */
     private static function anonymize_creators(\context $context, array $userids): void {
-        global $DB;
-
         $quizid = self::quizid_for_context($context);
         if (!$quizid || !$userids) {
             return;
         }
-        $userids = array_map('intval', $userids);
-        quiz_lock::execute($quizid, function () use ($quizid, $userids, $DB): void {
-            $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quizid], 'id,createdby');
-            if (!$record || (int) $record->createdby <= 0 || !in_array((int) $record->createdby, $userids, true)) {
-                return;
-            }
-            // Retain the generation so a pre-erasure management form remains stale after regeneration.
-            $DB->update_record('quizaccess_presencial_invite', (object) [
-                'id' => $record->id,
-                'createdby' => 0,
-                'state' => 'disabled',
-                'tokenhash' => '',
-                'timecreated' => 0,
-                'timemodified' => 0,
-                'timeexpires' => 0,
-            ]);
-        });
+        invitation::erase_user_data($context->instanceid, array_map('intval', $userids));
     }
 
     /**

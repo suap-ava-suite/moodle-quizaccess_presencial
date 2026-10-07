@@ -23,7 +23,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-if (PHP_SAPI !== 'cli' || count($argv) !== 4) {
+if (PHP_SAPI !== 'cli' || !in_array(count($argv), [4, 5], true)) {
     die;
 }
 
@@ -41,8 +41,15 @@ fwrite(STDOUT, "READY\n");
 fflush(STDOUT);
 fgets(STDIN);
 try {
-    $result = \quizaccess_presencial\local\invitation::generate((int) $argv[2], 0);
-    echo json_encode(['token' => $result['token']]);
+    if (($argv[4] ?? '') === 'status') {
+        fwrite(STDOUT, "ATTEMPTING\n");
+        fflush(STDOUT);
+        $result = \quizaccess_presencial\local\invitation::get_status((int) $argv[2]);
+        echo json_encode(['state' => $result['state'], 'generation' => $result['generation']]);
+    } else {
+        $result = \quizaccess_presencial\local\invitation::generate((int) $argv[2], 0);
+        echo json_encode(['token' => $result['token']]);
+    }
 } catch (\moodle_exception $exception) {
     echo json_encode(['error' => $exception->errorcode]);
 }
