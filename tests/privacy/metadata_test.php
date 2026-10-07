@@ -20,7 +20,7 @@ use core_privacy\local\metadata\collection;
 
 #[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 /**
- * Invitation metadata without Moodle database state.
+ * Delegation and invitation metadata without Moodle database state.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -29,17 +29,24 @@ use core_privacy\local\metadata\collection;
  */
 final class metadata_test extends \basic_testcase {
     /**
-     * The registry describes the creator and invitation lifecycle data.
+     * The registry describes the delegation data and the invitation creator and lifecycle data.
      */
-    public function test_metadata_describes_invitation_personal_data(): void {
+    public function test_metadata_describes_delegation_and_invitation_personal_data(): void {
         $collection = provider::get_metadata(new collection('quizaccess_presencial'));
-        $items = $collection->get_collection();
+        $items = [];
+        foreach ($collection->get_collection() as $item) {
+            $items[$item->get_name()] = $item;
+        }
 
-        $this->assertCount(1, $items);
-        $item = reset($items);
-        $this->assertSame('quizaccess_presencial_invite', $item->get_name());
+        $this->assertEqualsCanonicalizing(
+            ['quizaccess_presencial_delegation', 'quizaccess_presencial_invite'],
+            array_keys($items),
+        );
+        $this->assertEqualsCanonicalizing([
+            'quizid', 'userid', 'timeopen', 'timeclose', 'origin', 'timecreated', 'timemodified', 'timerevoked', 'revokedby',
+        ], array_keys($items['quizaccess_presencial_delegation']->get_privacy_fields()));
         $this->assertEqualsCanonicalizing([
             'createdby', 'generation', 'state', 'timecreated', 'timemodified', 'timeexpires',
-        ], array_keys($item->get_privacy_fields()));
+        ], array_keys($items['quizaccess_presencial_invite']->get_privacy_fields()));
     }
 }

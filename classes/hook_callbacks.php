@@ -17,20 +17,19 @@
 namespace quizaccess_presencial;
 
 /**
- * Integrate invitation management into the contextual quiz navigation.
+ * Navigation callbacks for Liberação Presencial.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class hook_callbacks {
+final class hook_callbacks {
     /**
-     * Add the manager's activity administration link before navigation is rendered.
+     * Add the application-team and invitation management page before navigation is rendered.
      *
-     * @param \core\hook\output\before_http_headers $hook Output hook.
-     * @return void
+     * @param \core\hook\output\before_http_headers $hook Before output starts.
      */
-    public static function before_http_headers(\core\hook\output\before_http_headers $hook): void {
+    public static function add_quiz_settings_link(\core\hook\output\before_http_headers $hook): void {
         $page = $hook->renderer->get_page();
         if (!$page->cm || $page->cm->modname !== 'quiz' || $page->context->contextlevel !== CONTEXT_MODULE) {
             return;
@@ -41,16 +40,16 @@ class hook_callbacks {
         }
 
         $settings = $page->settingsnav->find('modulesettings', \navigation_node::TYPE_SETTING);
-        if (!$settings || $settings->find('quizaccess_presencial_invitation', \navigation_node::TYPE_SETTING)) {
+        if (!$settings || $settings->find('quizaccess_presencial_manageapplicators', \navigation_node::TYPE_SETTING)) {
             return;
         }
         $url = new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $page->cm->id]);
         $node = $settings->add(
-            get_string('invitationmanage', 'quizaccess_presencial'),
+            get_string('manageapplicators', 'quizaccess_presencial'),
             $url,
             \navigation_node::TYPE_SETTING,
             null,
-            'quizaccess_presencial_invitation'
+            'quizaccess_presencial_manageapplicators'
         );
         $node->set_force_into_more_menu(true);
         if ($page->url->compare($url, URL_MATCH_EXACT)) {

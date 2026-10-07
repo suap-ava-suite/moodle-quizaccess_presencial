@@ -18,21 +18,21 @@ namespace quizaccess_presencial;
 
 #[\PHPUnit\Framework\Attributes\CoversClass(hook_callbacks::class)]
 /**
- * Invitation navigation through Moodle's complete header render integration.
+ * Application-team and invitation management navigation through Moodle's complete header render integration.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \quizaccess_presencial\hook_callbacks
  */
-final class invitation_navigation_test extends \advanced_testcase {
+final class management_navigation_test extends \advanced_testcase {
     /**
-     * Only quiz managers receive the Invitation link when Moodle builds its header.
+     * Only quiz managers receive the management link when Moodle builds its header.
      *
      * @dataProvider navigation_provider
      * @param string $activity Activity type.
      * @param string $role Course role.
-     * @param bool $expected Whether the Invitation link should be rendered.
+     * @param bool $expected Whether the management link should be rendered.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('navigation_provider')]
     public function test_rendered_activity_navigation(string $activity, string $role, bool $expected): void {
@@ -65,7 +65,7 @@ final class invitation_navigation_test extends \advanced_testcase {
         $links = $xpath->query('//nav//a[@href="' . $url->out(false) . '"]');
         $this->assertCount($expected ? 1 : 0, $links);
         if ($expected) {
-            $this->assertSame(get_string('invitationmanage', 'quizaccess_presencial'), trim($links->item(0)->textContent));
+            $this->assertSame(get_string('manageapplicators', 'quizaccess_presencial'), trim($links->item(0)->textContent));
             $this->assertSame('true', $links->item(0)->parentNode->getAttribute('data-forceintomoremenu'));
         }
     }

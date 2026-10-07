@@ -22,7 +22,7 @@ Feature: Manage the in-person release invitation
 
   Scenario: Generate a link through quiz navigation and hide it after returning
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
-    When I navigate to "Invitation" in current page administration
+    When I navigate to "Manage application team" in current page administration
     Then I should see "No invitation has been generated."
     When I press "Generate invitation"
     Then I should see "Invitation generated"
@@ -37,7 +37,7 @@ Feature: Manage the in-person release invitation
   @javascript
   Scenario: Copy the generated link with Moodle feedback
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
-    And I navigate to "Invitation" in current page administration
+    And I navigate to "Manage application team" in current page administration
     When I press "Generate invitation"
     And I press "Copy invitation link"
     Then I should see "Invitation link copied."
@@ -46,7 +46,7 @@ Feature: Manage the in-person release invitation
   @javascript
   Scenario: Disable an invitation and generate a replacement
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
-    And I navigate to "Invitation" in current page administration
+    And I navigate to "Manage application team" in current page administration
     And I press "Generate invitation"
     And I remember the generated invitation link
     And I follow "Return to invitation management"
@@ -61,12 +61,12 @@ Feature: Manage the in-person release invitation
 
   Scenario: A student cannot access invitation management
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
-    Then "Invitation" "link" should not exist in current page administration
+    Then "Manage application team" "link" should not exist in current page administration
     And accessing invitation management for "Quiz 1" should be denied
 
   Scenario: An expired invitation stays secret and requires a replacement
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
-    And I navigate to "Invitation" in current page administration
+    And I navigate to "Manage application team" in current page administration
     And I press "Generate invitation"
     And I remember the generated invitation link
     And the generated invitation for "Quiz 1" has expired
@@ -85,6 +85,6 @@ Feature: Manage the in-person release invitation
       | activity | name         | course | idnumber    | presencial_enabled | presencial_timeopen       | presencial_timeclose      |
       | quiz     | Expired quiz | C1     | expiredquiz | 1                  | ## 1 January 2020 08:00 ## | ## 2 January 2020 20:00 ## |
     And I am on the "Expired quiz" "mod_quiz > View" page logged in as "teacher1"
-    When I navigate to "Invitation" in current page administration
+    When I navigate to "Manage application team" in current page administration
     Then I should see "Enable in-person release and set a valid authorization period before generating an invitation."
     And "Generate invitation" "button" should not exist

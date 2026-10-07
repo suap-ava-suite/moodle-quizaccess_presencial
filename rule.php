@@ -272,6 +272,7 @@ class quizaccess_presencial extends access_rule_base {
         global $DB;
         quiz_lock::execute($quiz->id, function () use ($quiz, $DB): void {
             $DB->delete_records('quizaccess_presencial_invite', ['quizid' => $quiz->id]);
+            $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quiz->id]);
             $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
         });
     }

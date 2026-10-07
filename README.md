@@ -30,11 +30,13 @@ Valores de prazo inválidos não são salvos.
 
 ## Estado atual
 
-Esta entrega fornece o componente instalável, a configuração global, o formulário de configuração por Questionário, a gestão do Convite por link, internacionalização, Privacy API e testes automatizados.
+Esta entrega fornece o componente instalável, a configuração global, o formulário de configuração por Questionário, o gerenciamento direto da equipe de aplicação, a gestão do Convite por link, internacionalização, Privacy API e testes automatizados.
 
 Ao habilitar **Liberação Presencial** nas configurações de um Questionário, o plugin grava na tabela `quizaccess_presencial` a configuração daquele Questionário e o início e o fim do Período de Autorização. Há somente um registro por Questionário; desabilitar a opção suspende a regra e preserva o período para uma reabilitação posterior. As alterações também geram o evento de configuração correspondente no log do Moodle.
 
-Professores com `mod/quiz:manage` no contexto do Questionário encontram **Convite** no menu **Mais**. O link completo aparece somente na resposta à geração, com um botão para copiá-lo. A página posterior mostra apenas o estado e a validade. Regenerar substitui imediatamente o segredo anterior; desativar impede seu uso. Desabilitar e reabilitar a regra também exige gerar outro convite.
+No menu **Mais** do Questionário, o Professor com `mod/quiz:manage` no contexto do Questionário abre **Gerenciar equipe de aplicação**, inclui Contas elegíveis pelo seletor padrão do Moodle e revoga Delegações individualmente. Essas operações não criam matrícula nem atribuem papéis no curso e exigem uma submissão POST com token de sessão válido. A inclusão repetida é idempotente; uma nova inclusão depois de revogação cria outro registro e preserva o anterior.
+
+A mesma página reúne a gestão do **Convite** por link. O link completo aparece somente na resposta à geração, com um botão para copiá-lo. A página posterior mostra apenas o estado e a validade. Regenerar substitui imediatamente o segredo anterior; desativar impede seu uso. Desabilitar e reabilitar a regra também exige gerar outro convite.
 
 O convite pode ser gerado e validado antes do início do Período de Autorização, mas expira no seu fim. Encurtar o período limita a validade definitivamente; ampliá-lo depois não estende nem reativa o convite existente. A validação aplica a expiração imediatamente, e uma tarefa agendada materializa as expirações pendentes sem repetir eventos. Transições de convite e tentativas de uso inválido são registradas pela Events API, sem o token.
 
@@ -94,7 +96,7 @@ Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 ### Testes automatizados
 
-A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre geração, rejeição de tokens, estados, concorrência, integração com configuração, navegação, CSRF e privacidade; Behat cobre as jornadas de gestão e cópia do link. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
+A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade; Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash
 moodle-plugin-ci phpunit --fail-on-warning
@@ -103,7 +105,7 @@ moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
 
 ## Privacidade
 
-O registro do convite guarda a referência ao Professor que o gerou e dados mínimos do seu ciclo de vida. A Privacy API declara esses dados, localiza os usuários e contextos correspondentes, exporta o estado sem segredos e atende à exclusão individual, em lote e por contexto. A exclusão dos dados de um usuário anonimiza e desativa seu convite, preservando a geração para impedir o reaproveitamento de formulários antigos. A configuração do Questionário é preservada. Os eventos permanecem sob responsabilidade dos subsistemas de logs do Moodle.
+O plugin armazena Delegações de aplicação com a conta, o Questionário, o Período de Autorização, a origem e os dados de auditoria de criação e revogação. O registro do convite guarda a referência ao Professor que o gerou e dados mínimos do seu ciclo de vida. A Privacy API declara esses dados, localiza os usuários e contextos correspondentes, exporta o estado sem segredos e atende à exclusão individual, em lote e por contexto. A exclusão dos dados de um usuário remove suas Delegações e anonimiza e desativa seu convite, preservando a geração para impedir o reaproveitamento de formulários antigos. A configuração do Questionário é preservada. Os eventos permanecem sob responsabilidade dos subsistemas de logs do Moodle.
 
 ## Licença
 
