@@ -22,6 +22,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['addapplicators'] = 'Include selected accounts';
+$string['applicators'] = 'Eligible accounts';
 $string['authorisationvalidity'] = 'Attempt authorisation validity';
 $string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
 $string['authorizationperiodavailability'] = 'The authorization period must be contained within the quiz availability.';
@@ -31,11 +33,37 @@ $string['authorizationperiodfuture'] = 'The authorization period must end in the
 $string['authorizationperiodordered'] = 'The authorization period must end after it starts.';
 $string['authorizationperiodstart'] = 'Authorization period starts';
 $string['authorizationperiodstartrequired'] = 'Set when the authorization period starts.';
+$string['currentapplicators'] = 'Current application team';
+$string['delegationincluded'] = 'Application delegation included.';
+$string['delegationlocktimeout'] = 'Another application team update is in progress. Please try again.';
+$string['delegationnotfound'] = 'The selected application delegation does not belong to this quiz.';
+$string['delegationorigin'] = 'Origin';
+$string['delegationorigin_direct'] = 'Direct inclusion';
+$string['delegationorigin_invite'] = 'Invitation';
+$string['delegationorigin_unknown'] = 'Unknown';
+$string['delegationperiodclosed'] = 'The authorization period is not open for new applications.';
+$string['delegationrevoked'] = 'Application delegation revoked.';
 $string['enable'] = 'Enable in-person release';
 $string['eventconfigurationupdated'] = 'In-person release configuration updated';
+$string['eventdelegationcreated'] = 'Application delegation created';
+$string['eventdelegationidempotent'] = 'Application delegation included again';
+$string['eventdelegationupdated'] = 'Application delegation updated';
+$string['ineligibleuser'] = 'One or more selected accounts cannot receive an application delegation.';
+$string['manageapplicators'] = 'Manage application team';
 $string['pluginname'] = 'In-person release';
-$string['privacy:metadata'] = 'The In-person release quiz access rule does not store any personal data.';
+$string['privacy:metadata'] = 'The In-person release quiz access rule stores application delegation records.';
+$string['privacy:metadata:delegation'] = 'Application delegation records for a quiz.';
+$string['privacy:metadata:delegation:origin'] = 'The source that created the delegation.';
+$string['privacy:metadata:delegation:quizid'] = 'The quiz receiving the delegation.';
+$string['privacy:metadata:delegation:revokedby'] = 'The account that revoked the delegation.';
+$string['privacy:metadata:delegation:timeclose'] = 'The end of the delegation period.';
+$string['privacy:metadata:delegation:timecreated'] = 'The time the delegation was created.';
+$string['privacy:metadata:delegation:timemodified'] = 'The time the delegation was last changed.';
+$string['privacy:metadata:delegation:timeopen'] = 'The start of the delegation period.';
+$string['privacy:metadata:delegation:timerevoked'] = 'The time the delegation was revoked.';
+$string['privacy:metadata:delegation:userid'] = 'The account receiving the delegation.';
 $string['rejectionjustificationrequired'] = 'Require a rejection justification';
 $string['rejectionjustificationrequired_desc'] = 'Require a justification when a release request is rejected.';
 $string['requestvalidity'] = 'Release request validity';
 $string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';
+$string['revokeapplicator'] = 'Revoke';

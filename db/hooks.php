@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for the Presencial quiz access rule.
+ * Hook callbacks for Liberação Presencial.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -24,8 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.2.0';
-$plugin->version = 2026100100;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+$callbacks = [
+    [
+        'hook' => \core\hook\output\before_http_headers::class,
+        'callback' => \quizaccess_presencial\hook_callbacks::class . '::add_quiz_settings_link',
+    ],
+];

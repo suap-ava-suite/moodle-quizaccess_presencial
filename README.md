@@ -30,9 +30,11 @@ Valores de prazo inválidos não são salvos.
 
 ## Estado atual
 
-Esta entrega fornece o componente instalável, a configuração global, o formulário de configuração por Questionário, internacionalização, declaração de privacidade e testes automatizados.
+Esta entrega fornece o componente instalável, a configuração global, o formulário de configuração por Questionário, o gerenciamento direto da equipe de aplicação, internacionalização, declaração de privacidade e testes automatizados.
 
 Ao habilitar **Liberação Presencial** nas configurações de um Questionário, o plugin grava na tabela `quizaccess_presencial` a configuração daquele Questionário e o início e o fim do Período de Autorização. Há somente um registro por Questionário; desabilitar a opção suspende a regra e preserva o período para uma reabilitação posterior. As alterações também geram o evento de configuração correspondente no log do Moodle.
+
+No menu do Questionário, o Professor pode abrir **Gerenciar equipe de aplicação**, incluir Contas elegíveis pelo seletor padrão do Moodle e revogar Delegações individualmente. Essas operações não criam matrícula nem atribuem papéis no curso e exigem uma submissão POST com token de sessão válido. A inclusão repetida é idempotente; uma nova inclusão depois de revogação cria outro registro e preserva o anterior.
 
 Nesta etapa, a regra ainda não impede nem autoriza o início de novas tentativas. Em particular, ela não cria Solicitações de liberação, não emite Autorizações de tentativa e não oferece o fluxo para Professor ou Aplicador decidir essas solicitações. Assim, mesmo quando habilitada e com o período salvo, a Liberação Presencial não altera o fluxo nativo de tentativas do Questionário.
 
@@ -97,7 +99,7 @@ moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
 
 ## Privacidade
 
-O plugin declara um `null_provider`: embora armazene a configuração e o período de cada Questionário, não armazena nem transmite dados pessoais. Quando uma entrega futura introduzir dados pessoais ou integração externa, o provider deverá ser atualizado para declarar e atender esses dados pela Privacy API do Moodle.
+O plugin armazena Delegações de aplicação com a conta, o Questionário, o Período de Autorização, a origem e os dados de auditoria de criação e revogação. Seu provider declara esses dados e atende à descoberta de contexto, exportação e exclusão pela Privacy API do Moodle.
 
 ## Licença
 

@@ -251,6 +251,7 @@ class quizaccess_presencial extends access_rule_base {
      */
     public static function delete_settings($quiz): void {
         global $DB;
+        $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quiz->id]);
         $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
     }
 
