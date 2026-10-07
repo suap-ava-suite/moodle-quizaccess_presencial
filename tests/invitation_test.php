@@ -68,6 +68,29 @@ final class invitation_test extends \advanced_testcase {
     }
 
     /**
+     * Only a one-way derivation of the secret is persisted, never the secret, its body or a trivial rewriting of it.
+     */
+    public function test_only_a_non_reversible_derivation_of_the_secret_is_persisted(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+
+        $first = invitation::generate($quiz->cmid, 0);
+        $firstrow = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], '*', MUST_EXIST);
+        $this->assert_only_the_derivation_is_persisted($first['token'], $firstrow, $quiz->cmid);
+
+        // Regeneration replaces the derivation; no trace of the previous one survives.
+        $second = invitation::generate($quiz->cmid, 1);
+        $secondrow = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], '*', MUST_EXIST);
+        $this->assert_only_the_derivation_is_persisted($second['token'], $secondrow, $quiz->cmid);
+        $this->assertNotSame($firstrow->tokenhash, $secondrow->tokenhash);
+        $this->assertStringNotContainsString($firstrow->tokenhash, json_encode($secondrow));
+        $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
+    }
+
+    /**
      * Regeneration atomically replaces the secret and refuses stale management forms.
      */
     public function test_regeneration_rejects_previous_token_and_stale_generation(): void {
@@ -420,6 +443,47 @@ final class invitation_test extends \advanced_testcase {
         \quizaccess_presencial::delete_settings($quiz);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertSame('none', invitation::get_status($quiz->cmid)['state']);
+    }
+
+    /**
+     * Assert that a persisted invitation holds exactly the one-way derivation of its secret and nothing usable.
+     *
+     * @param string $token Complete secret, as shown once to the manager.
+     * @param \stdClass $row Persisted invitation record.
+     * @param int $cmid Quiz course module.
+     */
+    private function assert_only_the_derivation_is_persisted(string $token, \stdClass $row, int $cmid): void {
+        $this->assertSame(1, preg_match('/\Ai1_([0-9a-f]{64})\z/', $token, $matches));
+        $body = $matches[1];
+
+        // Neither the complete secret nor its hexadecimal body is stored in any column, in any letter case.
+        foreach ((array) $row as $column => $value) {
+            $this->assertStringNotContainsStringIgnoringCase($body, (string) $value, "Column {$column} holds the secret.");
+        }
+        // The stored value is neither the secret nor a trivial, reversible rewriting of it.
+        $this->assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $row->tokenhash);
+        foreach ([$token, $body, strrev($body)] as $trivial) {
+            $this->assertNotSame($trivial, $row->tokenhash);
+        }
+        // It is exactly the expected one-way derivation of this secret.
+        $this->assertSame($this->expected_derivation($token), $row->tokenhash);
+        // Knowing what is persisted does not grant access, in any plausible form of presenting it.
+        $this->assertFalse(invitation::validate($cmid, $row->tokenhash));
+        $this->assertFalse(invitation::validate($cmid, 'i1_' . $row->tokenhash));
+        // The secret itself is still accepted, so validation uses the derivation.
+        $this->assertTrue(invitation::validate($cmid, $token));
+    }
+
+    /**
+     * Reproduce the persisted-format contract: SHA-256 over the secret, bound to its purpose and format version.
+     *
+     * Changing this on purpose requires an upgrade step that invalidates the links already issued, and this test.
+     *
+     * @param string $token Complete secret, as shown once to the manager.
+     * @return string Expected persisted derivation.
+     */
+    private function expected_derivation(string $token): string {
+        return hash('sha256', 'quizaccess_presencial:invite:v1:' . $token);
     }
 
     /**
