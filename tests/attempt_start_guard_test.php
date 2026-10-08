@@ -42,7 +42,12 @@ final class attempt_start_guard_test extends \advanced_testcase {
         $this->assertTrue(attempt_start_guard::acquire($requestid));
 
         $bootstrap = var_export($CFG->dirroot . '/lib/phpunit/bootstrap.php', true);
-        $autoload = var_export($CFG->dirroot . '/vendor/autoload.php', true);
+        // Moodle 5.1+ keeps Composer dependencies above the public dirroot.
+        $autoloadpath = $CFG->dirroot . '/vendor/autoload.php';
+        if (!is_readable($autoloadpath)) {
+            $autoloadpath = dirname($CFG->dirroot) . '/vendor/autoload.php';
+        }
+        $autoload = var_export($autoloadpath, true);
         $childcode = 'require_once(' . $autoload . ');'
             . 'define("PHPUNIT_UTIL", true);'
             . 'require_once(' . $bootstrap . ');'
@@ -68,8 +73,19 @@ final class attempt_start_guard_test extends \advanced_testcase {
             );
             $this->assertIsResource($process, 'Could not start the competing PHP process.');
             stream_set_timeout($pipes[1], 10);
-            $result = fgets($pipes[1]);
-            $this->assertSame("BUSY\n", $result, 'A second PHP process must not acquire the held request lock.');
+            $result = stream_get_contents($pipes[1]);
+            $erroroutput = stream_get_contents($pipes[2]);
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitcode = proc_close($process);
+            $process = false;
+            $this->assertSame(
+                "BUSY\n",
+                $result,
+                'A second PHP process must not acquire the held request lock. '
+                    . 'Child exit code: ' . $exitcode . '. Child stderr: ' . $erroroutput,
+            );
         } finally {
             if (is_resource($process)) {
                 fclose($pipes[0]);
