@@ -36,6 +36,53 @@ class behat_quizaccess_presencial extends behat_base {
     private ?string $previouslink = null;
 
     /**
+     * Prepare valid delegations through the public domain operation.
+     *
+     * @Given application account :username is delegated to the quizzes in course :shortname
+     * @param string $username Applicator username.
+     * @param string $shortname Course short name.
+     */
+    public function the_account_is_delegated_to_course_quizzes(string $username, string $shortname): void {
+        global $DB, $USER;
+
+        $userid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
+        $courseid = $DB->get_field('course', 'id', ['shortname' => $shortname], MUST_EXIST);
+        $quizzes = $DB->get_records('quiz', ['course' => $courseid], 'id ASC', 'id');
+        $previoususer = $USER;
+        try {
+            \core\session\manager::set_user(get_admin());
+            foreach ($quizzes as $quiz) {
+                \quizaccess_presencial\local\delegation_manager::include_users($quiz->id, [$userid], $USER->id);
+            }
+        } finally {
+            \core\session\manager::set_user($previoususer);
+        }
+    }
+
+    /**
+     * Reach an element with Tab or menu arrow keys, without calling focus() or clicking it.
+     *
+     * @When I reach :element :selectortype using only the keyboard
+     * @param string $element Element identifier.
+     * @param string $selectortype Moodle selector type.
+     */
+    public function i_reach_using_only_the_keyboard(string $element, string $selectortype): void {
+        self::require_javascript_in_session($this->getSession());
+        $node = $this->get_selected_node($selectortype, $element);
+        $key = $node->getAttribute('role') === 'menuitem' ? behat_keys::ARROW_DOWN : behat_keys::TAB;
+        $xpath = json_encode($node->getXpath());
+        $script = "return document.activeElement === document.evaluate({$xpath}, document,
+            null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;";
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            if ($this->evaluate_script($script)) {
+                return;
+            }
+            self::type_keys($this->getSession(), [$key]);
+        }
+        throw new ExpectationException("Cannot reach {$element} using the keyboard.", $this->getSession());
+    }
+
+    /**
      * Verify the native course and quiz routes still demand enrolment.
      *
      * @Then academic access to :quizname should still require enrolment

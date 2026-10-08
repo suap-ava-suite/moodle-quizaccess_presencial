@@ -20,6 +20,7 @@ Feature: Find and open standalone applications
       | activity | name   | course | idnumber | timeopen        | timeclose      |
       | quiz     | Quiz 1 | C1     | quiz1    | ## yesterday ## | ## tomorrow ## |
     And I am on the "quiz1" "Activity editing" page logged in as "teacher1"
+    And I expand all fieldsets
     And I set the field "Enable in-person release" to "Yes"
     And I press "Save and return to course"
     And I am on the "Quiz 1" "quizaccess_presencial > Invitation" page
@@ -68,3 +69,77 @@ Feature: Find and open standalone applications
     Then I should see "Application panel" in the "h2" "css_element"
     And I should see "Quiz 1"
     And I should see "Release requests are not available in this version."
+
+  @javascript @presencial_keyboard
+  Scenario: An applicator opens and refreshes the panel using only the keyboard
+    Given I log in as "applicator1"
+    When I reach "#user-menu-toggle" "css_element" using only the keyboard
+    Then the focused element is "#user-menu-toggle" "css_element"
+    When I press the enter key
+    Then I should see "My applications" in the "#user-action-menu" "css_element"
+    And I reach "My applications" "link" using only the keyboard
+    Then the focused element is "My applications" "link"
+    When I press the enter key
+    Then I should see "My applications" in the "h2" "css_element"
+    When I reach "Open application" "link" using only the keyboard
+    Then the focused element is "Open application" "link"
+    When I press the enter key
+    Then I should see "Application panel" in the "h2" "css_element"
+    And I should see "Quiz 1"
+    When I reach "Refresh" "link" using only the keyboard
+    Then the focused element is "Refresh" "link"
+    When I press the enter key
+    Then I should see "Application panel" in the "h2" "css_element"
+    When I reach "Refresh" "link" using only the keyboard
+    And I press the tab key
+    Then the focused element is "My applications" "link" in the "#region-main" "css_element"
+    When I press the enter key
+    Then I should see "My applications" in the "h2" "css_element"
+
+  @javascript @presencial_keyboard
+  Scenario: An applicator changes pages and opens an application using only the keyboard
+    Given the following "activities" exist:
+      | activity | name             | course | presencial_enabled | presencial_timeopen | presencial_timeclose |
+      | quiz     | Keyboard quiz 01 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 02 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 03 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 04 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 05 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 06 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 07 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 08 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 09 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 10 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 11 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 12 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 13 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 14 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 15 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 16 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 17 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 18 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 19 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+      | quiz     | Keyboard quiz 20 | C1     | 1                  | ## today ##         | ## tomorrow ##       |
+    And application account "applicator1" is delegated to the quizzes in course "C1"
+    And I log in as "applicator1"
+    When I reach "#user-menu-toggle" "css_element" using only the keyboard
+    And I press the enter key
+    And I reach "My applications" "link" using only the keyboard
+    And I press the enter key
+    Then I should see "Quiz 1" in the ".presencial-applications" "css_element"
+    And I should not see "Keyboard quiz 20" in the ".presencial-applications" "css_element"
+    When I reach "Page 2" "link" using only the keyboard
+    Then the focused element is "Page 2" "link"
+    When I press the enter key
+    Then I should see "Keyboard quiz 20" in the ".presencial-applications" "css_element"
+    And I should not see "Quiz 1" in the ".presencial-applications" "css_element"
+    When I reach "Page 1" "link" using only the keyboard
+    And I press the enter key
+    Then I should see "Quiz 1" in the ".presencial-applications" "css_element"
+    When I reach "Page 2" "link" using only the keyboard
+    And I press the enter key
+    And I reach "Open application" "link" using only the keyboard
+    Then the focused element is "Open application" "link"
+    When I press the enter key
+    Then I should see "Application panel" in the "h2" "css_element"
+    And I should see "Keyboard quiz 20"
