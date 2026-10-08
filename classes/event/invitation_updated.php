@@ -14,32 +14,38 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace quizaccess_presencial;
+namespace quizaccess_presencial\event;
 
-use mod_quiz\quiz_settings;
-
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
-
-#[\PHPUnit\Framework\Attributes\CoversClass(\quizaccess_presencial::class)]
 /**
- * Tests for the inactive Presencial access rule.
+ * Audit an invitation transition without retaining the secret.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \quizaccess_presencial
  */
-final class rule_inactive_test extends \basic_testcase {
+final class invitation_updated extends \core\event\base {
     /**
-     * The rule is inactive until a quiz explicitly enables it.
+     * Initialise event data.
      */
-    public function test_rule_is_inactive_without_configuration(): void {
-        $quizsettings = $this->createStub(quiz_settings::class);
-        $quizsettings->method('get_quiz')->willReturn((object) ['presencial_enabled' => null]);
+    protected function init(): void {
+        $this->data['objecttable'] = 'quiz';
+        $this->data['crud'] = 'u';
+        $this->data['edulevel'] = self::LEVEL_OTHER;
+    }
 
-        $this->assertNull(\quizaccess_presencial::make($quizsettings, time(), false));
+    /**
+     * Get the translated event name.
+     * @return string Event name.
+     */
+    public static function get_name(): string {
+        return get_string('eventinvitationupdated', 'quizaccess_presencial');
+    }
+
+    /**
+     * Describe the transition using only nonsecret identifiers.
+     * @return string Event description.
+     */
+    public function get_description(): string {
+        return "The invitation for quiz '{$this->objectid}' was {$this->other['action']}.";
     }
 }

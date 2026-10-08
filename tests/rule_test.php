@@ -24,6 +24,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 require_once($CFG->dirroot . '/mod/quiz/mod_form.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(\quizaccess_presencial::class)]
 /**
  * Tests for the Presencial access rule.
  *

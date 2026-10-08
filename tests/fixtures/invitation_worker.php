@@ -15,17 +15,34 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for the Presencial quiz access rule.
+ * Independent Moodle connection used to exercise concurrent public invite issuance.
  *
  * @package    quizaccess_presencial
+ * @category   test
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.3.0';
-$plugin->version = 2026100600;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+if (PHP_SAPI !== 'cli' || !in_array(count($argv), [4, 5], true)) {
+    die;
+}
+
+\advanced_testcase::setUser((int) $argv[3]);
+fwrite(STDOUT, "READY\n");
+fflush(STDOUT);
+fgets(STDIN);
+try {
+    if (($argv[4] ?? '') === 'status') {
+        fwrite(STDOUT, "ATTEMPTING\n");
+        fflush(STDOUT);
+        $result = \quizaccess_presencial\local\invitation::get_status((int) $argv[2]);
+        echo json_encode(['state' => $result['state'], 'generation' => $result['generation']]);
+    } else {
+        $result = \quizaccess_presencial\local\invitation::generate((int) $argv[2], 0);
+        echo json_encode(['token' => $result['token']]);
+    }
+} catch (\moodle_exception $exception) {
+    echo json_encode(['error' => $exception->errorcode]);
+}

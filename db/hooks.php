@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Hook callbacks for Liberação Presencial.
+ * Register navigation hooks for Liberação Presencial.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite

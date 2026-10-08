@@ -18,6 +18,8 @@ use mod_quiz\local\access_rule_base;
 use mod_quiz\quiz_settings;
 use quizaccess_presencial\event\configuration_updated;
 use quizaccess_presencial\local\authorization_period;
+use quizaccess_presencial\local\invitation;
+use quizaccess_presencial\local\quiz_lock;
 
 /**
  * Presencial quiz access rule.
@@ -152,7 +154,22 @@ class quizaccess_presencial extends access_rule_base {
             return;
         }
 
+        quiz_lock::execute($quiz->id, function () use ($quiz): void {
+            self::save_locked_settings($quiz);
+        });
+    }
+
+    /**
+     * Save settings atomically with irreversible invitation transitions.
+     *
+     * @param \stdClass $quiz Quiz record and submitted settings.
+     * @return void
+     */
+    private static function save_locked_settings(\stdClass $quiz): void {
+        global $DB;
+
         $existing = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id]) ?: null;
+        $previousend = (int) ($existing->timeclose ?? 0);
         if (empty($quiz->presencial_enabled)) {
             if (!$existing) {
                 return;
@@ -173,6 +190,7 @@ class quizaccess_presencial extends access_rule_base {
 
             $existing->timemodified = time();
             $DB->update_record('quizaccess_presencial', $existing);
+            invitation::synchronize_configuration($quiz->coursemodule, $previousend);
             self::trigger_configuration_event(
                 $quiz,
                 $previous['enabled'] ? 'disabled' : 'period_changed',
@@ -215,6 +233,7 @@ class quizaccess_presencial extends access_rule_base {
             $action = 'enabled';
         }
         self::trigger_configuration_event($quiz, $action, $previous, $current);
+        invitation::synchronize_configuration($quiz->coursemodule, $previousend);
     }
 
     /**
@@ -251,8 +270,11 @@ class quizaccess_presencial extends access_rule_base {
      */
     public static function delete_settings($quiz): void {
         global $DB;
-        $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quiz->id]);
-        $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
+        quiz_lock::execute($quiz->id, function () use ($quiz, $DB): void {
+            $DB->delete_records('quizaccess_presencial_invite', ['quizid' => $quiz->id]);
+            $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quiz->id]);
+            $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
+        });
     }
 
     /**

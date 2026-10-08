@@ -14,18 +14,37 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace quizaccess_presencial\event;
+
 /**
- * Version information for the Presencial quiz access rule.
+ * Audit rejected invitation validation without exposing tokens or academic data.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+final class invitation_invalid extends \core\event\base {
+    /**
+     * Initialise event data.
+     */
+    protected function init(): void {
+        $this->data['crud'] = 'r';
+        $this->data['edulevel'] = self::LEVEL_OTHER;
+    }
 
-defined('MOODLE_INTERNAL') || die();
+    /**
+     * Get the translated event name.
+     * @return string Event name.
+     */
+    public static function get_name(): string {
+        return get_string('eventinvitationinvalid', 'quizaccess_presencial');
+    }
 
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.3.0';
-$plugin->version = 2026100600;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+    /**
+     * Describe the rejection without recording the submitted token.
+     * @return string Event description.
+     */
+    public function get_description(): string {
+        return 'An invalid invitation was presented.';
+    }
+}

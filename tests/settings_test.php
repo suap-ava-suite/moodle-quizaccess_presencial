@@ -22,6 +22,7 @@ global $CFG;
 require_once($CFG->libdir . '/adminlib.php');
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/classes/admin_setting/positive_integer.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(\quizaccess_presencial\admin_setting\positive_integer::class)]
 /**
  * Tests for the Presencial access rule global settings.
  *
@@ -81,6 +82,7 @@ final class settings_test extends \advanced_testcase {
      * @dataProvider invalid_duration_provider
      * @param string $value Invalid duration submitted by the administrator.
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalid_duration_provider')]
     public function test_invalid_duration_does_not_replace_saved_policy(string $value): void {
         $this->resetAfterTest();
 

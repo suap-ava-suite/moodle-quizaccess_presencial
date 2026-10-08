@@ -1,0 +1,60 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template quizaccess_presencial/invitation
+
+    Invitation status or the link displayed immediately after generation.
+
+    Context variables required for this template:
+    * generated - Whether this response contains a newly generated link.
+    * link - Complete invitation URL, only for the generation response.
+    * returnurl - URL of the clean invitation management page.
+    * state - Localised current invitation status, for the management page.
+    * expires - Localised expiry date, when an invitation exists.
+    * unavailable - Whether an invitation cannot currently be issued.
+
+    Example context (json):
+    {
+        "state": "No invitation has been generated.",
+        "unavailable": false
+    }
+}}
+{{#generated}}
+    <h4>{{#str}}invitationgenerated, quizaccess_presencial{{/str}}</h4>
+    <p id="presencial-invitation-warning">{{#str}}invitationlinkwarning, quizaccess_presencial{{/str}}</p>
+    <div class="form-group">
+        <label for="presencial-invitation-link">{{#str}}invitationlink, quizaccess_presencial{{/str}}</label>
+        <input type="text" id="presencial-invitation-link" class="form-control" value="{{link}}"
+            readonly aria-describedby="presencial-invitation-warning">
+    </div>
+    <button type="button" class="btn btn-primary mb-3" data-action="copytoclipboard"
+        data-clipboard-target="#presencial-invitation-link"
+        data-clipboard-success-message="{{#str}}invitationcopied, quizaccess_presencial{{/str}}">
+        {{#str}}invitationcopy, quizaccess_presencial{{/str}}
+    </button>
+    <p><a href="{{returnurl}}">{{#str}}invitationreturn, quizaccess_presencial{{/str}}</a></p>
+    {{#js}}
+        require(['core/copy_to_clipboard']);
+    {{/js}}
+{{/generated}}
+{{^generated}}
+    <p>{{state}}</p>
+    {{#expires}}<p>{{expires}}</p>{{/expires}}
+    {{#unavailable}}
+        <p>{{#str}}invitationunavailable, quizaccess_presencial{{/str}}</p>
+    {{/unavailable}}
+{{/generated}}

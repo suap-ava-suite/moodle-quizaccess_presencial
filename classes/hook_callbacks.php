@@ -25,34 +25,35 @@ namespace quizaccess_presencial;
  */
 final class hook_callbacks {
     /**
-     * Adds the application-team management page to Quiz navigation.
+     * Add the application-team and invitation management page before navigation is rendered.
      *
      * @param \core\hook\output\before_http_headers $hook Before output starts.
      */
     public static function add_quiz_settings_link(\core\hook\output\before_http_headers $hook): void {
-        global $PAGE;
-
-        $cm = $PAGE->cm;
-        if (!$cm || $cm->modname !== 'quiz') {
+        $page = $hook->renderer->get_page();
+        if (!$page->cm || $page->cm->modname !== 'quiz' || $page->context->contextlevel !== CONTEXT_MODULE) {
+            return;
+        }
+        $context = \context_module::instance($page->cm->id);
+        if ($page->context->id !== $context->id || !has_capability('mod/quiz:manage', $context)) {
             return;
         }
 
-        $context = \context_module::instance($cm->id);
-        if (!has_capability('mod/quiz:manage', $context)) {
+        $settings = $page->settingsnav->find('modulesettings', \navigation_node::TYPE_SETTING);
+        if (!$settings || $settings->find('quizaccess_presencial_manageapplicators', \navigation_node::TYPE_SETTING)) {
             return;
         }
-
-        $modulesettings = $PAGE->settingsnav->find('modulesettings', \navigation_node::TYPE_SETTING);
-        if (!$modulesettings || $modulesettings->get('quizaccess_presencial_manageapplicators', \navigation_node::TYPE_SETTING)) {
-            return;
-        }
-
-        $modulesettings->add(
+        $url = new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $page->cm->id]);
+        $node = $settings->add(
             get_string('manageapplicators', 'quizaccess_presencial'),
-            new \moodle_url('/mod/quiz/accessrule/presencial/manage.php', ['cmid' => $cm->id]),
+            $url,
             \navigation_node::TYPE_SETTING,
             null,
-            'quizaccess_presencial_manageapplicators',
+            'quizaccess_presencial_manageapplicators'
         );
+        $node->set_force_into_more_menu(true);
+        if ($page->url->compare($url, URL_MATCH_EXACT)) {
+            $node->make_active();
+        }
     }
 }

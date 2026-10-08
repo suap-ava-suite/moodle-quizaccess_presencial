@@ -14,6 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
+/**
+ * Privacy provider for the Presencial quiz access rule.
+ *
+ * @package    quizaccess_presencial
+ * @copyright  2026 SUAP AVA Suite
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 namespace quizaccess_presencial\privacy;
 
 use core_privacy\local\metadata\collection;
@@ -23,9 +31,10 @@ use core_privacy\local\request\contextlist;
 use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
+use quizaccess_presencial\local\invitation;
 
 /**
- * Privacy provider for quiz application delegations.
+ * Describe and remove personal data associated with quiz application delegations and the current invitation.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -36,7 +45,7 @@ class provider implements
     \core_privacy\local\request\core_userlist_provider,
     \core_privacy\local\request\plugin\provider {
     /**
-     * Describe delegation data stored by the plugin.
+     * Describe delegation data and the invitation creator and lifecycle data stored by the plugin.
      *
      * @param collection $collection Metadata collection.
      * @return collection Metadata collection.
@@ -57,17 +66,28 @@ class provider implements
             ],
             'privacy:metadata:delegation',
         );
+        $collection->add_database_table('quizaccess_presencial_invite', [
+            'createdby' => 'privacy:metadata:invite:createdby',
+            'generation' => 'privacy:metadata:invite:generation',
+            'state' => 'privacy:metadata:invite:state',
+            'timecreated' => 'privacy:metadata:invite:timecreated',
+            'timemodified' => 'privacy:metadata:invite:timemodified',
+            'timeexpires' => 'privacy:metadata:invite:timeexpires',
+        ], 'privacy:metadata:invite');
         return $collection;
     }
 
     /**
-     * Find quiz contexts containing data for a user.
+     * Find quiz contexts containing a user's delegations or the user's current invitation.
      *
      * @param int $userid User id.
      * @return contextlist Contexts containing data.
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
         $contextlist = new contextlist();
+        if ($userid <= 0) {
+            return $contextlist;
+        }
         $contextlist->add_from_sql(
             self::context_sql('d.userid = :userid OR d.revokedby = :userid2'),
             [
@@ -77,20 +97,31 @@ class provider implements
                 'contextlevel' => CONTEXT_MODULE,
             ],
         );
+        $sql = "SELECT ctx.id
+                  FROM {context} ctx
+                  JOIN {course_modules} cm ON cm.id = ctx.instanceid
+                  JOIN {modules} m ON m.id = cm.module
+                  JOIN {quizaccess_presencial_invite} i ON i.quizid = cm.instance
+                 WHERE ctx.contextlevel = :contextlevel
+                   AND m.name = :modname AND i.createdby = :userid";
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'modname' => 'quiz',
+            'userid' => $userid,
+        ]);
         return $contextlist;
     }
 
     /**
-     * List users with data in a quiz module context.
+     * List users with delegation data or the current invitation in a quiz module context.
      *
      * @param userlist $userlist User list.
      */
     public static function get_users_in_context(userlist $userlist): void {
-        $context = $userlist->get_context();
-        if (!self::is_quiz_context($context)) {
+        $quizid = self::quizid_for_context($userlist->get_context());
+        if (!$quizid) {
             return;
         }
-        $quizid = self::quizid_from_context($context);
         $userlist->add_from_sql(
             'userid',
             'SELECT userid FROM {quizaccess_presencial_delegation} WHERE quizid = :quizid',
@@ -102,10 +133,15 @@ class provider implements
               WHERE quizid = :quizid AND revokedby <> 0',
             ['quizid' => $quizid],
         );
+        $userlist->add_from_sql(
+            'createdby',
+            'SELECT createdby FROM {quizaccess_presencial_invite} WHERE quizid = :quizid AND createdby > 0',
+            ['quizid' => $quizid],
+        );
     }
 
     /**
-     * Export a user's delegation data.
+     * Export a user's delegation data and the lifecycle data of the user's invitation, never its secret.
      *
      * @param approved_contextlist $contextlist Approved contexts.
      */
@@ -113,8 +149,14 @@ class provider implements
         global $DB;
 
         $userid = (int) $contextlist->get_user()->id;
+        if ($userid <= 0) {
+            return;
+        }
         foreach ($contextlist->get_contexts() as $context) {
-            $quizid = self::quizid_from_context($context);
+            $quizid = self::quizid_for_context($context);
+            if (!$quizid) {
+                continue;
+            }
             $records = $DB->get_records_select(
                 'quizaccess_presencial_delegation',
                 'quizid = :quizid AND (userid = :userid OR revokedby = :userid2)',
@@ -139,24 +181,42 @@ class provider implements
                     ],
                 );
             }
+
+            $record = $DB->get_record('quizaccess_presencial_invite', [
+                'quizid' => $quizid, 'createdby' => $userid,
+            ], 'state,generation,timecreated,timemodified,timeexpires');
+            if (!$record) {
+                continue;
+            }
+            $data = (object) [
+                'state' => $record->state,
+                'generation' => (int) $record->generation,
+                'timecreated' => transform::datetime($record->timecreated),
+                'timemodified' => transform::datetime($record->timemodified),
+                'timeexpires' => transform::datetime($record->timeexpires),
+            ];
+            writer::with_context($context)->export_data([get_string('pluginname', 'quizaccess_presencial')], $data);
         }
     }
 
     /**
-     * Delete all delegation data in a module context.
+     * Delete all delegation data and erase invitation creator data in a quiz module context.
      *
      * @param \context $context Module context.
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
         global $DB;
 
-        if (self::is_quiz_context($context)) {
-            $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => self::quizid_from_context($context)]);
+        $quizid = self::quizid_for_context($context);
+        if (!$quizid) {
+            return;
         }
+        $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid]);
+        invitation::erase_user_data($context->instanceid);
     }
 
     /**
-     * Delete one user's data in approved module contexts.
+     * Delete one user's delegation data and anonymize the user's invitation in approved quiz contexts.
      *
      * @param approved_contextlist $contextlist Approved contexts.
      */
@@ -164,8 +224,14 @@ class provider implements
         global $DB;
 
         $userid = (int) $contextlist->get_user()->id;
+        if ($userid <= 0) {
+            return;
+        }
         foreach ($contextlist->get_contexts() as $context) {
-            $quizid = self::quizid_from_context($context);
+            $quizid = self::quizid_for_context($context);
+            if (!$quizid) {
+                continue;
+            }
             $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid, 'userid' => $userid]);
             $DB->set_field_select(
                 'quizaccess_presencial_delegation',
@@ -174,22 +240,26 @@ class provider implements
                 'quizid = :quizid AND revokedby = :userid',
                 ['quizid' => $quizid, 'userid' => $userid],
             );
+            invitation::erase_user_data($context->instanceid, [$userid]);
         }
     }
 
     /**
-     * Delete multiple users' data in one context.
+     * Delete multiple users' delegation data and anonymize their invitation in one quiz context.
+     *
+     * Invitation data is erased only if the current invitation still belongs to an approved user.
      *
      * @param approved_userlist $userlist Approved users.
      */
     public static function delete_data_for_users(approved_userlist $userlist): void {
         global $DB;
 
-        $userids = $userlist->get_userids();
-        if (!$userids || !self::is_quiz_context($userlist->get_context())) {
+        $context = $userlist->get_context();
+        $userids = array_map('intval', $userlist->get_userids());
+        $quizid = self::quizid_for_context($context);
+        if (!$userids || !$quizid) {
             return;
         }
-        $quizid = self::quizid_from_context($userlist->get_context());
         [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'userid');
         $params['quizid'] = $quizid;
         $DB->delete_records_select(
@@ -204,10 +274,11 @@ class provider implements
             "quizid = :quizid AND revokedby {$insql}",
             $params,
         );
+        invitation::erase_user_data($context->instanceid, $userids);
     }
 
     /**
-     * Build the context query shared by privacy lookups.
+     * Build the delegation context query shared by privacy lookups.
      *
      * @param string $condition User data condition.
      * @return string SQL query.
@@ -223,28 +294,21 @@ class provider implements
     }
 
     /**
-     * Resolve the quiz id for a module context.
+     * Resolve only module contexts belonging to an actual quiz.
      *
-     * @param \context $context Module context.
-     * @return int Quiz id.
+     * @param \context $context Requested context.
+     * @return int Quiz ID, or zero for another context.
      */
-    private static function quizid_from_context(\context $context): int {
+    private static function quizid_for_context(\context $context): int {
         global $DB;
 
-        $cm = get_coursemodule_from_id('quiz', $context->instanceid, 0, false, MUST_EXIST);
-        return (int) $DB->get_field('quiz', 'id', ['id' => $cm->instance], MUST_EXIST);
-    }
-
-    /**
-     * Check whether a context belongs to a Quiz activity.
-     *
-     * @param \context $context Context to check.
-     * @return bool Whether the context is a Quiz module context.
-     */
-    private static function is_quiz_context(\context $context): bool {
         if ($context->contextlevel !== CONTEXT_MODULE) {
-            return false;
+            return 0;
         }
-        return (bool) get_coursemodule_from_id('quiz', $context->instanceid, 0, false);
+        $sql = "SELECT cm.instance
+                  FROM {course_modules} cm
+                  JOIN {modules} m ON m.id = cm.module
+                 WHERE cm.id = :cmid AND m.name = :modname";
+        return (int) $DB->get_field_sql($sql, ['cmid' => $context->instanceid, 'modname' => 'quiz']);
     }
 }
