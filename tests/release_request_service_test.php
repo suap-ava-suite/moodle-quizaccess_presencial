@@ -375,9 +375,11 @@ final class release_request_service_test extends \advanced_testcase {
 
         $exception = null;
         try {
-            \mod_quiz_external::start_attempt($quiz->id);
+            \mod_quiz_external::start_attempt($quiz->id, [
+                ['name' => 'quizpassword', 'value' => 'incorrect-password'],
+            ]);
         } catch (\moodle_exception $caught) {
-            // The core rejects the request at its unsatisfied password preflight.
+            // The core rejects the request at its failed password preflight.
             $exception = $caught;
         }
         $this->assertInstanceOf(\moodle_exception::class, $exception);
