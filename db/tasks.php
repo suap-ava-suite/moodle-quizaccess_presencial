@@ -6,7 +6,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// Moodle is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled invitation maintenance.
+ * Scheduled lifecycle maintenance for requests and invitations.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -33,5 +33,14 @@ $tasks = [
         'day' => '*',
         'month' => '*',
         'dayofweek' => '*',
+    ],
+    [
+        'classname' => '\\quizaccess_presencial\\task\\expire_requests',
+        'blocking' => 0,
+        'minute' => '*/1',
+        'hour' => '*',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*',
     ],
 ];

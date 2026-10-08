@@ -15,11 +15,13 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 use mod_quiz\local\access_rule_base;
+use mod_quiz\form\preflight_check_form;
 use mod_quiz\quiz_settings;
 use quizaccess_presencial\event\configuration_updated;
 use quizaccess_presencial\local\authorization_period;
 use quizaccess_presencial\local\invitation;
 use quizaccess_presencial\local\quiz_lock;
+use quizaccess_presencial\local\release_request_service;
 
 /**
  * Presencial quiz access rule.
@@ -30,10 +32,119 @@ use quizaccess_presencial\local\quiz_lock;
  */
 class quizaccess_presencial extends access_rule_base {
     /**
+     * Require the Quiz preflight boundary before any new attempt can be created.
+     *
+     * This hook is read-only: no request is created while Moodle renders pages or
+     * probes access. Existing attempts always bypass the release workflow.
+     *
+     * @param int|null $attemptid Existing attempt id, if resuming.
+     * @return bool Whether Moodle must run the preflight boundary.
+     */
+    public function is_preflight_check_required($attemptid): bool {
+        if ($attemptid || $this->quizobj->is_preview_user() || !empty($GLOBALS['QUIZACCESS_PRESENCIAL_REQUEST_FLOW'])) {
+            return false;
+        }
+        // The view page's normal button is redirected by our JS enhancement. The
+        // core startattempt and external API boundaries still require preflight.
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        if (substr($script, -strlen('/mod/quiz/view.php')) === '/mod/quiz/view.php') {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Create or reuse the pending request after Moodle's native access checks.
+     * Web requests are sent to the waiting page. External calls are rejected before
+     * core creates a quiz_attempt, while recording the same idempotent request.
+     *
+     * @param int|null $attemptid Existing attempt id, if resuming.
+     */
+    public function notify_preflight_check_passed($attemptid): void {
+        global $USER;
+        if ($attemptid || $this->quizobj->is_preview_user()) {
+            return;
+        }
+
+        $service = new release_request_service();
+        $attemptnumber = $service->next_attempt_number((int) $this->quiz->id, (int) $USER->id);
+        if ($service->begin_authorized_attempt((int) $this->quiz->id, (int) $USER->id, $attemptnumber)) {
+            return;
+        }
+        try {
+            $request = $service->ensure_pending(
+                (int) $this->quiz->id,
+                (int) $USER->id,
+                $attemptnumber,
+            );
+        } catch (\moodle_exception $exception) {
+            if ($exception->errorcode !== 'requestattemptalreadyexists') {
+                throw $exception;
+            }
+            $attempt = $service->find_attempt((int) $this->quiz->id, (int) $USER->id, $attemptnumber);
+            if ($attempt) {
+                redirect($this->quizobj->attempt_url($attempt->id));
+            }
+            throw $exception;
+        }
+
+        if (defined('WS_SERVER') && WS_SERVER) {
+            throw new \moodle_exception('requestpending', 'quizaccess_presencial', $this->quizobj->view_url());
+        }
+        redirect(new \moodle_url('/mod/quiz/accessrule/presencial/wait.php', ['requestid' => $request->id]));
+    }
+
+    /**
+     * Explain the pending release process and enhance Moodle's relevant pages.
+     *
+     * @return string Student-facing explanation.
+     */
+    public function description(): string {
+        global $PAGE;
+        if ($this->quizobj->is_preview_user()) {
+            return '';
+        }
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        if (substr($script, -strlen('/mod/quiz/view.php')) === '/mod/quiz/view.php') {
+            if (!isguestuser()) {
+                $PAGE->requires->js_call_amd(
+                    'quizaccess_presencial/start_request',
+                    'init',
+                    [(new \moodle_url('/mod/quiz/accessrule/presencial/request.php', [
+                        'cmid' => $this->quizobj->get_cmid(),
+                        'sesskey' => sesskey(),
+                    ]))->out(false)],
+                );
+            }
+        }
+        return get_string('requestdescription', 'quizaccess_presencial');
+    }
+
+    /**
+     * Let Moodle run an empty/valid preflight form through its standard callback.
+     *
+     * @param preflight_check_form $quizform The Moodle preflight form.
+     * @param \MoodleQuickForm $mform The wrapped form instance.
+     * @param int|null $attemptid Existing attempt id, if resuming.
+     */
+    public function add_preflight_check_form_fields(
+        preflight_check_form $quizform,
+        \MoodleQuickForm $mform,
+        $attemptid,
+    ): void {
+        global $PAGE;
+        if ($attemptid || $this->quizobj->is_preview_user()) {
+            return;
+        }
+        // Secure-window and native-preflight flows stay inside Moodle's route. Auto-submit
+        // only when all native preflight fields are already valid/empty.
+        $PAGE->requires->js_call_amd('quizaccess_presencial/start_request', 'continue_preflight');
+    }
+
+    /**
      * Create the rule when Presencial release is configured for the quiz.
      *
-     * The initial plugin is deliberately inert. A later delivery will create
-     * a rule instance only when the quiz explicitly enables Presencial release.
+     * The rule is instantiated only when the quiz explicitly enables Presencial release.
      *
      * @param quiz_settings $quizobj Quiz settings.
      * @param int $timenow Current time.
@@ -197,6 +308,9 @@ class quizaccess_presencial extends access_rule_base {
                 $previous,
                 $current,
             );
+            if ($previous['enabled']) {
+                (new release_request_service())->expire_for_quiz((int) $quiz->id);
+            }
             return;
         }
 
@@ -273,6 +387,7 @@ class quizaccess_presencial extends access_rule_base {
         quiz_lock::execute($quiz->id, function () use ($quiz, $DB): void {
             $DB->delete_records('quizaccess_presencial_invite', ['quizid' => $quiz->id]);
             $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quiz->id]);
+            $DB->delete_records('quizaccess_presencial_req', ['quizid' => $quiz->id]);
             $DB->delete_records('quizaccess_presencial', ['quizid' => $quiz->id]);
         });
     }

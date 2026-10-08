@@ -41,7 +41,7 @@ O pedido temporário criado automaticamente quando um estudante presente no labo
 _Avoid_: solicitação de prova, pedido de acesso ao curso
 
 **Autorização de tentativa**:
-A decisão temporária e de uso único que permite ao estudante iniciar sua próxima tentativa, com validade administrativa padrão de 5 minutos. Ela é consumida quando o estudante confirma o início e a tentativa é criada; desabilitar a Liberação Presencial encerra autorizações não consumidas, mas retomar uma tentativa já criada não exige nova autorização.
+A decisão temporária e de uso único que permite ao estudante iniciar sua próxima tentativa, com validade administrativa padrão de 5 minutos. Uma autorização já reclamada para iniciar uma tentativa conclui essa criação antes de ser consumida; desabilitar a Liberação Presencial encerra apenas autorizações ainda não reclamadas, e retomar uma tentativa criada não exige nova autorização.
 _Avoid_: autorização do estudante, autorização permanente do Questionário
 
 **Decisão vigente**:

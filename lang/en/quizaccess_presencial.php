@@ -30,6 +30,7 @@ $string['authorizationperiodavailability'] = 'The authorization period must be c
 $string['authorizationperiodend'] = 'Authorization period ends';
 $string['authorizationperiodendrequired'] = 'Set when the authorization period ends.';
 $string['authorizationperiodfuture'] = 'The authorization period must end in the future.';
+$string['authorizationperiodinactive'] = 'The authorization period is not active, so this request cannot be authorized.';
 $string['authorizationperiodordered'] = 'The authorization period must end after it starts.';
 $string['authorizationperiodstart'] = 'Authorization period starts';
 $string['authorizationperiodstartrequired'] = 'Set when the authorization period starts.';
@@ -71,7 +72,6 @@ $string['invitationstate_none'] = 'No invitation has been generated.';
 $string['invitationunavailable'] = 'Enable in-person release and set a valid authorization period before generating an invitation.';
 $string['manageapplicators'] = 'Manage application team';
 $string['pluginname'] = 'In-person release';
-$string['privacy:metadata'] = 'The In-person release quiz access rule stores application delegation records.';
 $string['privacy:metadata:delegation'] = 'Application delegation records for a quiz.';
 $string['privacy:metadata:delegation:origin'] = 'The source that created the delegation.';
 $string['privacy:metadata:delegation:quizid'] = 'The quiz receiving the delegation.';
@@ -89,6 +89,47 @@ $string['privacy:metadata:invite:state'] = 'The operational state of the invitat
 $string['privacy:metadata:invite:timecreated'] = 'When the invitation was generated.';
 $string['privacy:metadata:invite:timeexpires'] = 'The latest time at which the invitation can be used.';
 $string['privacy:metadata:invite:timemodified'] = 'When the invitation was last changed.';
+$string['privacy:metadata'] = 'The In-person release quiz access rule stores application delegations, invitation lifecycle data, and student release requests.';
+$string['privacy:metadata:request'] = 'A release request links a student to a quiz and a numbered attempt, with its current state and timestamps.';
+$string['privacy:metadata:request:attemptnumber'] = 'The next quiz attempt number covered by this request.';
+$string['privacy:metadata:request:expiresat'] = 'The absolute expiry time for the pending request or unused authorization.';
+$string['privacy:metadata:request:quizid'] = 'The quiz associated with this request.';
+$string['privacy:metadata:request:state'] = 'The current state of this request.';
+$string['privacy:metadata:request:timecreated'] = 'The time this request was created.';
+$string['privacy:metadata:request:timemodified'] = 'The time this request last changed state.';
+$string['privacy:metadata:request:userid'] = 'The student who created this request.';
+$string['privacy:exportpath:request'] = 'Release request';
+$string['eventrequestcreated'] = 'Attempt release request created';
+$string['eventrequestcreateddesc'] = 'Release request {$a->requestid} was created for student {$a->studentid}.';
+$string['eventrequestauthorized'] = 'Attempt release request authorized';
+$string['eventrequestauthorizeddesc'] = 'Release request {$a->requestid} for student {$a->studentid} was authorized ' .
+    'by user {$a->actorid}.';
+$string['eventrequestconsumed'] = 'Attempt release authorization consumed';
+$string['eventrequestconsumeddesc'] = 'Release request {$a->requestid} for student {$a->studentid} was consumed ' .
+    'by attempt {$a->attemptnumber}.';
+$string['eventrequeststarting'] = 'Authorized attempt creation started';
+$string['eventrequeststartingdesc'] = 'Release request {$a->requestid} for student {$a->studentid} began ' .
+    'creating attempt {$a->attemptnumber}.';
+$string['eventrequestexpired'] = 'Attempt release request or authorization expired';
+$string['eventrequestexpireddesc'] = 'Release request {$a->requestid} or its unused authorization for student ' .
+    '{$a->studentid} expired.';
+$string['requestattemptalreadyexists'] = 'An attempt has already been created for this request. ' .
+    'Return to the quiz to resume it.';
+$string['requestnotfound'] = 'The release request was not found.';
+$string['requestpending'] = 'Your release request is pending. Keep this page open while the status updates ' .
+    'automatically.';
+$string['requestdescription'] = 'Starting a new attempt requires in-person release. Your request will appear on a ' .
+    'waiting page and update automatically.';
+$string['requestexpired'] = 'This request or its unused authorization has expired. Return to the quiz and start a ' .
+    'new request.';
+$string['requestauthorized'] = 'Your request was authorized. Continue to start your attempt.';
+$string['requestconsumed'] = 'This authorization has already been used. Return to the quiz to continue your attempt.';
+$string['requeststartattempt'] = 'Start attempt';
+$string['requestpolling'] = 'This page checks for an update automatically every five seconds.';
+$string['backtoquiz'] = 'Return to the quiz';
+$string['requestwaittitle'] = 'Waiting for in-person release';
+$string['ruleisdisabled'] = 'In-person release is not enabled for this quiz.';
+$string['taskexpirerequests'] = 'Expire due release requests and unused authorizations';
 $string['rejectionjustificationrequired'] = 'Require a rejection justification';
 $string['rejectionjustificationrequired_desc'] = 'Require a justification when a release request is rejected.';
 $string['requestvalidity'] = 'Release request validity';

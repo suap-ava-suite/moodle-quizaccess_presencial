@@ -1,0 +1,22 @@
+<section class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}">
+    <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}"
+         role="status" aria-live="polite" data-region="request-status">
+        {{message}}
+    </div>
+    {{#pending}}
+        <p>{{#str}}requestpolling, quizaccess_presencial{{/str}}</p>
+        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
+    {{/pending}}
+    {{#authorized}}
+        <form action="{{starturl}}" method="post">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <button type="submit" class="btn btn-primary">{{startlabel}}</button>
+        </form>
+    {{/authorized}}
+    {{#expired}}
+        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
+    {{/expired}}
+    {{#consumed}}
+        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
+    {{/consumed}}
+</section>
