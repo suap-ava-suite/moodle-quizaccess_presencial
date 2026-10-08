@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled lifecycle maintenance for requests and invitations.
+ * External function declarations for the plugin.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -24,23 +24,21 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$tasks = [
-    [
-        'classname' => 'quizaccess_presencial\task\expire_invitations',
-        'blocking' => 0,
-        'minute' => '*',
-        'hour' => '*',
-        'day' => '*',
-        'month' => '*',
-        'dayofweek' => '*',
+$functions = [
+    'quizaccess_presencial_read_request' => [
+        'classname' => '\\quizaccess_presencial\\external\\read_request_status',
+        'methodname' => 'execute',
+        'description' => 'Read and refresh the current user\'s release request state.',
+        'type' => 'read',
+        'ajax' => true,
+        'loginrequired' => true,
     ],
-    [
-        'classname' => '\\quizaccess_presencial\\task\\expire_requests',
-        'blocking' => 0,
-        'minute' => '*/1',
-        'hour' => '*',
-        'day' => '*',
-        'dayofweek' => '*',
-        'month' => '*',
+    'quizaccess_presencial_authorize_request' => [
+        'classname' => '\\quizaccess_presencial\\external\\authorize_request',
+        'methodname' => 'execute',
+        'description' => 'Authorize a student release request during the Quiz authorization period.',
+        'type' => 'write',
+        'ajax' => true,
+        'loginrequired' => true,
     ],
 ];

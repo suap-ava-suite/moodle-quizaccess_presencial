@@ -18,6 +18,9 @@ namespace quizaccess_presencial;
 
 use core_privacy\local\request\userlist;
 use quizaccess_presencial\local\delegation_manager;
+use core_privacy\local\request\approved_contextlist;
+use core_privacy\local\request\writer;
+use quizaccess_presencial\local\release_request_service;
 use quizaccess_presencial\privacy\provider;
 
 defined('MOODLE_INTERNAL') || die();
@@ -26,7 +29,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 
 /**
- * Privacy provider boundary tests.
+ * Privacy API boundary tests for delegations, invitations, and release requests.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -129,5 +132,58 @@ final class privacy_provider_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('quiz', ['id' => $quiz->id]));
         $this->assertFalse($DB->record_exists('quizaccess_presencial', ['quizid' => $quiz->id]));
         $this->assertFalse($DB->record_exists('quizaccess_presencial_delegation', ['quizid' => $quiz->id]));
+    }
+
+    /**
+     * Context discovery, export, and deletion expose and remove the request data.
+     */
+    public function test_context_export_and_deletion(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        $this->setAdminUser();
+        $course = self::getDataGenerator()->create_course();
+        $quiz = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_test_quiz(
+            [['First question', 1, 'truefalse']],
+            ['course' => $course->id],
+        )->get_quiz();
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+        $quiz->coursemodule = $cm->id;
+        $quiz->presencial_enabled = 1;
+        $quiz->presencial_timeopen = 1_799_999_000;
+        $quiz->presencial_timeclose = 1_800_010_000;
+        \quizaccess_presencial::save_settings($quiz);
+        $student = self::getDataGenerator()->create_user();
+        $request = (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
+        $context = \context_module::instance($cm->id);
+
+        $contexts = provider::get_contexts_for_userid($student->id);
+        $contextids = array_map('intval', $contexts->get_contextids());
+        $this->assertSame([(int) $context->id], $contextids);
+        $approvedcontexts = new approved_contextlist($student, 'quizaccess_presencial', [$context->id]);
+        writer::reset();
+        $writer = writer::with_context($context);
+        $this->assertFalse($writer->has_any_data());
+
+        provider::export_user_data($approvedcontexts);
+
+        $export = $writer->get_data([
+            get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:request', 'quizaccess_presencial'),
+            '1',
+        ]);
+        $this->assertNotEmpty($export);
+        $this->assertSame((int) $quiz->id, $export->quizid);
+        $this->assertSame(1, $export->attemptnumber);
+        $this->assertSame('pending', $export->state);
+        $this->assertSame(userdate($request->timecreated), $export->timecreated);
+
+        provider::delete_data_for_user($approvedcontexts);
+        $this->assertFalse($DB->record_exists('quizaccess_presencial_req', ['id' => $request->id]));
+
+        $secondstudent = self::getDataGenerator()->create_user();
+        $secondrequest = (new release_request_service($clock))->ensure_pending($quiz->id, $secondstudent->id, 1);
+        provider::delete_data_for_all_users_in_context($context);
+        $this->assertFalse($DB->record_exists('quizaccess_presencial_req', ['id' => $secondrequest->id]));
     }
 }

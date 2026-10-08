@@ -6,7 +6,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// Moodle is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for the Presencial quiz access rule.
+ * Event observer registration for the plugin.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -24,8 +24,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.3.0';
-$plugin->version = 2026100700;
-$plugin->requires = 2024100700;
-$plugin->maturity = MATURITY_ALPHA;
+$observers = [
+    [
+        'eventname' => '\\mod_quiz\\event\\attempt_started',
+        'callback' => '\\quizaccess_presencial\\observer::attempt_started',
+        'internal' => true,
+    ],
+];

@@ -27,9 +27,10 @@
 require_once(__DIR__ . '/../../../../../../lib/behat/behat_base.php');
 
 use Behat\Mink\Exception\ExpectationException;
+use quizaccess_presencial\external\authorize_request as authorize_request_endpoint;
 
 /**
- * Steps for application-team management and the invitation link.
+ * Steps for application-team management, invitations, and release requests.
  */
 class behat_quizaccess_presencial extends behat_base {
     /** @var string|null A link observed in the browser, retained only by this test. */
@@ -211,6 +212,175 @@ class behat_quizaccess_presencial extends behat_base {
             (new \quizaccess_presencial\task\expire_invitations())->execute();
         } finally {
             \core\di::set(\core\clock::class, $clock);
+        }
+    }
+
+    /**
+     * Assert that the logged-in student has not received an attempt prematurely.
+     *
+     * @Then /^there should be no attempt for "([^"]*)" as "([^"]*)"$/
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function assert_no_attempt_for_quiz(string $quizname, string $username): void {
+        global $DB;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        $count = $DB->count_records('quiz_attempts', [
+            'quiz' => $quiz->id,
+            'userid' => $user->id,
+            'preview' => 0,
+        ]);
+        if ($count) {
+            throw new ExpectationException('A quiz attempt was created before release.', $this->getSession());
+        }
+    }
+
+    /**
+     * Assert that a student's next attempt has one pending release request.
+     *
+     * @Then /^the release request for "([^"]*)" for "([^"]*)" should be pending$/
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function assert_request_is_pending(string $quizname, string $username): void {
+        global $DB;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        $request = $DB->get_record('quizaccess_presencial_req', [
+            'quizid' => $quiz->id,
+            'userid' => $user->id,
+            'attemptnumber' => 1,
+            'active' => 1,
+        ], '*', MUST_EXIST);
+        if ($request->state !== 'pending') {
+            throw new ExpectationException('The release request is not pending.', $this->getSession());
+        }
+    }
+
+    /**
+     * Assert that pending users have no manual polling control.
+     *
+     * @Then /^the waiting page should not contain a manual check button$/
+     */
+    public function assert_no_manual_check_button(): void {
+        $buttons = $this->getSession()->getPage()->findAll('css', '.quizaccess-presencial-waiting button');
+        if ($buttons) {
+            throw new ExpectationException('The pending page contains a manual check button.', $this->getSession());
+        }
+    }
+
+    /**
+     * Authorize the current student's request in the fixture for the UI transition test.
+     *
+     * @When /^I authorize the release request for "([^"]*)" for "([^"]*)"$/
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function authorize_request(string $quizname, string $username): void {
+        global $DB, $USER;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        $request = $DB->get_record('quizaccess_presencial_req', [
+            'quizid' => $quiz->id,
+            'userid' => $user->id,
+            'attemptnumber' => 1,
+            'state' => 'pending',
+        ], '*', MUST_EXIST);
+        $student = $USER;
+        \core\session\manager::set_user(get_admin());
+        try {
+            authorize_request_endpoint::execute((int) $request->id);
+        } finally {
+            \core\session\manager::set_user($student);
+        }
+    }
+
+    /**
+     * Move the expiry into the past so the browser's next normal poll processes it.
+     *
+     * @When /^I make the release request for "([^"]*)" for "([^"]*)" due$/
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function make_request_due(string $quizname, string $username): void {
+        global $DB;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        $request = $DB->get_record('quizaccess_presencial_req', [
+            'quizid' => $quiz->id,
+            'userid' => $user->id,
+            'attemptnumber' => 1,
+            'state' => 'pending',
+        ], '*', MUST_EXIST);
+        $now = \core\di::get(\core\clock::class)->time();
+        $DB->set_field('quizaccess_presencial_req', 'expiresat', $now - 1, ['id' => $request->id]);
+    }
+
+    /**
+     * Wait for the scheduled browser poll to reload after a state change.
+     *
+     * @When /^I wait for the release request poll "([^"]*)"$/
+     * @param string $state Expected state rendered after the poll.
+     */
+    public function wait_for_request_poll(string $state): void {
+        $success = $this->getSession()->wait(
+            10000,
+            "document.querySelector('[data-request-id]')?.getAttribute('data-state') === '" . $state . "'",
+        );
+        if (!$success) {
+            throw new ExpectationException(
+                'The automatic release request poll did not show ' . $state . '.',
+                $this->getSession(),
+            );
+        }
+    }
+
+    /**
+     * Assert that no request exists for the given next attempt number.
+     *
+     * @Then /^there should be no release request for attempt (\d+) of "([^"]*)" for "([^"]*)"$/
+     * @param int $attemptnumber Attempt number.
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function assert_no_request_for_attempt(int $attemptnumber, string $quizname, string $username): void {
+        global $DB;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        if (
+            $DB->record_exists('quizaccess_presencial_req', [
+                'quizid' => $quiz->id,
+                'userid' => $user->id,
+                'attemptnumber' => $attemptnumber,
+            ])
+        ) {
+            throw new ExpectationException(
+                'An unexpected release request exists for attempt ' . $attemptnumber . '.',
+                $this->getSession(),
+            );
+        }
+    }
+
+    /**
+     * Assert that the newly created attempt consumed its release authorization.
+     *
+     * @Then /^the release request for attempt (\d+) of "([^"]*)" for "([^"]*)" should be consumed$/
+     * @param int $attemptnumber Attempt number.
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function assert_request_consumed(int $attemptnumber, string $quizname, string $username): void {
+        global $DB;
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+        $request = $DB->get_record('quizaccess_presencial_req', [
+            'quizid' => $quiz->id,
+            'userid' => $user->id,
+            'attemptnumber' => $attemptnumber,
+        ], '*', MUST_EXIST);
+        if ($request->state !== 'consumed') {
+            throw new ExpectationException('The attempt did not consume its release request.', $this->getSession());
         }
     }
 }
