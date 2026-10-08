@@ -36,6 +36,109 @@ class behat_quizaccess_presencial extends behat_base {
     private ?string $previouslink = null;
 
     /**
+     * Verify the native course and quiz routes still demand enrolment.
+     *
+     * @Then academic access to :quizname should still require enrolment
+     * @param string $quizname Quiz name.
+     */
+    public function academic_access_should_still_require_enrolment(string $quizname): void {
+        global $DB;
+
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id, 0, false, MUST_EXIST);
+        $previousurl = $this->getSession()->getCurrentUrl();
+        $urls = [
+            new moodle_url('/course/view.php', ['id' => $quiz->course]),
+            new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]),
+        ];
+        try {
+            foreach ($urls as $url) {
+                $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
+                $path = parse_url($this->getSession()->getCurrentUrl(), PHP_URL_PATH);
+                if (
+                    !str_ends_with($path, '/enrol/index.php') ||
+                    !str_contains($this->getSession()->getPage()->getText(), get_string('enrolmentoptions', 'enrol'))
+                ) {
+                    throw new ExpectationException('Academic access must still require enrolment.', $this->getSession());
+                }
+            }
+        } finally {
+            $this->getSession()->visit($previousurl);
+        }
+    }
+
+    /**
+     * Suspend an account through Moodle without logging out the browser session.
+     *
+     * @When the application account :username is suspended
+     * @param string $username Applicator username.
+     */
+    public function the_application_account_is_suspended(string $username): void {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/user/lib.php');
+        $userid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
+        user_update_user((object) ['id' => $userid, 'suspended' => 1]);
+    }
+
+    /**
+     * Revoke through the public delegation boundary while the browser session remains open.
+     *
+     * @When the application delegation of :username for :quizname is revoked
+     * @param string $username Applicator username.
+     * @param string $quizname Quiz name.
+     */
+    public function the_application_delegation_is_revoked(string $username, string $quizname): void {
+        global $DB, $USER;
+
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $userid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
+        $previoususer = $USER;
+        try {
+            \core\session\manager::set_user(get_admin());
+            $delegations = \quizaccess_presencial\local\delegation_manager::list_current($quizid);
+            foreach ($delegations as $delegation) {
+                if ((int) $delegation->userid === (int) $userid) {
+                    \quizaccess_presencial\local\delegation_manager::revoke($quizid, $delegation->id, $USER->id);
+                    return;
+                }
+            }
+            throw new coding_exception('The applicator must have a current delegation to revoke.');
+        } finally {
+            \core\session\manager::set_user($previoususer);
+        }
+    }
+
+    /**
+     * A direct application URL must deny access before revealing application metadata.
+     *
+     * @Then accessing the application panel for :quizname should be denied
+     * @param string $quizname Quiz name.
+     */
+    public function application_panel_access_should_be_denied(string $quizname): void {
+        global $DB;
+
+        $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id, 0, false, MUST_EXIST);
+        $url = new moodle_url('/mod/quiz/accessrule/presencial/application.php', ['cmid' => $cm->id]);
+        try {
+            $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
+            $page = $this->getSession()->getPage();
+            $error = $page->find('css', '[data-rel="fatalerror"]');
+            if (
+                !$error ||
+                !str_contains($error->getText(), get_string('applicationaccessdenied', 'quizaccess_presencial')) ||
+                str_contains($page->getText(), $quizname)
+            ) {
+                throw new ExpectationException('Expected access denial without application metadata.', $this->getSession());
+            }
+        } finally {
+            // Leave the expected error page before Moodle's after-step exception check.
+            $this->getSession()->visit($this->locate_path('/'));
+        }
+    }
+
+    /**
      * Resolve the management page, which hosts the invitation, for the named quiz.
      *
      * @param string $type Page type.
