@@ -34,10 +34,11 @@ Feature: Find and open standalone applications
     And I should see "Quiz 1" in the ".presencial-applications" "css_element"
     And I should see "Current" in the ".presencial-applications" "css_element"
     And I should see "Pending requests"
+    And I should see "Unavailable" in the ".presencial-applications" "css_element"
     When I follow "Open application"
     Then I should see "Application panel" in the "h2" "css_element"
     And I should see "Quiz 1"
-    And I should see "No pending release requests."
+    And I should see "Release requests are not available in this version."
     And academic access to "Quiz 1" should still require enrolment
 
   Scenario: Revocation denies a known application URL in the existing session
@@ -66,4 +67,4 @@ Feature: Find and open standalone applications
     When I follow "Application panel"
     Then I should see "Application panel" in the "h2" "css_element"
     And I should see "Quiz 1"
-    And I should see "No pending release requests."
+    And I should see "Release requests are not available in this version."

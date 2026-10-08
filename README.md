@@ -40,7 +40,7 @@ O item **Minhas Aplicações** aparece no menu do usuário somente para Contas e
 
 Cada requisição verifica novamente a conta, a configuração, o período e a autoridade no Questionário. Revogação, expiração, suspensão da conta ou desabilitação da regra interrompe o acesso. Remover a suspensão recupera a mesma Delegação somente enquanto ela e o período continuam válidos; não há histórico pessoal de aplicações. Aplicações futuras mostram apenas informações de preparação, sem ações operacionais antes do início do período.
 
-Nesta entrega, a quantidade pendente é zero e o painel informa a ausência de solicitações. A criação das Solicitações de liberação e a Fila operacional serão implementadas nas issues #10 e #11, incluindo a contagem real e as decisões sobre estudantes.
+Nesta entrega, a coluna de solicitações pendentes informa **Indisponível**, e o painel explica que Solicitações de liberação ainda não estão disponíveis nesta versão. A contagem real permanece pendente da issue #10; um valor indisponível não é apresentado como zero. A Fila operacional e as decisões sobre estudantes serão implementadas na issue #11.
 
 A mesma página reúne a gestão do **Convite** por link. O link completo aparece somente na resposta à geração, com um botão para copiá-lo. A página posterior mostra apenas o estado e a validade. Regenerar substitui imediatamente o segredo anterior; desativar impede seu uso. Desabilitar e reabilitar a regra também exige gerar outro convite.
 

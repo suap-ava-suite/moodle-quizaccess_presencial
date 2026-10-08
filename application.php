@@ -57,7 +57,7 @@ echo html_writer::tag('p', get_string('applicationperiod', 'quizaccess_presencia
     'end' => userdate($application['timeclose']),
 ]));
 echo html_writer::tag('p', get_string(
-    $application['canoperate'] ? 'nopendingrequests' : 'applicationnotstarted',
+    $application['canoperate'] ? 'applicationrequestsnotavailable' : 'applicationnotstarted',
     'quizaccess_presencial',
 ));
 echo html_writer::link($url, get_string('refresh'));

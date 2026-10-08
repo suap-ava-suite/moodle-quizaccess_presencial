@@ -54,7 +54,7 @@ final class applications_test extends \advanced_testcase {
         $this->assertSame(['Current quiz', 'Future quiz'], array_column($page['items'], 'quizname'));
         $this->assertSame(['current', 'future'], array_column($page['items'], 'state'));
         $this->assertSame([true, false], array_column($page['items'], 'canoperate'));
-        $this->assertSame([0, 0], array_column($page['items'], 'pendingcount'));
+        $this->assertSame([null, null], array_column($page['items'], 'pendingcount'));
         $this->assertNotContains((int) $unrelated->id, array_column($page['items'], 'quizid'));
         $this->assertFalse(is_enrolled(\context_module::instance($current->cmid), $user->id));
         $this->assertFalse(has_capability('mod/quiz:view', \context_module::instance($current->cmid)));

@@ -63,7 +63,8 @@ if (!$applications['total']) {
             userdate($application['timeopen']),
             userdate($application['timeclose']),
             get_string('applicationstate_' . $application['state'], 'quizaccess_presencial'),
-            $application['pendingcount'],
+            $application['pendingcount'] === null
+                ? get_string('pendingrequestsunavailable', 'quizaccess_presencial') : $application['pendingcount'],
             html_writer::link(
                 new moodle_url('/mod/quiz/accessrule/presencial/application.php', ['cmid' => $application['cmid']]),
                 get_string('openapplication', 'quizaccess_presencial'),

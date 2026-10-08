@@ -47,7 +47,7 @@ final class applications {
      * @param int $page Zero-based page number.
      * @param int $pagesize Items per page, limited to 100.
      * @return array Total and application items, ordered by authorization start and quiz id.
-     *     Each item includes state (current, future or teacher), canoperate and pendingcount.
+     *     Each item includes state (current, future or teacher), canoperate and pendingcount (null when unavailable).
      */
     public static function get_page(int $page = 0, int $pagesize = 20): array {
         return self::find(max(0, $page), max(1, min(100, $pagesize)));
@@ -142,8 +142,8 @@ final class applications {
             $item['canoperate'] = (int) $record->timeopen <= $now;
             $item['state'] = $record->delegated ? ($item['canoperate'] ? 'current' : 'future') : 'teacher';
             unset($item['delegated']);
-            // Release requests are introduced by issue #10; there are none in this delivery.
-            $item['pendingcount'] = 0;
+            // Release requests are introduced by issue #10; their count is not available in this delivery.
+            $item['pendingcount'] = null;
             $items[] = $item;
         }
         return ['total' => count($quizids), 'items' => $items];
