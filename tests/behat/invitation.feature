@@ -88,3 +88,23 @@ Feature: Manage the in-person release invitation
     When I navigate to "Manage application team" in current page administration
     Then I should see "Enable in-person release and set a valid authorization period before generating an invitation."
     And "Generate invitation" "button" should not exist
+
+  Scenario: An authenticated eligible account accepts the remembered invitation after login
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Manage application team" in current page administration
+    And I press "Generate invitation"
+    And I remember the generated invitation link
+    When I log out
+    And I open the remembered invitation link
+    And I log in as "student1"
+    Then I should see "Course 1"
+    And I should see "Quiz 1"
+    And I should see "Teacher One"
+    And I should not see "Student One"
+    And I should not see "Questions"
+    And I should not see "Grades"
+    When I press "Accept invitation"
+    Then I should see "You are now part of the application team."
+    And I should not see "Student One"
+    And I should not see "Questions"
+    And I should not see "Grades"

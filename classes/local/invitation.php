@@ -31,6 +31,63 @@ use quizaccess_presencial\event\invitation_updated;
  */
 final class invitation {
     /**
+     * Return the restricted, acceptance-safe invitation summary.
+     *
+     * @param int $cmid Quiz course module.
+     * @param string $token Untrusted secret.
+     * @return array Quiz, course, authorization period and invitation creator.
+     */
+    public static function get_acceptance_details(int $cmid, string $token): array {
+        global $DB;
+
+        $cm = get_coursemodule_from_id('quiz', $cmid);
+        if (!$cm || !self::validate($cmid, $token)) {
+            throw new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
+        }
+        $quiz = $DB->get_record('quiz', ['id' => $cm->instance], 'id,name,course', MUST_EXIST);
+        $course = $DB->get_record('course', ['id' => $cm->course], 'id,fullname', MUST_EXIST);
+        $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id], '*', MUST_EXIST);
+        $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], 'createdby', MUST_EXIST);
+        $creator = $DB->get_record('user', ['id' => $record->createdby], 'id,firstname,lastname', MUST_EXIST);
+
+        return [
+            'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),
+            'quiz' => format_string($quiz->name, true, ['context' => \context_module::instance($cm->id)]),
+            'timeopen' => (int) $configuration->timeopen,
+            'timeclose' => (int) $configuration->timeclose,
+            'teacher' => fullname($creator),
+        ];
+    }
+
+    /**
+     * Accept a valid invitation for an eligible authenticated account.
+     *
+     * @param int $cmid Quiz course module.
+     * @param string $token Untrusted secret.
+     * @return array Delegation record and whether it was created.
+     */
+    public static function accept(int $cmid, string $token): array {
+        global $DB, $USER;
+
+        $cm = get_coursemodule_from_id('quiz', $cmid);
+        if (!$cm) {
+            invitation_invalid::create(['context' => \context_system::instance()])->trigger();
+            throw new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
+        }
+        return quiz_lock::execute($cm->instance, function () use ($cm, $token, $DB, $USER): array {
+            $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
+            self::reconcile($cm, $record ?: null, $configuration ?: null);
+            $valid = self::is_valid($cm, $record ?: null, $configuration ?: null, $token);
+            if (!$valid) {
+                invitation_invalid::create(['context' => \context_module::instance($cm->id)])->trigger();
+                throw new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
+            }
+            return delegation_manager::accept_invitation($cm->instance, (int) $USER->id);
+        });
+    }
+
+    /**
      * Generate a secret, returning it only to this caller.
      *
      * @param int $cmid Quiz course module.
@@ -119,10 +176,7 @@ final class invitation {
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
             self::reconcile($cm, $record ?: null, $configuration ?: null);
-            $valid = $record && $record->state === 'active' && self::can_issue($cm, $configuration ?: null)
-                && $record->timeexpires > \core\di::get(\core\clock::class)->time()
-                && preg_match('/\Ai1_[0-9a-f]{64}\z/', $token)
-                && hash_equals($record->tokenhash, self::derive($token));
+            $valid = self::is_valid($cm, $record ?: null, $configuration ?: null, $token);
             if (!$valid) {
                 invitation_invalid::create(['context' => \context_module::instance($cm->id)])->trigger();
             }
@@ -331,6 +385,27 @@ final class invitation {
             \core\di::get(\core\clock::class)->time(),
             false
         );
+    }
+
+    /**
+     * Test whether a token still identifies the active invitation under its quiz lock.
+     *
+     * @param \stdClass $cm Course module.
+     * @param \stdClass|null $record Invitation record.
+     * @param \stdClass|null $configuration Quiz configuration.
+     * @param string $token Untrusted secret.
+     * @return bool Whether the token can be accepted.
+     */
+    private static function is_valid(
+        \stdClass $cm,
+        ?\stdClass $record,
+        ?\stdClass $configuration,
+        string $token,
+    ): bool {
+        return $record && $record->state === 'active' && self::can_issue($cm, $configuration)
+            && $record->timeexpires > \core\di::get(\core\clock::class)->time()
+            && preg_match('/\Ai1_[0-9a-f]{64}\z/', $token)
+            && hash_equals($record->tokenhash, self::derive($token));
     }
 
     /**

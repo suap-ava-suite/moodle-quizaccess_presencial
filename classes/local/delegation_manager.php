@@ -85,39 +85,8 @@ final class delegation_manager {
             $transaction = $DB->start_delegated_transaction();
             $result = [];
             foreach ($userids as $userid) {
-                $current = $DB->get_record_select(
-                    'quizaccess_presencial_delegation',
-                    'quizid = :quizid AND userid = :userid AND timerevoked = 0 AND timeclose > :now
-                        AND timeopen = :timeopen AND timeclose = :timeclose',
-                    [
-                        'quizid' => $quizid,
-                        'userid' => $userid,
-                        'now' => $now,
-                        'timeopen' => $configuration->timeopen,
-                        'timeclose' => $configuration->timeclose,
-                    ],
-                    '*',
-                );
-                if ($current) {
-                    $result[$userid] = $current;
-                    self::trigger_event($current, $actorid, 'idempotent', $origin);
-                    continue;
-                }
-
-                $record = (object) [
-                    'quizid' => $quizid,
-                    'userid' => $userid,
-                    'timeopen' => $configuration->timeopen,
-                    'timeclose' => $configuration->timeclose,
-                    'origin' => $origin,
-                    'timecreated' => $now,
-                    'timemodified' => $now,
-                    'timerevoked' => 0,
-                    'revokedby' => 0,
-                ];
-                $record->id = $DB->insert_record('quizaccess_presencial_delegation', $record);
-                $result[$userid] = $record;
-                self::trigger_event($record, $actorid, 'created', $origin);
+                $included = self::create_or_find($quizid, $userid, $actorid, $origin, $configuration, $now);
+                $result[$userid] = $included['delegation'];
             }
             $transaction->allow_commit();
             return $result;
@@ -125,6 +94,45 @@ final class delegation_manager {
             foreach (array_reverse($locks) as $lock) {
                 $lock->release();
             }
+        }
+    }
+
+    /**
+     * Create or find the delegation resulting from a validated invitation.
+     *
+     * Invitation validation is deliberately owned by the invitation boundary;
+     * this method only applies its resulting delegation with the same lifecycle
+     * and audit semantics as a direct inclusion.
+     *
+     * @param int $quizid Quiz id.
+     * @param int $userid Authenticated account accepting the invitation.
+     * @param int|null $now Current timestamp, for deterministic tests.
+     * @return array Delegation record and whether it was created.
+     */
+    public static function accept_invitation(int $quizid, int $userid, ?int $now = null): array {
+        global $DB;
+
+        $now ??= time();
+        if (!self::is_eligible_user($userid)) {
+            throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
+        }
+        $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
+        if (!$configuration->enabled || $configuration->timeclose <= $now) {
+            throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
+        }
+
+        $lockfactory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
+        $lock = $lockfactory->get_lock("delegation:{$quizid}:{$userid}", 10);
+        if (!$lock) {
+            throw new \moodle_exception('delegationlocktimeout', 'quizaccess_presencial');
+        }
+        try {
+            $transaction = $DB->start_delegated_transaction();
+            $result = self::create_or_find($quizid, $userid, $userid, 'invite', $configuration, $now);
+            $transaction->allow_commit();
+            return $result;
+        } finally {
+            $lock->release();
         }
     }
 
@@ -263,6 +271,60 @@ final class delegation_manager {
     private static function quiz_context(int $quizid): \context_module {
         $cm = get_coursemodule_from_instance('quiz', $quizid, 0, false, MUST_EXIST);
         return \context_module::instance($cm->id);
+    }
+
+    /**
+     * Create a delegation or return its current equivalent inside the caller's transaction.
+     *
+     * @param int $quizid Quiz id.
+     * @param int $userid Delegated account.
+     * @param int $actorid User performing the operation.
+     * @param string $origin Delegation origin.
+     * @param \stdClass $configuration Current quiz configuration.
+     * @param int $now Current timestamp.
+     * @return array Delegation record and whether it was created.
+     */
+    private static function create_or_find(
+        int $quizid,
+        int $userid,
+        int $actorid,
+        string $origin,
+        \stdClass $configuration,
+        int $now,
+    ): array {
+        global $DB;
+
+        $current = $DB->get_record_select(
+            'quizaccess_presencial_delegation',
+            'quizid = :quizid AND userid = :userid AND timerevoked = 0 AND timeclose > :now
+                AND timeopen = :timeopen AND timeclose = :timeclose',
+            [
+                'quizid' => $quizid,
+                'userid' => $userid,
+                'now' => $now,
+                'timeopen' => $configuration->timeopen,
+                'timeclose' => $configuration->timeclose,
+            ],
+            '*',
+        );
+        if ($current) {
+            self::trigger_event($current, $actorid, 'idempotent', $origin);
+            return ['delegation' => $current, 'created' => false];
+        }
+        $delegation = (object) [
+            'quizid' => $quizid,
+            'userid' => $userid,
+            'timeopen' => $configuration->timeopen,
+            'timeclose' => $configuration->timeclose,
+            'origin' => $origin,
+            'timecreated' => $now,
+            'timemodified' => $now,
+            'timerevoked' => 0,
+            'revokedby' => 0,
+        ];
+        $delegation->id = $DB->insert_record('quizaccess_presencial_delegation', $delegation);
+        self::trigger_event($delegation, $actorid, 'created', $origin);
+        return ['delegation' => $delegation, 'created' => true];
     }
 
     /**

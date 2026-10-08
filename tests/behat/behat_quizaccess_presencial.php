@@ -146,6 +146,18 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Open the invitation previously observed in the generated-link response.
+     *
+     * @When /^I open the remembered invitation link$/
+     */
+    public function i_open_the_remembered_invitation_link(): void {
+        if (!$this->previouslink) {
+            throw new \coding_exception('No generated invitation link has been remembered.');
+        }
+        $this->getSession()->visit($this->locate_path($this->previouslink));
+    }
+
+    /**
      * Compare the regenerated link through the public output field.
      *
      * @Then /^the generated invitation link should differ from the previous link$/
