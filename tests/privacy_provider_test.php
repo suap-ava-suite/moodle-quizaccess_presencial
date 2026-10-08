@@ -158,7 +158,8 @@ final class privacy_provider_test extends \advanced_testcase {
         $context = \context_module::instance($cm->id);
 
         $contexts = provider::get_contexts_for_userid($student->id);
-        $this->assertSame([$context->id], $contexts->get_contextids());
+        $contextids = array_map('intval', $contexts->get_contextids());
+        $this->assertSame([(int) $context->id], $contextids);
         $approvedcontexts = new approved_contextlist($student, 'quizaccess_presencial', [$context->id]);
         writer::reset();
         $writer = writer::with_context($context);

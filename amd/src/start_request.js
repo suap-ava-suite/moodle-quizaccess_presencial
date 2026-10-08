@@ -33,7 +33,7 @@ export const init = (requestUrl) => {
  * Submit an otherwise empty Moodle preflight form automatically. Required native inputs
  * remain user-controlled; Moodle validates them before notifying access rules.
  */
-export const continue_preflight = () => {
+export const continuePreflight = () => {
     const form = document.querySelector('#mod_quiz_preflight_form');
     if (!form) {
         return;

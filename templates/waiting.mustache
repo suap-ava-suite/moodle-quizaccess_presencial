@@ -1,4 +1,53 @@
-<section class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}">
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template quizaccess_presencial/waiting
+
+    Waiting page for a student's in-person release request.
+
+    Context variables required for this template:
+    * requestid - The release request identifier used by the polling module.
+    * state - The current request state.
+    * pending - Whether the request is pending or an attempt start is being completed.
+    * authorized - Whether the student may start the attempt.
+    * expired - Whether the request or unused authorization has expired.
+    * consumed - Whether the authorization has already created an attempt.
+    * message - The localized state message.
+    * quizurl - URL to return to the quiz.
+    * starturl - URL to submit Moodle's normal attempt-start form.
+    * startlabel - Localized attempt-start button label.
+    * sesskey - Moodle session key for the start form.
+
+    Example context (json):
+    {
+        "requestid": 1,
+        "state": "pending",
+        "pending": true,
+        "authorized": false,
+        "expired": false,
+        "consumed": false,
+        "message": "Your release request is pending.",
+        "quizurl": "/mod/quiz/view.php?id=1",
+        "starturl": "/mod/quiz/startattempt.php?cmid=1",
+        "startlabel": "Start attempt",
+        "sesskey": "example"
+    }
+}}
+<div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}">
     <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}"
          role="status" aria-live="polite" data-region="request-status">
         {{message}}
@@ -19,4 +68,4 @@
     {{#consumed}}
         <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
     {{/consumed}}
-</section>
+</div>

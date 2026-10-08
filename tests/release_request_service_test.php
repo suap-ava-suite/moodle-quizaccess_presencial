@@ -49,8 +49,8 @@ final class release_request_service_test extends \advanced_testcase {
 
         $request = (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
 
-        $this->assertSame($quiz->id, $request->quizid);
-        $this->assertSame($student->id, $request->userid);
+        $this->assertSame((int) $quiz->id, $request->quizid);
+        $this->assertSame((int) $student->id, $request->userid);
         $this->assertSame(1, $request->attemptnumber);
         $this->assertSame(release_request::STATE_PENDING, $request->state);
         $this->assertSame(1_800_000_000, $request->timecreated);
@@ -209,7 +209,7 @@ final class release_request_service_test extends \advanced_testcase {
     public function test_configured_request_validity_is_stored_as_absolute_deadline(): void {
         $this->resetAfterTest();
         $clock = $this->mock_clock_with_frozen(1_800_000_000);
-        $this->set_config('requestvalidity', 20, 'quizaccess_presencial');
+        set_config('requestvalidity', 20, 'quizaccess_presencial');
         [$quiz, $student] = $this->create_enabled_quiz_and_student();
 
         $request = (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
@@ -307,6 +307,7 @@ final class release_request_service_test extends \advanced_testcase {
         [$quiz, $student] = $this->create_enabled_quiz_and_student();
         $service = new release_request_service($clock);
         $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
 
         $this->setUser($student);
         try {
@@ -338,11 +339,14 @@ final class release_request_service_test extends \advanced_testcase {
         // Core's external API invokes the same access-rule callback before its
         // quiz_prepare_and_start_new_attempt() call. The plugin stops it by raising
         // the normal pending response (or redirect in a non-WS test context).
+        $exception = null;
         try {
             \mod_quiz_external::start_attempt($quiz->id);
-        } catch (\moodle_exception $exception) {
+        } catch (\moodle_exception $caught) {
             // The endpoint is expected to stop before returning an attempt.
+            $exception = $caught;
         }
+        $this->assertInstanceOf(\moodle_exception::class, $exception);
 
         $request = $DB->get_record('quizaccess_presencial_req', [
             'quizid' => $quiz->id,
@@ -358,20 +362,26 @@ final class release_request_service_test extends \advanced_testcase {
      * A native Quiz password check runs before the plugin can create a request.
      */
     public function test_native_quiz_preflight_must_pass_before_external_api_creates_request(): void {
-        global $DB;
+        global $DB, $SESSION;
         $this->resetAfterTest();
         $clock = $this->mock_clock_with_frozen(1_800_000_000);
         $quiz = $this->create_enabled_quiz(['password' => 'door-code']);
+        $this->assertSame('door-code', $quiz->password, 'The test must exercise the native Quiz password rule.');
         $this->remove_core_quiz_time_gates($quiz);
         $student = self::getDataGenerator()->create_user();
         self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
         $this->setUser($student);
+        unset($SESSION->passwordcheckedquizzes[$quiz->id]);
 
+        $exception = null;
         try {
             \mod_quiz_external::start_attempt($quiz->id);
-        } catch (\moodle_exception $exception) {
+        } catch (\moodle_exception $caught) {
             // The core rejects the request at its unsatisfied password preflight.
+            $exception = $caught;
         }
+        $this->assertInstanceOf(\moodle_exception::class, $exception);
+        $this->assertSame('passworderror', $exception->errorcode);
 
         $this->assertFalse($DB->record_exists('quizaccess_presencial_req', [
             'quizid' => $quiz->id,
@@ -583,6 +593,7 @@ final class release_request_service_test extends \advanced_testcase {
     /**
      * Create a quiz with the access rule enabled through its public lifecycle hook.
      *
+     * @param array $quizsettings Additional quiz settings.
      * @return \stdClass Quiz record.
      */
     private function create_enabled_quiz(array $quizsettings = []): \stdClass {

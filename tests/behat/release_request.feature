@@ -73,10 +73,10 @@ Feature: Gate new quiz attempts with an in-person release request
   Scenario: Core preflight protects the no-JavaScript start path
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
     When I press "Attempt quiz"
-    Then I should see "Start attempt"
     And there should be no release request for attempt 1 of "Quiz 1" for "student1"
     And there should be no attempt for "Quiz 1" as "student1"
     When I press "Start attempt"
     Then I should see "Waiting for in-person release"
+    And I should see "Your release request is pending"
     And the release request for "Quiz 1" for "student1" should be pending
     And there should be no attempt for "Quiz 1" as "student1"

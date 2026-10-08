@@ -5,6 +5,14 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial\local;
 
@@ -27,6 +35,8 @@ final class release_request_service {
     private clock $clock;
 
     /**
+     * Create the service with Moodle's clock or an injected test clock.
+     *
      * @param clock|null $clock Moodle clock, replaceable by deterministic test clocks.
      */
     public function __construct(?clock $clock = null) {
@@ -64,12 +74,14 @@ final class release_request_service {
             throw new \moodle_exception('ruleisdisabled', 'quizaccess_presencial');
         }
 
-        if ($DB->record_exists('quiz_attempts', [
-            'quiz' => $quizid,
-            'userid' => $userid,
-            'attempt' => $attemptnumber,
-            'preview' => 0,
-        ])) {
+        if (
+            $DB->record_exists('quiz_attempts', [
+                'quiz' => $quizid,
+                'userid' => $userid,
+                'attempt' => $attemptnumber,
+                'preview' => 0,
+            ])
+        ) {
             throw new \moodle_exception('requestattemptalreadyexists', 'quizaccess_presencial');
         }
 
@@ -81,8 +93,10 @@ final class release_request_service {
                 AND active = 1 FOR UPDATE',
             ['quizid' => $quizid, 'userid' => $userid, 'attemptnumber' => $attemptnumber],
         );
-        if ($active && in_array($active->state, release_request::expirable_states(), true) &&
-                (int) $active->expiresat <= $now) {
+        if (
+            $active && in_array($active->state, release_request::expirable_states(), true) &&
+                (int) $active->expiresat <= $now
+        ) {
             // A claimed Moodle start may still be creating its attempt. Its guard
             // lock keeps it active until the attempt event or the process exits.
             if ($active->state === release_request::STATE_STARTING) {
@@ -205,8 +219,10 @@ final class release_request_service {
             'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
             ['quizid' => $existing->quizid],
         );
-        if (!$configuration || empty($configuration->enabled) ||
-                (int) $configuration->timeopen > $now || (int) $configuration->timeclose < $now) {
+        if (
+            !$configuration || empty($configuration->enabled) ||
+                (int) $configuration->timeopen > $now || (int) $configuration->timeclose < $now
+        ) {
             throw new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
         }
         $changed = false;
@@ -280,12 +296,14 @@ final class release_request_service {
                 attempt_start_guard::release((int) $requestid);
                 return false;
             }
-            if ($DB->record_exists('quiz_attempts', [
-                'quiz' => $quizid,
-                'userid' => $userid,
-                'attempt' => $attemptnumber,
-                'preview' => 0,
-            ])) {
+            if (
+                $DB->record_exists('quiz_attempts', [
+                    'quiz' => $quizid,
+                    'userid' => $userid,
+                    'attempt' => $attemptnumber,
+                    'preview' => 0,
+                ])
+            ) {
                 $tx->allow_commit();
                 attempt_start_guard::release((int) $requestid);
                 return false;
@@ -462,8 +480,10 @@ final class release_request_service {
                 'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
                 ['id' => $requestid],
             );
-            if (!$record || !in_array($record->state, release_request::expirable_states(), true) ||
-                    (!$force && (int) $record->expiresat > $now)) {
+            if (
+                !$record || !in_array($record->state, release_request::expirable_states(), true) ||
+                    (!$force && (int) $record->expiresat > $now)
+            ) {
                 $tx->allow_commit();
                 return false;
             }
@@ -540,8 +560,9 @@ final class release_request_service {
     /**
      * Trigger the selected event with the request's quiz context.
      *
-     * @param class-string<\core\event\base> $eventclass Event class.
+     * @param string $eventclass Event class to trigger.
      * @param int $id Request id.
+     * @return void
      */
     private function trigger_for_request(string $eventclass, int $id): void {
         global $DB;

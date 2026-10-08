@@ -82,7 +82,6 @@
       <INDEXES>
         <INDEX NAME="identityactive_uix" UNIQUE="true" FIELDS="quizid, userid, attemptnumber, active"/>
         <INDEX NAME="stateexpiresat_ix" UNIQUE="false" FIELDS="state, expiresat"/>
-        <INDEX NAME="userid_ix" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

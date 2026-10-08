@@ -116,7 +116,6 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
         $table->add_index('identityactive_uix', XMLDB_INDEX_UNIQUE, ['quizid', 'userid', 'attemptnumber', 'active']);
         $table->add_index('stateexpiresat_ix', XMLDB_INDEX_NOTUNIQUE, ['state', 'expiresat']);
-        $table->add_index('userid_ix', XMLDB_INDEX_NOTUNIQUE, ['userid']);
         if (!$dbman->table_exists($table)) {
             $dbman->create_table($table);
         }

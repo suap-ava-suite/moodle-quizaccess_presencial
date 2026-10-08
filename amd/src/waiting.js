@@ -30,13 +30,14 @@ export const init = (requestId) => {
         }])[0].then((result) => {
             if (result.state !== renderedState) {
                 window.location.reload();
-                return;
+                return result;
             }
             if (['pending', 'authorized', 'starting'].includes(result.state)) {
                 window.setTimeout(poll, 5000);
-                return;
+                return result;
             }
             window.location.reload();
+            return result;
         }).catch(() => {
             window.setTimeout(poll, 5000);
         });

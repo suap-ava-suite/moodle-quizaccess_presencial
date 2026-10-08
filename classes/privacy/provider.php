@@ -33,8 +33,6 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use quizaccess_presencial\local\invitation;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Describe, export, and remove persisted personal data stored by the plugin.
  *

@@ -5,6 +5,14 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial\external;
 
@@ -22,7 +30,11 @@ use quizaccess_presencial\local\release_request_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class read_request_status extends external_api {
-    /** @return external_function_parameters */
+    /**
+     * Describe the parameters for reading a release request.
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'requestid' => new external_value(PARAM_INT, 'Release request id'),
@@ -48,7 +60,11 @@ class read_request_status extends external_api {
         return ['state' => $request->state, 'expiresat' => $request->expiresat];
     }
 
-    /** @return external_single_structure */
+    /**
+     * Describe the return value for reading a release request.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'state' => new external_value(PARAM_ALPHANUMEXT, 'Current release request state'),

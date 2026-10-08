@@ -138,7 +138,7 @@ class quizaccess_presencial extends access_rule_base {
         }
         // Secure-window and native-preflight flows stay inside Moodle's route. Auto-submit
         // only when all native preflight fields are already valid/empty.
-        $PAGE->requires->js_call_amd('quizaccess_presencial/start_request', 'continue_preflight');
+        $PAGE->requires->js_call_amd('quizaccess_presencial/start_request', 'continuePreflight');
     }
 
     /**

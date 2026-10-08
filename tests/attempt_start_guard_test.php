@@ -18,8 +18,6 @@ namespace quizaccess_presencial;
 
 use quizaccess_presencial\local\attempt_start_guard;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Tests for the attempt-start lock boundary.
  *
@@ -44,7 +42,8 @@ final class attempt_start_guard_test extends \advanced_testcase {
         $this->assertTrue(attempt_start_guard::acquire($requestid));
 
         $bootstrap = var_export($CFG->dirroot . '/config.php', true);
-        $childcode = 'require_once(' . $bootstrap . ');'
+        $childcode = 'define("CLI_SCRIPT", true);'
+            . 'require_once(' . $bootstrap . ');'
             . '$requestid = (int) $argv[1];'
             . 'if (\\quizaccess_presencial\\local\\attempt_start_guard::acquire($requestid)) {'
             . '\\quizaccess_presencial\\local\\attempt_start_guard::release($requestid);'

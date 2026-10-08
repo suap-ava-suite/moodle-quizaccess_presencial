@@ -348,11 +348,13 @@ class behat_quizaccess_presencial extends behat_base {
         global $DB;
         $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
         $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
-        if ($DB->record_exists('quizaccess_presencial_req', [
-            'quizid' => $quiz->id,
-            'userid' => $user->id,
-            'attemptnumber' => $attemptnumber,
-        ])) {
+        if (
+            $DB->record_exists('quizaccess_presencial_req', [
+                'quizid' => $quiz->id,
+                'userid' => $user->id,
+                'attemptnumber' => $attemptnumber,
+            ])
+        ) {
             throw new ExpectationException(
                 'An unexpected release request exists for attempt ' . $attemptnumber . '.',
                 $this->getSession(),

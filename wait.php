@@ -5,6 +5,22 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Display and refresh the current student's release request.
+ *
+ * @package    quizaccess_presencial
+ * @copyright  2026 SUAP AVA Suite
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 use mod_quiz\quiz_attempt;
 use quizaccess_presencial\local\release_request;
@@ -57,8 +73,10 @@ $data = [
     'authorized' => $state === release_request::STATE_AUTHORIZED,
     'expired' => $state === release_request::STATE_EXPIRED,
     'consumed' => $state === release_request::STATE_CONSUMED,
-    'message' => get_string($state === release_request::STATE_STARTING ? 'requestpending' : 'request' . $state,
-        'quizaccess_presencial'),
+    'message' => get_string(
+        $state === release_request::STATE_STARTING ? 'requestpending' : 'request' . $state,
+        'quizaccess_presencial',
+    ),
     'expiresat' => $request->expiresat,
     'quizurl' => $quizobj->view_url()->out(false),
     'starturl' => $quizobj->start_attempt_url()->out(false),

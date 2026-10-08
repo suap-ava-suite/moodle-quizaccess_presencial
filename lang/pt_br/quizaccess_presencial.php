@@ -35,6 +35,7 @@ $string['authorizationperiodinactive'] = 'O Período de Autorização não está
 $string['authorizationperiodordered'] = 'O Período de Autorização deve terminar depois do início.';
 $string['authorizationperiodstart'] = 'Início do Período de Autorização';
 $string['authorizationperiodstartrequired'] = 'Informe o início do Período de Autorização.';
+$string['backtoquiz'] = 'Voltar ao Questionário';
 $string['currentapplicators'] = 'Equipe de aplicação atual';
 $string['delegationincluded'] = 'Delegação de aplicação incluída.';
 $string['delegationlocktimeout'] = 'Outra atualização da equipe de aplicação está em andamento. Tente novamente.';
@@ -52,6 +53,21 @@ $string['eventdelegationidempotent'] = 'Delegação de aplicação incluída nov
 $string['eventdelegationupdated'] = 'Delegação de aplicação atualizada';
 $string['eventinvitationinvalid'] = 'Uso inválido de convite';
 $string['eventinvitationupdated'] = 'Convite atualizado';
+$string['eventrequestauthorized'] = 'Solicitação de liberação de tentativa autorizada';
+$string['eventrequestauthorizeddesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} foi autorizada ' .
+    'pelo usuário {$a->actorid}.';
+$string['eventrequestconsumed'] = 'Autorização de tentativa consumida';
+$string['eventrequestconsumeddesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} foi consumida ' .
+    'pela tentativa {$a->attemptnumber}.';
+$string['eventrequestcreated'] = 'Solicitação de liberação de tentativa criada';
+$string['eventrequestcreateddesc'] = 'A solicitação de liberação {$a->requestid} foi criada para o estudante ' .
+    '{$a->studentid}.';
+$string['eventrequestexpired'] = 'Solicitação de liberação de tentativa ou autorização expirada';
+$string['eventrequestexpireddesc'] = 'A solicitação {$a->requestid} ou sua autorização não utilizada expirou para ' .
+    'o estudante {$a->studentid}.';
+$string['eventrequeststarting'] = 'Início da criação de tentativa autorizada';
+$string['eventrequeststartingdesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} iniciou a ' .
+    'criação da tentativa {$a->attemptnumber}.';
 $string['ineligibleuser'] = 'Uma ou mais contas selecionadas não podem receber uma Delegação de aplicação.';
 $string['invitationcopied'] = 'Link do convite copiado.';
 $string['invitationcopy'] = 'Copiar link do convite';
@@ -73,6 +89,8 @@ $string['invitationstate_none'] = 'Nenhum convite foi gerado.';
 $string['invitationunavailable'] = 'Habilite a Liberação Presencial e configure um período de autorização válido antes de gerar um convite.';
 $string['manageapplicators'] = 'Gerenciar equipe de aplicação';
 $string['pluginname'] = 'Liberação Presencial';
+$string['privacy:exportpath:request'] = 'Solicitação de liberação';
+$string['privacy:metadata'] = 'A regra de acesso Liberação Presencial armazena Delegações de aplicação, dados do ciclo de vida dos Convites e solicitações de liberação de estudantes.';
 $string['privacy:metadata:delegation'] = 'Registros de Delegação de aplicação de um Questionário.';
 $string['privacy:metadata:delegation:origin'] = 'A origem que criou a Delegação.';
 $string['privacy:metadata:delegation:quizid'] = 'O Questionário que recebeu a Delegação.';
@@ -90,7 +108,6 @@ $string['privacy:metadata:invite:state'] = 'O estado operacional do convite.';
 $string['privacy:metadata:invite:timecreated'] = 'Quando o convite foi gerado.';
 $string['privacy:metadata:invite:timeexpires'] = 'O instante limite para utilização do convite.';
 $string['privacy:metadata:invite:timemodified'] = 'Quando o convite foi alterado pela última vez.';
-$string['privacy:metadata'] = 'A regra de acesso Liberação Presencial armazena Delegações de aplicação, dados do ciclo de vida dos Convites e solicitações de liberação de estudantes.';
 $string['privacy:metadata:request'] = 'Uma solicitação associa estudante, Questionário e número de tentativa, com estado e datas.';
 $string['privacy:metadata:request:attemptnumber'] = 'O número da próxima tentativa do Questionário coberta pela solicitação.';
 $string['privacy:metadata:request:expiresat'] = 'O instante absoluto de expiração da solicitação pendente ou autorização não utilizada.';
@@ -99,43 +116,26 @@ $string['privacy:metadata:request:state'] = 'O estado atual da solicitação.';
 $string['privacy:metadata:request:timecreated'] = 'O instante em que a solicitação foi criada.';
 $string['privacy:metadata:request:timemodified'] = 'O instante da última mudança de estado da solicitação.';
 $string['privacy:metadata:request:userid'] = 'O estudante que criou a solicitação.';
-$string['privacy:exportpath:request'] = 'Solicitação de liberação';
-$string['eventrequestcreated'] = 'Solicitação de liberação de tentativa criada';
-$string['eventrequestcreateddesc'] = 'A solicitação de liberação {$a->requestid} foi criada para o estudante ' .
-    '{$a->studentid}.';
-$string['eventrequestauthorized'] = 'Solicitação de liberação de tentativa autorizada';
-$string['eventrequestauthorizeddesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} foi autorizada ' .
-    'pelo usuário {$a->actorid}.';
-$string['eventrequestconsumed'] = 'Autorização de tentativa consumida';
-$string['eventrequestconsumeddesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} foi consumida ' .
-    'pela tentativa {$a->attemptnumber}.';
-$string['eventrequeststarting'] = 'Início da criação de tentativa autorizada';
-$string['eventrequeststartingdesc'] = 'A solicitação {$a->requestid} do estudante {$a->studentid} iniciou a ' .
-    'criação da tentativa {$a->attemptnumber}.';
-$string['eventrequestexpired'] = 'Solicitação de liberação de tentativa ou autorização expirada';
-$string['eventrequestexpireddesc'] = 'A solicitação {$a->requestid} ou sua autorização não utilizada expirou para ' .
-    'o estudante {$a->studentid}.';
+$string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
+$string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';
 $string['requestattemptalreadyexists'] = 'Uma tentativa já foi criada para esta solicitação. ' .
     'Volte ao Questionário para retomá-la.';
-$string['requestnotfound'] = 'A solicitação de liberação não foi encontrada.';
-$string['requestpending'] = 'Sua solicitação de liberação está pendente. Mantenha esta página aberta enquanto o ' .
-    'estado é atualizado automaticamente.';
+$string['requestauthorized'] = 'Sua solicitação foi autorizada. Continue para iniciar sua tentativa.';
+$string['requestconsumed'] = 'Esta autorização já foi utilizada. Volte ao Questionário para continuar sua tentativa.';
 $string['requestdescription'] = 'Para iniciar uma nova tentativa, é necessária a liberação presencial. A solicitação ' .
     'aparecerá em uma página de espera com atualização automática.';
 $string['requestexpired'] = 'Esta solicitação ou sua autorização não utilizada expirou. Volte ao Questionário e ' .
     'inicie uma nova solicitação.';
-$string['requestauthorized'] = 'Sua solicitação foi autorizada. Continue para iniciar sua tentativa.';
-$string['requestconsumed'] = 'Esta autorização já foi utilizada. Volte ao Questionário para continuar sua tentativa.';
-$string['requeststartattempt'] = 'Iniciar tentativa';
+$string['requestnotfound'] = 'A solicitação de liberação não foi encontrada.';
+$string['requestpending'] = 'Sua solicitação de liberação está pendente. Mantenha esta página aberta enquanto o ' .
+    'estado é atualizado automaticamente.';
 $string['requestpolling'] = 'Esta página verifica automaticamente se houve atualização a cada cinco segundos.';
-$string['backtoquiz'] = 'Voltar ao Questionário';
-$string['requestwaittitle'] = 'Aguardando liberação presencial';
-$string['ruleisdisabled'] = 'A Liberação Presencial não está habilitada neste Questionário.';
-$string['taskexpirerequests'] = 'Expirar solicitações vencidas e autorizações não utilizadas';
-$string['rejectionjustificationrequired'] = 'Exigir justificativa de rejeição';
-$string['rejectionjustificationrequired_desc'] = 'Exige uma justificativa ao rejeitar uma solicitação de liberação.';
+$string['requeststartattempt'] = 'Iniciar tentativa';
 $string['requestvalidity'] = 'Validade da solicitação de liberação';
 $string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
     'permanece válida.';
+$string['requestwaittitle'] = 'Aguardando liberação presencial';
 $string['revokeapplicator'] = 'Revogar';
+$string['ruleisdisabled'] = 'A Liberação Presencial não está habilitada neste Questionário.';
 $string['taskexpireinvitations'] = 'Expirar convites';
+$string['taskexpirerequests'] = 'Expirar solicitações vencidas e autorizações não utilizadas';
