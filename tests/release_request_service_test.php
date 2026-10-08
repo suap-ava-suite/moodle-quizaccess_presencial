@@ -365,7 +365,7 @@ final class release_request_service_test extends \advanced_testcase {
         global $DB, $SESSION;
         $this->resetAfterTest();
         $clock = $this->mock_clock_with_frozen(1_800_000_000);
-        $quiz = $this->create_enabled_quiz(['password' => 'door-code']);
+        $quiz = $this->create_enabled_quiz(['quizpassword' => 'door-code']);
         $this->assertSame('door-code', $quiz->password, 'The test must exercise the native Quiz password rule.');
         $this->remove_core_quiz_time_gates($quiz);
         $student = self::getDataGenerator()->create_user();
@@ -381,7 +381,7 @@ final class release_request_service_test extends \advanced_testcase {
             $exception = $caught;
         }
         $this->assertInstanceOf(\moodle_exception::class, $exception);
-        $this->assertSame('passworderror', $exception->errorcode);
+        $this->assertSame(get_string('passworderror', 'quizaccess_password'), $exception->errorcode);
 
         $this->assertFalse($DB->record_exists('quizaccess_presencial_req', [
             'quizid' => $quiz->id,

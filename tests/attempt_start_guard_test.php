@@ -41,8 +41,10 @@ final class attempt_start_guard_test extends \advanced_testcase {
         $requestid = random_int(1_000_000, 2_000_000);
         $this->assertTrue(attempt_start_guard::acquire($requestid));
 
-        $bootstrap = var_export($CFG->dirroot . '/config.php', true);
-        $childcode = 'define("CLI_SCRIPT", true);'
+        $bootstrap = var_export($CFG->dirroot . '/lib/phpunit/bootstrap.php', true);
+        $autoload = var_export($CFG->dirroot . '/vendor/autoload.php', true);
+        $childcode = 'require_once(' . $autoload . ');'
+            . 'define("PHPUNIT_UTIL", true);'
             . 'require_once(' . $bootstrap . ');'
             . '$requestid = (int) $argv[1];'
             . 'if (\\quizaccess_presencial\\local\\attempt_start_guard::acquire($requestid)) {'
