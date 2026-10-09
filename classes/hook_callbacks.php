@@ -25,6 +25,23 @@ namespace quizaccess_presencial;
  */
 final class hook_callbacks {
     /**
+     * Add My applications to the user menu only for current or future applicators.
+     *
+     * @param \core_user\hook\extend_user_menu $hook Moodle user-menu extension.
+     */
+    public static function add_applications_link(\core_user\hook\extend_user_menu $hook): void {
+        if (!isloggedin() || isguestuser() || !\quizaccess_presencial\local\applications::has_delegations()) {
+            return;
+        }
+        $hook->add_navitem((object) [
+            'itemtype' => 'link',
+            'url' => new \moodle_url('/mod/quiz/accessrule/presencial/applications.php'),
+            'title' => get_string('myapplications', 'quizaccess_presencial'),
+            'titleidentifier' => 'myapplications,quizaccess_presencial',
+        ]);
+    }
+
+    /**
      * Add the application-team and invitation management page before navigation is rendered.
      *
      * @param \core\hook\output\before_http_headers $hook Before output starts.
@@ -55,5 +72,23 @@ final class hook_callbacks {
         if ($page->url->compare($url, URL_MATCH_EXACT)) {
             $node->make_active();
         }
+
+        try {
+            \quizaccess_presencial\local\applications::get_application((int) $page->cm->id);
+        } catch (\moodle_exception $exception) {
+            if ($exception->errorcode !== 'applicationaccessdenied') {
+                throw $exception;
+            }
+            return;
+        }
+        $panelurl = new \moodle_url('/mod/quiz/accessrule/presencial/application.php', ['cmid' => $page->cm->id]);
+        $panelnode = $settings->add(
+            get_string('applicationpanel', 'quizaccess_presencial'),
+            $panelurl,
+            \navigation_node::TYPE_SETTING,
+            null,
+            'quizaccess_presencial_applicationpanel',
+        );
+        $panelnode->set_force_into_more_menu(true);
     }
 }

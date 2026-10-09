@@ -36,6 +36,12 @@ Ao habilitar **Liberação Presencial** nas configurações de um Questionário,
 
 No menu **Mais** do Questionário, o Professor com `mod/quiz:manage` no contexto do Questionário abre **Gerenciar equipe de aplicação**, inclui Contas elegíveis pelo seletor padrão do Moodle e revoga Delegações individualmente. Essas operações não criam matrícula nem atribuem papéis no curso e exigem uma submissão POST com token de sessão válido. A inclusão repetida é idempotente; uma nova inclusão depois de revogação cria outro registro e preserva o anterior.
 
+O item **Minhas Aplicações** aparece no menu do usuário somente para Contas elegíveis com Delegação atual ou futura. A página lista disciplina, Questionário, Período de Autorização, estado da Delegação, quantidade pendente e a ação **Abrir aplicação**, com paginação de 20 itens no servidor. O Aplicador pode abrir essa página e o **Painel do Aplicador** sem matrícula, mantendo bloqueado o acesso acadêmico à disciplina e ao Questionário. O Professor acessa o mesmo painel pelo menu do Questionário, sem precisar receber uma Delegação.
+
+Cada requisição verifica novamente a conta, a configuração, o período e a autoridade no Questionário. Revogação, expiração, suspensão da conta ou desabilitação da regra interrompe o acesso. Remover a suspensão recupera a mesma Delegação somente enquanto ela e o período continuam válidos; não há histórico pessoal de aplicações. Aplicações futuras mostram apenas informações de preparação, sem ações operacionais antes do início do período.
+
+Nesta entrega, a coluna de solicitações pendentes informa **Indisponível**, e o painel explica que Solicitações de liberação ainda não estão disponíveis nesta versão. A contagem real permanece pendente da issue #10; um valor indisponível não é apresentado como zero. A Fila operacional e as decisões sobre estudantes serão implementadas na issue #11.
+
 A mesma página reúne a gestão do **Convite** por link. O link completo aparece somente na resposta à geração, com um botão para copiá-lo. A página posterior mostra apenas o estado e a validade. Regenerar substitui imediatamente o segredo anterior; desativar impede seu uso. Desabilitar e reabilitar a regra também exige gerar outro convite.
 
 O convite pode ser gerado e validado antes do início do Período de Autorização, mas expira no seu fim. Encurtar o período limita a validade definitivamente; ampliá-lo depois não estende nem reativa o convite existente. A validação aplica a expiração imediatamente, e uma tarefa agendada materializa as expirações pendentes sem repetir eventos. Transições de convite e tentativas de uso inválido são registradas pela Events API, sem o token.
@@ -96,7 +102,7 @@ Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 ### Testes automatizados
 
-A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade; Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
+A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade. Também cobre autorização, paginação e visibilidade de **Minhas Aplicações**, fronteiras temporais, autoridade contextual do Professor e suspensão com recuperação da mesma Delegação. Behat cobre gestão da equipe, gestão do convite e as jornadas do painel: navegação sem matrícula, recusa de acesso acadêmico, revogação e suspensão na sessão existente, usuário sem autoridade e Professor sem Delegação. Os cenários de teclado usam um navegador real e percorrem menu, abertura, atualização, retorno e paginação com Tab, setas e Enter, verificando o foco sem forçá-lo por JavaScript. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash
 moodle-plugin-ci phpunit --fail-on-warning
