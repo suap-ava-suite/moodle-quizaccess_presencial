@@ -88,26 +88,111 @@ final class release_request_service_test extends \advanced_testcase {
     }
 
     /**
-     * The database rejects a second active request for one student, quiz and attempt.
+     * Concurrent requests return one pending request and emit one creation event.
      */
-    public function test_database_enforces_active_request_uniqueness(): void {
-        global $DB;
-        $this->resetAfterTest();
-        $clock = $this->mock_clock_with_frozen(1_800_000_000);
-        [$quiz, $student] = $this->create_enabled_quiz_and_student();
-        $request = (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
+    public function test_concurrent_ensure_pending_calls_share_one_request(): void {
+        global $CFG;
 
-        $this->expectException(\dml_write_exception::class);
-        $DB->insert_record('quizaccess_presencial_req', (object) [
-            'quizid' => $quiz->id,
-            'userid' => $student->id,
-            'attemptnumber' => 1,
-            'state' => release_request::STATE_PENDING,
-            'active' => 1,
-            'timecreated' => $request->timecreated,
-            'expiresat' => $request->expiresat,
-            'timemodified' => $request->timecreated,
-        ]);
+        $this->resetAfterTest();
+        if (!function_exists('proc_open')) {
+            $this->markTestSkipped('This PHP runtime cannot start competing processes.');
+        }
+
+        // The fixtures must be committed so both child processes can see them on PostgreSQL.
+        $this->preventResetByRollback();
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+
+        $bootstrap = var_export($CFG->dirroot . '/lib/phpunit/bootstrap.php', true);
+        // Moodle 5.1+ keeps Composer dependencies above the public dirroot.
+        $autoloadpath = $CFG->dirroot . '/vendor/autoload.php';
+        if (!is_readable($autoloadpath)) {
+            $autoloadpath = dirname($CFG->dirroot) . '/vendor/autoload.php';
+        }
+        $autoload = var_export($autoloadpath, true);
+        $childcode = 'require_once(' . $autoload . ');'
+            . 'define("PHPUNIT_UTIL", true);'
+            . 'require_once(' . $bootstrap . ');'
+            . 'fwrite(STDOUT, "READY\n");'
+            . 'fflush(STDOUT);'
+            . 'if (trim(fgets(STDIN)) !== "GO") { exit(2); }'
+            . '$sink = \phpunit_util::start_event_redirection();'
+            . '$request = (new \quizaccess_presencial\local\release_request_service())'
+            . '->ensure_pending((int) $argv[1], (int) $argv[2], 1);'
+            . '$events = array_filter($sink->get_events(), static function ($event) {'
+            . 'return $event instanceof \quizaccess_presencial\event\request_created;'
+            . '});'
+            . 'fwrite(STDOUT, "RESULT " . $request->id . " " . count($events) . "\n");';
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $children = [];
+        try {
+            for ($i = 0; $i < 2; $i++) {
+                $process = proc_open(
+                    [PHP_BINARY, '-r', $childcode, (string) $quiz->id, (string) $student->id],
+                    $descriptors,
+                    $pipes,
+                    $CFG->dirroot,
+                );
+                $this->assertIsResource($process, 'Could not start a competing PHP process.');
+                $children[] = ['process' => $process, 'pipes' => $pipes];
+                stream_set_timeout($pipes[1], 20);
+                stream_set_timeout($pipes[2], 20);
+            }
+
+            foreach ($children as $child) {
+                $this->assertSame("READY\n", fgets($child['pipes'][1]), 'A child did not reach the start barrier.');
+            }
+            foreach ($children as $child) {
+                fwrite($child['pipes'][0], "GO\n");
+                fflush($child['pipes'][0]);
+            }
+
+            $ids = [];
+            $createdevents = 0;
+            foreach ($children as &$child) {
+                $result = fgets($child['pipes'][1]);
+                $erroroutput = stream_get_contents($child['pipes'][2]);
+                $this->assertMatchesRegularExpression(
+                    '/^RESULT ([0-9]+) ([0-9]+)\n$/',
+                    $result ?: '',
+                    'Child failed to create or recover the request. Stderr: ' . $erroroutput,
+                );
+                preg_match('/^RESULT ([0-9]+) ([0-9]+)\n$/', $result, $matches);
+                $ids[] = (int) $matches[1];
+                $createdevents += (int) $matches[2];
+                foreach ($child['pipes'] as $pipe) {
+                    fclose($pipe);
+                }
+                $exitcode = proc_close($child['process']);
+                $child['process'] = false;
+                $this->assertSame(0, $exitcode, 'Competing PHP process failed. Stderr: ' . $erroroutput);
+            }
+            unset($child);
+
+            $this->assertSame($ids[0], $ids[1]);
+            $this->assertSame(1, $createdevents);
+            $service = new release_request_service();
+            $this->assertSame(release_request::STATE_PENDING, $service->get($ids[0])->state);
+            $this->assertSame($ids[0], $service->ensure_pending($quiz->id, $student->id, 1)->id);
+            $this->assertSame(0, $this->count_attempts($quiz->id, $student->id));
+        } finally {
+            foreach ($children as $child) {
+                if (is_resource($child['process'])) {
+                    foreach ($child['pipes'] as $pipe) {
+                        if (is_resource($pipe)) {
+                            fclose($pipe);
+                        }
+                    }
+                    if (proc_get_status($child['process'])['running']) {
+                        proc_terminate($child['process']);
+                    }
+                    proc_close($child['process']);
+                }
+            }
+        }
     }
 
     /**
