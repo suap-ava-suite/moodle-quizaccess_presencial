@@ -128,6 +128,43 @@ final class applications_test extends \advanced_testcase {
     }
 
     /**
+     * Listing one delegated quiz does not add a database read for every unrelated quiz.
+     */
+    public function test_listing_reads_do_not_grow_with_unrelated_applications(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_quiz('Delegated application', -HOURSECS);
+        $user = self::getDataGenerator()->create_user();
+        delegation_manager::include_users($quiz->id, [$user->id], $GLOBALS['USER']->id);
+        $reads = [];
+        foreach ([10, 20] as $additionalquizzes) {
+            $this->setAdminUser();
+            for ($i = 0; $i < $additionalquizzes; $i++) {
+                $this->create_quiz('Unrelated application', -HOURSECS);
+            }
+            $this->setUser($user);
+            // Simulate a new request with module contexts not yet loaded.
+            \context_helper::reset_caches();
+            has_capability('mod/quiz:manage', \context_system::instance());
+            $before = $DB->perf_get_reads();
+
+            $page = applications::get_page();
+
+            $reads[] = $DB->perf_get_reads() - $before;
+            $this->assertSame(1, $page['total']);
+            $this->assertSame(['Delegated application'], array_column($page['items'], 'quizname'));
+        }
+
+        $this->assertLessThanOrEqual(
+            $reads[0] + 2,
+            $reads[1],
+            "Listing reads grew from {$reads[0]} to {$reads[1]} when unrelated quizzes grew from 10 to 30.",
+        );
+    }
+
+    /**
      * Losing authority removes the listing and denies a previously known application URL.
      *
      * @dataProvider authority_loss_provider

@@ -71,8 +71,14 @@ final class applications {
                JOIN {course} c ON c.id = q.course
                JOIN {course_modules} cm ON cm.instance = q.id AND cm.course = c.id
                JOIN {modules} m ON m.id = cm.module AND m.name = :modulename
+               JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
               WHERE p.enabled = 1 AND p.timeclose > :now AND cm.deletioninprogress = 0";
-        return [$from, $delegated, ['modulename' => 'quiz', 'now' => $now, 'userid' => $userid]];
+        return [$from, $delegated, [
+            'modulename' => 'quiz',
+            'contextlevel' => CONTEXT_MODULE,
+            'now' => $now,
+            'userid' => $userid,
+        ]];
     }
 
     /**
@@ -105,13 +111,16 @@ final class applications {
             $from .= ' AND cm.id = :cmid';
             $params['cmid'] = $cmid;
         }
+        $contextcolumns = \context_helper::get_preload_record_columns_sql('ctx');
         $candidates = $DB->get_recordset_sql(
-            "SELECT q.id AS quizid, cm.id AS cmid, CASE WHEN {$delegated} THEN 1 ELSE 0 END AS delegated {$from}",
+            "SELECT q.id AS quizid, cm.id AS cmid, CASE WHEN {$delegated} THEN 1 ELSE 0 END AS delegated,
+                    {$contextcolumns} {$from}",
             $params,
         );
         $quizids = [];
         try {
             foreach ($candidates as $candidate) {
+                \context_helper::preload_from_record($candidate);
                 if (self::can_access($candidate)) {
                     $quizids[] = (int) $candidate->quizid;
                 }
