@@ -111,7 +111,6 @@ if ($issued !== null) {
         'cmid' => $cm->id,
         'token' => $issued['token'],
     ]);
-    echo $OUTPUT->heading(get_string('invitationmanage', 'quizaccess_presencial'), 3);
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
         'generated' => true,
         'link' => $link->out(false),
