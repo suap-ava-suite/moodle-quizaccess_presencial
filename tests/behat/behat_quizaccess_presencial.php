@@ -158,6 +158,89 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Start from either a logged-out browser or Moodle's visitor account.
+     *
+     * @Given I start the invitation journey with :session
+     * @param string $session Initial authentication state.
+     */
+    public function i_start_the_invitation_journey_with(string $session): void {
+        if ($session === 'guest') {
+            $this->execute('behat_general::i_visit', ['/login/index.php']);
+            $this->execute('behat_forms::press_button', ['loginguestbtn']);
+        } else if ($session !== 'no session') {
+            throw new \coding_exception('Unknown invitation authentication state: ' . $session);
+        }
+    }
+
+    /**
+     * Check the real login returned to the original URL, including its validation parameters.
+     *
+     * @Then I should be on the remembered invitation page
+     */
+    public function i_should_be_on_the_remembered_invitation_page(): void {
+        if ($this->getSession()->getCurrentUrl() !== $this->previouslink) {
+            throw new ExpectationException('Login did not return to the original invitation.', $this->getSession());
+        }
+    }
+
+    /**
+     * Verify the browser's acceptance form exposes the CSRF-protected POST boundary.
+     *
+     * @Then the invitation acceptance form should require POST and a session key
+     */
+    public function the_invitation_acceptance_form_should_require_post_and_a_session_key(): void {
+        $form = $this->getSession()->getPage()->find('css', 'form[action*="invite.php"]');
+        $sesskey = $form ? $form->find('css', 'input[type="hidden"][name="sesskey"]') : null;
+        if (!$form || strtolower($form->getAttribute('method')) !== 'post' || !$sesskey || !$sesskey->getValue()) {
+            throw new ExpectationException('Invitation acceptance must use POST with a session key.', $this->getSession());
+        }
+    }
+
+    /**
+     * Try to accept via GET using the browser's valid session key.
+     *
+     * @When I request invitation acceptance with GET
+     */
+    public function i_request_invitation_acceptance_with_get(): void {
+        $sesskey = $this->getSession()->getPage()->find('css', 'input[name="sesskey"]');
+        if (!$this->previouslink || !$sesskey) {
+            throw new \coding_exception('An invitation acceptance form must be open.');
+        }
+        $url = new moodle_url($this->previouslink, ['accept' => 1, 'sesskey' => $sesskey->getValue()]);
+        $this->getSession()->visit($this->locate_path($url->out(false)));
+    }
+
+    /**
+     * Check the complete response for academic details and navigation, even when hidden by CSS.
+     *
+     * @Then the invitation page should not expose restricted academic information
+     */
+    public function the_invitation_page_should_not_expose_restricted_academic_information(): void {
+        $page = $this->getSession()->getPage();
+        $html = $page->getContent();
+        $restrictedcontent = [
+            'Student One', 'Secret questions', 'Private question', 'Secret question text',
+            'Private material', 'Secret course content', 'Secret quiz introduction', 'Secret course summary',
+        ];
+        foreach ($restrictedcontent as $restricted) {
+            if (str_contains($html, $restricted)) {
+                throw new ExpectationException('The invitation exposed: ' . $restricted, $this->getSession());
+            }
+        }
+        $restrictedpaths = [
+            '/question/', '/grade/', '/user/index.php', '/mod/quiz/view.php',
+            '/mod/quiz/report.php', '/mod/quiz/edit.php', '/course/view.php',
+        ];
+        foreach ($restrictedpaths as $restrictedpath) {
+            foreach ($page->findAll('css', 'a[href]') as $link) {
+                if (str_contains($link->getAttribute('href'), $restrictedpath)) {
+                    throw new ExpectationException('The invitation exposed academic navigation.', $this->getSession());
+                }
+            }
+        }
+    }
+
+    /**
      * Compare the regenerated link through the public output field.
      *
      * @Then /^the generated invitation link should differ from the previous link$/

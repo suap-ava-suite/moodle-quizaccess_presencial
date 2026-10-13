@@ -26,10 +26,18 @@ $PAGE->set_url($url);
 $PAGE->set_cacheable(false);
 header('Referrer-Policy: no-referrer');
 require_login(null, false);
+if (isguestuser()) {
+    // An existing guest session is allowed by require_login() when no course is supplied.
+    $SESSION->wantsurl = $url->out(false);
+    redirect(get_login_url());
+}
 
 $cm = get_coursemodule_from_id('quiz', $cmid, 0, false, MUST_EXIST);
-$PAGE->set_context(context_module::instance($cm->id));
-$PAGE->set_pagelayout('standard');
+// Associate the module with its course without requiring course enrolment.
+$PAGE->set_cm($cm);
+// The invitation summary must not include course navigation or the quiz introduction.
+$PAGE->set_pagelayout('embedded');
+$PAGE->activityheader->disable();
 $PAGE->set_title(get_string('invitationaccept', 'quizaccess_presencial'));
 $PAGE->set_heading(get_string('invitationaccept', 'quizaccess_presencial'));
 
