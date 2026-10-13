@@ -158,6 +158,26 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Arrange a current or future period through the public quiz settings boundary.
+     *
+     * @Given the authorization period for :quizname starts :period
+     * @param string $quizname Quiz name.
+     * @param string $period Whether authorization starts now or later.
+     */
+    public function the_authorization_period_starts(string $quizname, string $period): void {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        $cm = get_coursemodule_from_instance('quiz', $quizid, $quiz->course, false, MUST_EXIST);
+        $quiz->coursemodule = $cm->id;
+        $quiz->presencial_timeopen = time() + ($period === 'later' ? HOURSECS : -HOURSECS);
+        $quiz->presencial_timeclose = time() + (2 * HOURSECS);
+        \quizaccess_presencial::save_settings($quiz);
+    }
+
+    /**
      * Start from either a logged-out browser or Moodle's visitor account.
      *
      * @Given I start the invitation journey with :session
@@ -221,6 +241,7 @@ class behat_quizaccess_presencial extends behat_base {
         $restrictedcontent = [
             'Student One', 'Secret questions', 'Private question', 'Secret question text',
             'Private material', 'Secret course content', 'Secret quiz introduction', 'Secret course summary',
+            'Private grade', 'Secret grading feedback', '73.25',
         ];
         foreach ($restrictedcontent as $restricted) {
             if (str_contains($html, $restricted)) {

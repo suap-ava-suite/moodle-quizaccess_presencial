@@ -90,7 +90,7 @@ Feature: Manage the in-person release invitation
     And "Generate invitation" "button" should not exist
 
   @javascript
-  Scenario Outline: An unenrolled eligible account returns to the restricted invitation after login
+  Scenario Outline: An unenrolled eligible account returns to the restricted invitation after login before or during the authorization period
     Given the following "users" exist:
       | username    | firstname  | lastname | email                  |
       | applicator1 | Applicator | One      | applicator@example.com |
@@ -107,8 +107,15 @@ Feature: Manage the in-person release invitation
       | question         | page |
       | Private question | 1    |
     And the following "activities" exist:
-      | activity | name            | intro                  | course | idnumber |
+      | activity | name             | intro                 | course | idnumber |
       | page     | Private material | Secret course content | C1     | private1 |
+    And the following "grade items" exist:
+      | itemname      | course | itemtype |
+      | Private grade | C1     | manual   |
+    And the following "grade grades" exist:
+      | gradeitem     | user     | grade | feedback                |
+      | Private grade | student1 | 73.25 | Secret grading feedback |
+    And the authorization period for "Quiz 1" starts "<period>"
     And I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
     And I navigate to "Manage application team" in current page administration
     And I press "Generate invitation"
@@ -144,9 +151,11 @@ Feature: Manage the in-person release invitation
     And the invitation page should not expose restricted academic information
 
     Examples:
-      | session    |
-      | no session |
-      | guest      |
+      | session    | period |
+      | no session | now    |
+      | guest      | now    |
+      | no session | later  |
+      | guest      | later  |
 
   @javascript
   Scenario: The invitation stays restricted even for an enrolled teacher

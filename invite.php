@@ -33,8 +33,10 @@ if (isguestuser()) {
 }
 
 $cm = get_coursemodule_from_id('quiz', $cmid, 0, false, MUST_EXIST);
-// Associate the module with its course without requiring course enrolment.
-$PAGE->set_cm($cm);
+// Associate the actual course and activity with the module, without requiring enrolment.
+$invitationcourse = get_course($cm->course);
+$invitationquiz = $DB->get_record('quiz', ['id' => $cm->instance, 'course' => $cm->course], '*', MUST_EXIST);
+$PAGE->set_cm($cm, $invitationcourse, $invitationquiz);
 // The invitation summary must not include course navigation or the quiz introduction.
 $PAGE->set_pagelayout('embedded');
 $PAGE->activityheader->disable();

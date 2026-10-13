@@ -96,11 +96,20 @@ Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 ### Testes automatizados
 
-A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade; Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
+A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade; Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link, além do retorno ao convite após login sem sessão ou como visitante, do aceite explícito e da confirmação. Essas jornadas usam Boost e uma conta sem matrícula, antes e durante o Período de Autorização, e verificam o HTML completo para impedir a exposição de dados e navegação acadêmicos. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash
 moodle-plugin-ci phpunit --fail-on-warning
 moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
+```
+
+Para execução local, inicialize PHPUnit e Behat com o mesmo código e versão do Moodle usados para executar os testes, em banco e diretórios de dados exclusivos para testes. Não reutilize um ambiente inicializado por outra versão do Moodle. A URL de Behat deve ser diferente da URL do site e acessível pelo navegador de testes. Após configurar os prefixos, diretórios e o perfil Chrome em `config.php`, execute a partir da raiz do Moodle 5.2:
+
+```bash
+php public/admin/tool/phpunit/cli/init.php
+php public/admin/tool/behat/cli/init.php
+vendor/bin/phpunit --testsuite quizaccess_presencial_testsuite
+vendor/bin/behat --config /CAMINHO/BEHAT/behatrun/behat/behat.yml --profile chrome --tags=@quizaccess_presencial
 ```
 
 ## Privacidade

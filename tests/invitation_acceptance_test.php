@@ -24,6 +24,7 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \quizaccess_presencial\local\invitation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(invitation::class)]
 final class invitation_acceptance_test extends \advanced_testcase {
     /**
      * An eligible authenticated account can accept before the period starts.
@@ -145,13 +146,21 @@ final class invitation_acceptance_test extends \advanced_testcase {
         $this->setUser($teacher);
         $issued = invitation::generate($quiz->cmid, 0);
         $this->setUser($applicator);
-        invitation::accept($quiz->cmid, $issued['token']);
+        $first = invitation::accept($quiz->cmid, $issued['token']);
+        $this->setUser($teacher);
+        $before = delegation_manager::list_current($quiz->id);
+        $this->setUser($applicator);
+        $this->mock_clock_with_frozen(time() + 60);
         $sink = $this->redirectEvents();
         $again = invitation::accept($quiz->cmid, $issued['token']);
 
         $this->assertFalse($again['created']);
+        $this->assertEquals($first['delegation'], $again['delegation']);
         $this->setUser($teacher);
-        $this->assertCount(1, delegation_manager::list_current($quiz->id));
+        $after = delegation_manager::list_current($quiz->id);
+        $this->assertCount(1, $after);
+        $this->assertEquals($before, $after);
+        $this->assertCount(1, $sink->get_events());
         $events = array_values(array_filter($sink->get_events(), static fn($event): bool =>
             $event instanceof \quizaccess_presencial\event\delegation_idempotent));
         $this->assertCount(1, $events);
@@ -261,8 +270,8 @@ final class invitation_acceptance_test extends \advanced_testcase {
         $course = self::getDataGenerator()->create_course();
         $quiz = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_instance([
             'course' => $course->id,
-            'timeopen' => time() - DAYSECS,
-            'timeclose' => time() + DAYSECS,
+            'timeopen' => $timeopen - DAYSECS,
+            'timeclose' => $timeclose + DAYSECS,
         ]);
         $quiz->coursemodule = $quiz->cmid;
         $quiz->presencial_enabled = 1;
