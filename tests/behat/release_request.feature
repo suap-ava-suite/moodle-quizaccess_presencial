@@ -7,8 +7,9 @@ Feature: Gate new quiz attempts with an in-person release request
   Background:
     Given the time is frozen at "2030-01-02 12:00:00"
     And the following "users" exist:
-      | username | firstname | lastname | email               |
-      | student1 | Student  | One      | student@example.com |
+      | username    | firstname | lastname | email                   |
+      | student1    | Student   | One      | student@example.com     |
+      | applicator1 | Operator  | One      | applicator@example.com  |
     And the following "courses" exist:
       | fullname | shortname | category |
       | Course 1 | C1        | 0        |
@@ -69,6 +70,21 @@ Feature: Gate new quiz attempts with an in-person release request
     Then I should see "Your release request is pending"
     And the release request for "Quiz 1" for "student1" should be pending
     And there should be no attempt for "Quiz 1" as "student1"
+
+  @javascript
+  Scenario: My applications shows the live pending count and removes due requests on refresh
+    Given application account "applicator1" is delegated to the quizzes in course "C1"
+    And I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    Then the release request for "Quiz 1" for "student1" should be pending
+    And there should be no attempt for "Quiz 1" as "student1"
+    When I log out
+    And I log in as "applicator1"
+    And I follow "My applications" in the user menu
+    Then I should see "1" in the ".presencial-applications tbody tr td:nth-child(6)" "css_element"
+    When I make the release request for "Quiz 1" for "student1" due
+    And I reload the page
+    Then I should see "0" in the ".presencial-applications tbody tr td:nth-child(6)" "css_element"
 
   Scenario: Core preflight protects the no-JavaScript start path
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"

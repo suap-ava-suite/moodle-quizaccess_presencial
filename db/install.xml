@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/quiz/accessrule/presencial/db" VERSION="2026100700" COMMENT="XMLDB file for quizaccess_presencial"
+<XMLDB PATH="mod/quiz/accessrule/presencial/db" VERSION="2026100900" COMMENT="XMLDB file for quizaccess_presencial"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../../lib/xmldb/xmldb.xsd"
 >
@@ -82,6 +82,7 @@
       <INDEXES>
         <INDEX NAME="identityactive_uix" UNIQUE="true" FIELDS="quizid, userid, attemptnumber, active"/>
         <INDEX NAME="stateexpiresat_ix" UNIQUE="false" FIELDS="state, expiresat"/>
+        <INDEX NAME="quizstateexpiry_ix" UNIQUE="false" FIELDS="quizid, state, expiresat"/>
       </INDEXES>
     </TABLE>
   </TABLES>

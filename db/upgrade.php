@@ -100,7 +100,7 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026100600, 'quizaccess', 'presencial');
     }
-    if ($oldversion < 2026100700) {
+    if ($oldversion < 2026100900) {
         $table = new xmldb_table('quizaccess_presencial_req');
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
         $table->add_field('quizid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
@@ -116,10 +116,15 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
         $table->add_index('identityactive_uix', XMLDB_INDEX_UNIQUE, ['quizid', 'userid', 'attemptnumber', 'active']);
         $table->add_index('stateexpiresat_ix', XMLDB_INDEX_NOTUNIQUE, ['state', 'expiresat']);
+        $index = new xmldb_index('quizstateexpiry_ix', XMLDB_INDEX_NOTUNIQUE, ['quizid', 'state', 'expiresat']);
+        $table->add_index('quizstateexpiry_ix', XMLDB_INDEX_NOTUNIQUE, ['quizid', 'state', 'expiresat']);
         if (!$dbman->table_exists($table)) {
             $dbman->create_table($table);
         }
-        upgrade_plugin_savepoint(true, 2026100700, 'quizaccess', 'presencial');
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+        upgrade_plugin_savepoint(true, 2026100900, 'quizaccess', 'presencial');
     }
     return true;
 }

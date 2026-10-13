@@ -23,6 +23,15 @@
  */
 
 $string['addapplicators'] = 'Include selected accounts';
+$string['applicationaccessdenied'] = 'You do not currently have access to this application.';
+$string['applicationnotstarted'] = 'The authorization period has not started. Student data and operational actions are unavailable.';
+$string['applicationpanel'] = 'Application panel';
+$string['applicationperiod'] = 'Authorization period: {$a->start} – {$a->end}';
+$string['applicationrequestsnotavailable'] = 'The request queue and decisions are not available in this panel yet.';
+$string['applicationstate'] = 'Delegation state';
+$string['applicationstate_current'] = 'Current';
+$string['applicationstate_future'] = 'Future';
+$string['applicationstate_teacher'] = 'Direct quiz management';
 $string['applicators'] = 'Eligible accounts';
 $string['authorisationvalidity'] = 'Attempt authorisation validity';
 $string['authorisationvalidity_desc'] = 'Number of whole minutes an unused attempt authorisation remains valid.';
@@ -86,6 +95,10 @@ $string['invitationstate_expired'] = 'The invitation has expired.';
 $string['invitationstate_none'] = 'No invitation has been generated.';
 $string['invitationunavailable'] = 'Enable in-person release and set a valid authorization period before generating an invitation.';
 $string['manageapplicators'] = 'Manage application team';
+$string['myapplications'] = 'My applications';
+$string['noapplications'] = 'There are no current or future applications available to you.';
+$string['openapplication'] = 'Open application';
+$string['pendingrequests'] = 'Pending requests';
 $string['pluginname'] = 'In-person release';
 $string['privacy:exportpath:request'] = 'Release request';
 $string['privacy:metadata'] = 'The In-person release quiz access rule stores application delegations, invitation lifecycle data, and student release requests.';

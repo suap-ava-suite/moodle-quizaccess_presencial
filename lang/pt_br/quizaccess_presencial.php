@@ -23,6 +23,15 @@
  */
 
 $string['addapplicators'] = 'Incluir contas selecionadas';
+$string['applicationaccessdenied'] = 'Você não possui acesso a esta aplicação no momento.';
+$string['applicationnotstarted'] = 'O Período de Autorização ainda não começou. Dados de estudantes e ações operacionais estão indisponíveis.';
+$string['applicationpanel'] = 'Painel do Aplicador';
+$string['applicationperiod'] = 'Período de Autorização: {$a->start} – {$a->end}';
+$string['applicationrequestsnotavailable'] = 'A fila de solicitações e as decisões ainda não estão disponíveis neste painel.';
+$string['applicationstate'] = 'Estado da Delegação';
+$string['applicationstate_current'] = 'Atual';
+$string['applicationstate_future'] = 'Futura';
+$string['applicationstate_teacher'] = 'Gestão direta do Questionário';
 $string['applicators'] = 'Contas elegíveis';
 $string['authorisationvalidity'] = 'Validade da autorização de tentativa';
 $string['authorisationvalidity_desc'] = 'Número de minutos inteiros durante os quais uma autorização de tentativa não consumida ' .
@@ -88,6 +97,10 @@ $string['invitationstate_expired'] = 'O convite expirou.';
 $string['invitationstate_none'] = 'Nenhum convite foi gerado.';
 $string['invitationunavailable'] = 'Habilite a Liberação Presencial e configure um período de autorização válido antes de gerar um convite.';
 $string['manageapplicators'] = 'Gerenciar equipe de aplicação';
+$string['myapplications'] = 'Minhas Aplicações';
+$string['noapplications'] = 'Não há aplicações atuais ou futuras disponíveis para você.';
+$string['openapplication'] = 'Abrir aplicação';
+$string['pendingrequests'] = 'Solicitações pendentes';
 $string['pluginname'] = 'Liberação Presencial';
 $string['privacy:exportpath:request'] = 'Solicitação de liberação';
 $string['privacy:metadata'] = 'A regra de acesso Liberação Presencial armazena Delegações de aplicação, dados do ciclo de vida dos Convites e solicitações de liberação de estudantes.';
