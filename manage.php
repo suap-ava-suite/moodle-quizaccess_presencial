@@ -129,7 +129,7 @@ if ($issued !== null) {
         'type' => 'submit',
         'name' => 'addapplicators',
         'value' => get_string('addapplicators', 'quizaccess_presencial'),
-        'class' => 'btn btn-primary mt-3',
+        'class' => 'btn btn-primary mt-3 mb-3',
     ]);
     echo html_writer::end_tag('form');
 

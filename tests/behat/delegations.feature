@@ -30,6 +30,7 @@ Feature: Manage the application team from a quiz
     And I follow "Manage application team"
     Then I should see "Eligible accounts"
     And the "class" attribute of "input[name='addapplicators']" "css_element" should contain "mt-3"
+    And the "class" attribute of "input[name='addapplicators']" "css_element" should contain "mb-3"
     When I set the field "Eligible accounts" to "Aplicador Um"
     And I request inclusion of the selected application accounts with GET
     Then I should see "None"
