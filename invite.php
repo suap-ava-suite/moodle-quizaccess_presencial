@@ -55,6 +55,9 @@ $header = $OUTPUT->header();
 // Core may apply the site's referrer policy while building its HTTP headers.
 header('Referrer-Policy: no-referrer');
 echo $header;
+echo html_writer::start_div('container px-3 px-sm-4 py-4');
+echo html_writer::start_div('row justify-content-center');
+echo html_writer::start_div('col-12 col-lg-10 col-xl-8');
 echo $OUTPUT->heading(get_string('invitationaccept', 'quizaccess_presencial'));
 if ($accepted) {
     echo $OUTPUT->notification(
@@ -85,4 +88,7 @@ if (!$accepted) {
     ]);
     echo html_writer::end_tag('form');
 }
+echo html_writer::end_div();
+echo html_writer::end_div();
+echo html_writer::end_div();
 echo $OUTPUT->footer();
