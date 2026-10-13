@@ -75,6 +75,64 @@ final class invitation_acceptance_test extends \advanced_testcase {
     }
 
     /**
+     * Acceptance details use every name field needed by the configured display format.
+     */
+    public function test_acceptance_details_identify_the_teacher_with_an_alternative_name_format(): void {
+        $this->resetAfterTest();
+        set_config('fullnamedisplay', 'alternatename middlename lastname firstname');
+        $quiz = $this->create_configured_quiz(time() - HOURSECS, time() + HOURSECS);
+        $teacher = self::getDataGenerator()->create_user([
+            'firstname' => 'Ada',
+            'middlename' => 'Byron',
+            'alternatename' => 'Lovelace',
+            'lastname' => 'Teacher',
+        ]);
+        self::getDataGenerator()->enrol_user($teacher->id, $quiz->course, 'editingteacher');
+
+        $this->setUser($teacher);
+        $issued = invitation::generate($quiz->cmid, 0);
+        $details = invitation::get_acceptance_details($quiz->cmid, $issued['token']);
+
+        $this->assertSame('Lovelace Byron Teacher Ada', $details['teacher']);
+        $this->assertDebuggingNotCalled();
+    }
+
+    /**
+     * A refused acceptance retains the expired transition and invalid-use audit.
+     */
+    public function test_refused_acceptance_commits_expiry_and_invalid_use_audit(): void {
+        $this->resetAfterTest();
+        $now = strtotime('2030-01-01 09:00:00 UTC');
+        $clock = $this->mock_clock_with_frozen($now);
+        $quiz = $this->create_configured_quiz($now - HOURSECS, $now + HOURSECS);
+        $teacher = self::getDataGenerator()->create_user();
+        $applicator = self::getDataGenerator()->create_user();
+        self::getDataGenerator()->enrol_user($teacher->id, $quiz->course, 'editingteacher');
+
+        $this->setUser($teacher);
+        $issued = invitation::generate($quiz->cmid, 0);
+        $clock->set_to($issued['timeexpires']);
+        $this->setUser($applicator);
+        $sink = $this->redirectEvents();
+
+        try {
+            invitation::accept($quiz->cmid, $issued['token']);
+            $this->fail('An expired invitation was accepted.');
+        } catch (\moodle_exception $exception) {
+            $this->assertSame('invitationinvalid', $exception->errorcode);
+        }
+
+        $events = $sink->get_events();
+        $this->assertCount(2, $events);
+        $this->assertSame('expired', $events[0]->get_data()['other']['action']);
+        $this->assertInstanceOf(\quizaccess_presencial\event\invitation_invalid::class, $events[1]);
+
+        $this->setUser($teacher);
+        $this->assertSame('expired', invitation::get_status($quiz->cmid)['state']);
+        $this->assertCount(2, $sink->get_events());
+    }
+
+    /**
      * Accepting again reports the current delegation without changing it.
      */
     public function test_reaccepting_an_invitation_is_idempotent(): void {

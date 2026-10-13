@@ -48,7 +48,8 @@ final class invitation {
         $course = $DB->get_record('course', ['id' => $cm->course], 'id,fullname', MUST_EXIST);
         $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id], '*', MUST_EXIST);
         $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], 'createdby', MUST_EXIST);
-        $creator = $DB->get_record('user', ['id' => $record->createdby], 'id,firstname,lastname', MUST_EXIST);
+        $creatorfields = implode(',', array_merge(['id'], \core_user\fields::get_name_fields()));
+        $creator = $DB->get_record('user', ['id' => $record->createdby], $creatorfields, MUST_EXIST);
 
         return [
             'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),
@@ -74,17 +75,22 @@ final class invitation {
             invitation_invalid::create(['context' => \context_system::instance()])->trigger();
             throw new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
         }
-        return quiz_lock::execute($cm->instance, function () use ($cm, $token, $DB, $USER): array {
+        $result = quiz_lock::execute($cm->instance, function () use ($cm, $token, $DB, $USER) {
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
             self::reconcile($cm, $record ?: null, $configuration ?: null);
             $valid = self::is_valid($cm, $record ?: null, $configuration ?: null, $token);
             if (!$valid) {
                 invitation_invalid::create(['context' => \context_module::instance($cm->id)])->trigger();
-                throw new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
+                // Return the refusal so reconcile and its audit event can commit with the lock transaction.
+                return new \moodle_exception('invitationinvalid', 'quizaccess_presencial');
             }
             return delegation_manager::accept_invitation($cm->instance, (int) $USER->id);
         });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
+        }
+        return $result;
     }
 
     /**

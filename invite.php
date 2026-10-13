@@ -41,7 +41,10 @@ if ($submitted && !empty($submitted->accept)) {
     $accepted = invitation::accept($cmid, $token);
 }
 
-echo $OUTPUT->header();
+$header = $OUTPUT->header();
+// Core may apply the site's referrer policy while building its HTTP headers.
+header('Referrer-Policy: no-referrer');
+echo $header;
 echo $OUTPUT->heading(get_string('invitationaccept', 'quizaccess_presencial'));
 if ($accepted) {
     echo $OUTPUT->notification(
