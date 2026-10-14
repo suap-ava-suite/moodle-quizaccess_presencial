@@ -18,6 +18,8 @@ namespace quizaccess_presencial;
 
 use quizaccess_presencial\local\applications;
 use quizaccess_presencial\local\delegation_manager;
+use quizaccess_presencial\local\release_request;
+use quizaccess_presencial\local\release_request_service;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -54,7 +56,7 @@ final class applications_test extends \advanced_testcase {
         $this->assertSame(['Current quiz', 'Future quiz'], array_column($page['items'], 'quizname'));
         $this->assertSame(['current', 'future'], array_column($page['items'], 'state'));
         $this->assertSame([true, false], array_column($page['items'], 'canoperate'));
-        $this->assertSame([null, null], array_column($page['items'], 'pendingcount'));
+        $this->assertSame([0, 0], array_column($page['items'], 'pendingcount'));
         $this->assertNotContains((int) $unrelated->id, array_column($page['items'], 'quizid'));
         $this->assertFalse(is_enrolled(\context_module::instance($current->cmid), $user->id));
         $this->assertFalse(has_capability('mod/quiz:view', \context_module::instance($current->cmid)));
@@ -79,6 +81,74 @@ final class applications_test extends \advanced_testcase {
         $this->assertTrue($application['canoperate']);
         $this->assertFalse(is_enrolled(\context_module::instance($quiz->cmid), $user->id));
         $this->assertEmpty(get_user_roles(\context_module::instance($quiz->cmid), $user->id, false));
+    }
+
+    /**
+     * Reloading the authorized list counts only pending requests for each visible quiz.
+     */
+    public function test_pending_counts_refresh_per_authorized_quiz_and_exclude_authorized_requests(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $clock = $this->mock_clock_with_frozen(time());
+        $firstquiz = $this->create_quiz('First counted quiz', -HOURSECS);
+        $secondquiz = $this->create_quiz('Second counted quiz', -HOURSECS);
+        $hiddenquiz = $this->create_quiz('Hidden quiz', -HOURSECS);
+        $applicator = self::getDataGenerator()->create_user();
+        $firststudent = self::getDataGenerator()->create_user();
+        $secondstudent = self::getDataGenerator()->create_user();
+        $actorid = $GLOBALS['USER']->id;
+        delegation_manager::include_users($firstquiz->id, [$applicator->id], $actorid);
+        delegation_manager::include_users($secondquiz->id, [$applicator->id], $actorid);
+        $this->setUser($applicator);
+
+        $this->assertSame([0, 0], array_column(applications::get_page()['items'], 'pendingcount'));
+
+        $service = new release_request_service($clock);
+        $service->ensure_pending($firstquiz->id, $firststudent->id, 1);
+        $service->ensure_pending($firstquiz->id, $secondstudent->id, 1);
+        $secondrequest = $service->ensure_pending($secondquiz->id, $firststudent->id, 1);
+        $service->ensure_pending($hiddenquiz->id, $firststudent->id, 1);
+
+        $page = applications::get_page();
+        $this->assertSame(2, $page['total']);
+        $this->assertSame(
+            [$firstquiz->id => 2, $secondquiz->id => 1],
+            array_column($page['items'], 'pendingcount', 'quizid'),
+        );
+        $this->assertSame(2, applications::get_application($firstquiz->cmid)['pendingcount']);
+
+        $this->setAdminUser();
+        $this->assertSame(release_request::STATE_AUTHORIZED, $service->authorize($secondrequest->id)->state);
+        $this->setUser($applicator);
+        $this->assertSame(
+            [$firstquiz->id => 2, $secondquiz->id => 0],
+            array_column(applications::get_page()['items'], 'pendingcount', 'quizid'),
+        );
+    }
+
+    /**
+     * At the exact expiry instant, a still-persisted pending request no longer counts.
+     */
+    public function test_pending_count_excludes_due_request_before_expiration_task_runs(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $clock = $this->mock_clock_with_frozen(time());
+        set_config('requestvalidity', 15, 'quizaccess_presencial');
+        $quiz = $this->create_quiz('Expiring request quiz', -HOURSECS);
+        $applicator = self::getDataGenerator()->create_user();
+        $student = self::getDataGenerator()->create_user();
+        delegation_manager::include_users($quiz->id, [$applicator->id], $GLOBALS['USER']->id);
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($applicator);
+
+        $clock->bump(899);
+        $this->assertSame(1, applications::get_page()['items'][0]['pendingcount']);
+        $clock->bump(1);
+        $this->assertSame(release_request::STATE_PENDING, $service->get($request->id)->state);
+        $this->assertSame(0, applications::get_page()['items'][0]['pendingcount']);
+        $this->assertSame(0, applications::get_application($quiz->cmid)['pendingcount']);
+        $this->assertSame(release_request::STATE_PENDING, $service->get($request->id)->state);
     }
 
     /**

@@ -35,11 +35,11 @@ Feature: Find and open standalone applications
     And I should see "Quiz 1" in the ".presencial-applications" "css_element"
     And I should see "Current" in the ".presencial-applications" "css_element"
     And I should see "Pending requests"
-    And I should see "Unavailable" in the ".presencial-applications" "css_element"
+    And I should see "0" in the ".presencial-applications tbody tr td:nth-child(6)" "css_element"
     When I follow "Open application"
     Then I should see "Application panel" in the "h2" "css_element"
     And I should see "Quiz 1"
-    And I should see "Release requests are not available in this version."
+    And I should see "The request queue and decisions are not available in this panel yet."
     And academic access to "Quiz 1" should still require enrolment
 
   Scenario: Revocation denies a known application URL in the existing session
@@ -68,7 +68,7 @@ Feature: Find and open standalone applications
     When I follow "Application panel"
     Then I should see "Application panel" in the "h2" "css_element"
     And I should see "Quiz 1"
-    And I should see "Release requests are not available in this version."
+    And I should see "The request queue and decisions are not available in this panel yet."
 
   @javascript @presencial_keyboard
   Scenario: An applicator opens and refreshes the panel using only the keyboard
