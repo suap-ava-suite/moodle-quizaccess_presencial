@@ -111,7 +111,6 @@ if ($issued !== null) {
         'cmid' => $cm->id,
         'token' => $issued['token'],
     ]);
-    echo $OUTPUT->heading(get_string('invitationmanage', 'quizaccess_presencial'), 3);
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
         'generated' => true,
         'link' => $link->out(false),
@@ -129,7 +128,7 @@ if ($issued !== null) {
         'type' => 'submit',
         'name' => 'addapplicators',
         'value' => get_string('addapplicators', 'quizaccess_presencial'),
-        'class' => 'btn btn-primary',
+        'class' => 'btn btn-primary mt-3 mb-3',
     ]);
     echo html_writer::end_tag('form');
 

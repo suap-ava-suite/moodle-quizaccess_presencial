@@ -46,7 +46,7 @@ A mesma página reúne a gestão do **Convite** por link. O link completo aparec
 
 O convite pode ser gerado e validado antes do início do Período de Autorização, mas expira no seu fim. Encurtar o período limita a validade definitivamente; ampliá-lo depois não estende nem reativa o convite existente. A validação aplica a expiração imediatamente, e uma tarefa agendada materializa as expirações pendentes sem repetir eventos. Transições de convite e tentativas de uso inválido são registradas pela Events API, sem o token.
 
-O token usa 32 bytes de `random_bytes()`; somente sua derivação SHA-256 com identificação de finalidade é persistida. As alterações usam bloqueio por Questionário, transação e uma geração numerada para recusar formulários antigos. A API pública de domínio `quizaccess_presencial\local\invitation::validate($cmid, $token)` retorna somente um booleano. A rota de destino do link e a jornada de autenticação, apresentação, aceite e criação de Delegação serão entregues na Issue #8; esta versão ainda não atende esse destino.
+O token usa 32 bytes de `random_bytes()`; somente sua derivação SHA-256 com identificação de finalidade é persistida. As alterações usam bloqueio por Questionário, transação e uma geração numerada para recusar formulários antigos. A API pública de domínio `quizaccess_presencial\local\invitation::validate($cmid, $token)` retorna somente um booleano. Ao abrir o link, visitantes são encaminhados ao login e retornam ao convite; depois da autenticação, a página apresenta somente a disciplina, o Questionário, o Período de Autorização e o Professor que o gerou. Uma Conta elegível pode aceitar antes do início ou durante o período, criando a mesma Delegação de aplicação da Inclusão direta com origem `invite`. Um novo aceite apenas informa a Delegação vigente, sem alterá-la.
 
 Para uma nova tentativa, o Moodle valida primeiro suas regras nativas. Depois, o plugin cria ou reutiliza uma Solicitação pendente sem criar `quiz_attempt`, e o estudante acompanha o estado numa página que consulta o servidor a cada cinco segundos. Solicitações pendentes expiram no instante absoluto persistido na criação; o prazo padrão é 15 minutos. Uma autorização transiciona a solicitação para `authorized` e o estudante pode então seguir pelo fluxo normal de início; uma autorização não utilizada também expira após o prazo global configurado (padrão: 5 minutos). Ao começar a criação normal da tentativa, a autorização passa por um lease curto de início e é consumida quando o Moodle persiste a tentativa. Se a regra for desabilitada durante esse lease, a criação já autorizada é concluída e consumida; solicitações pendentes e autorizações ainda não reclamadas são encerradas. Tentativas em andamento são retomadas sem Solicitação.
 
@@ -105,11 +105,28 @@ Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 ### Testes automatizados
 
-A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB. PHPUnit cobre Solicitações de liberação (unicidade, idempotência, relógio, expiração, autorização, retomada e privacidade), Delegações (inclusão, revogação e elegibilidade), Convites (tokens, estados e concorrência), integração com configuração, navegação e CSRF. Também cobre autorização, paginação, visibilidade e contagem de pendências em **Minhas Aplicações**, fronteiras temporais, autoridade contextual do Professor e suspensão com recuperação da mesma Delegação. Behat cobre as jornadas de equipe, Convite, Solicitação/espera e painel, incluindo a exibição e atualização da contagem: navegação sem matrícula, recusa de acesso acadêmico, revogação e suspensão na sessão existente, usuário sem autoridade e Professor sem Delegação. Os cenários de teclado usam um navegador real e percorrem menu, abertura, atualização, retorno e paginação com Tab, setas e Enter, verificando o foco sem forçá-lo por JavaScript. Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
+A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB.
+
+PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade. Também cobre autorização, paginação e visibilidade de **Minhas Aplicações**, fronteiras temporais, autoridade contextual do Professor e suspensão com recuperação da mesma Delegação.
+
+Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link, além do retorno ao convite após login sem sessão ou como visitante, do aceite explícito e da confirmação. As jornadas de aceite usam Boost e uma conta sem matrícula, antes e durante o Período de Autorização, e verificam o HTML completo para impedir a exposição de dados e navegação acadêmicos.
+
+As jornadas do painel cobrem navegação sem matrícula, recusa de acesso acadêmico, revogação e suspensão na sessão existente, usuário sem autoridade e Professor sem Delegação. Os cenários de teclado usam um navegador real e percorrem menu, abertura, atualização, retorno e paginação com Tab, setas e Enter, verificando o foco sem forçá-lo por JavaScript.
+
+Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash
 moodle-plugin-ci phpunit --fail-on-warning
 moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
+```
+
+Para execução local, inicialize PHPUnit e Behat com o mesmo código e versão do Moodle usados para executar os testes, em banco e diretórios de dados exclusivos para testes. Não reutilize um ambiente inicializado por outra versão do Moodle. A URL de Behat deve ser diferente da URL do site e acessível pelo navegador de testes. Após configurar os prefixos, diretórios e o perfil Chrome em `config.php`, execute a partir da raiz do Moodle 5.2:
+
+```bash
+php public/admin/tool/phpunit/cli/init.php
+php public/admin/tool/behat/cli/init.php
+vendor/bin/phpunit --testsuite quizaccess_presencial_testsuite
+vendor/bin/behat --config /CAMINHO/BEHAT/behatrun/behat/behat.yml --profile chrome --tags=@quizaccess_presencial
 ```
 
 ## Privacidade
