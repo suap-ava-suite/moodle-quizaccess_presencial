@@ -23,6 +23,10 @@ use quizaccess_presencial\event\delegation_updated;
 /**
  * Application boundary for creating and revoking quiz delegations.
  *
+ * All mutations acquire the quiz row lock before reading the configuration or delegations.
+ * The database retains that lock until the outermost transaction ends, including nested calls
+ * from invitation acceptance on the same connection.
+ *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -55,46 +59,27 @@ final class delegation_manager {
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
 
-        $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
-        if (!$configuration->enabled || $configuration->timeclose <= $now) {
-            throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
-        }
-
-        $userids = array_values(array_unique(array_filter(array_map('intval', $userids))));
-        if (!$userids) {
-            return [];
-        }
-        foreach ($userids as $userid) {
-            if (!self::is_eligible_user($userid)) {
-                throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
+        return quiz_lock::execute($quizid, function () use ($quizid, $userids, $actorid, $origin, $now, $DB): array {
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
+            if (!$configuration->enabled || $configuration->timeclose <= $now) {
+                throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
             }
-        }
 
-        sort($userids, SORT_NUMERIC);
-        $lockfactory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
-        $locks = [];
-        try {
+            $userids = array_values(array_unique(array_filter(array_map('intval', $userids))));
             foreach ($userids as $userid) {
-                $lock = $lockfactory->get_lock("delegation:{$quizid}:{$userid}", 10);
-                if (!$lock) {
-                    throw new \moodle_exception('delegationlocktimeout', 'quizaccess_presencial');
+                if (!self::is_eligible_user($userid)) {
+                    throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
                 }
-                $locks[] = $lock;
             }
 
-            $transaction = $DB->start_delegated_transaction();
+            sort($userids, SORT_NUMERIC);
             $result = [];
             foreach ($userids as $userid) {
                 $included = self::create_or_find($quizid, $userid, $actorid, $origin, $configuration, $now);
                 $result[$userid] = $included['delegation'];
             }
-            $transaction->allow_commit();
             return $result;
-        } finally {
-            foreach (array_reverse($locks) as $lock) {
-                $lock->release();
-            }
-        }
+        });
     }
 
     /**
@@ -113,27 +98,17 @@ final class delegation_manager {
         global $DB;
 
         $now ??= time();
-        if (!self::is_eligible_user($userid)) {
-            throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
-        }
-        $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
-        if (!$configuration->enabled || $configuration->timeclose <= $now) {
-            throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
-        }
+        return quiz_lock::execute($quizid, function () use ($quizid, $userid, $now, $DB): array {
+            if (!self::is_eligible_user($userid)) {
+                throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
+            }
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
+            if (!$configuration->enabled || $configuration->timeclose <= $now) {
+                throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
+            }
 
-        $lockfactory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
-        $lock = $lockfactory->get_lock("delegation:{$quizid}:{$userid}", 10);
-        if (!$lock) {
-            throw new \moodle_exception('delegationlocktimeout', 'quizaccess_presencial');
-        }
-        try {
-            $transaction = $DB->start_delegated_transaction();
-            $result = self::create_or_find($quizid, $userid, $userid, 'invite', $configuration, $now);
-            $transaction->allow_commit();
-            return $result;
-        } finally {
-            $lock->release();
-        }
+            return self::create_or_find($quizid, $userid, $userid, 'invite', $configuration, $now);
+        });
     }
 
     /**
@@ -151,27 +126,15 @@ final class delegation_manager {
         $now ??= time();
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
-        $delegation = $DB->get_record('quizaccess_presencial_delegation', [
-            'id' => $delegationid,
-            'quizid' => $quizid,
-        ]);
-        if (!$delegation) {
-            throw new \moodle_exception('delegationnotfound', 'quizaccess_presencial');
-        }
-
-        $lockfactory = \core\lock\lock_config::get_lock_factory('quizaccess_presencial');
-        $lock = $lockfactory->get_lock("delegation:{$quizid}:{$delegation->userid}", 10);
-        if (!$lock) {
-            throw new \moodle_exception('delegationlocktimeout', 'quizaccess_presencial');
-        }
-        try {
-            $transaction = $DB->start_delegated_transaction();
+        return quiz_lock::execute($quizid, function () use ($quizid, $delegationid, $actorid, $now, $DB): bool {
             $delegation = $DB->get_record('quizaccess_presencial_delegation', [
                 'id' => $delegationid,
                 'quizid' => $quizid,
-            ], '*', MUST_EXIST);
+            ]);
+            if (!$delegation) {
+                throw new \moodle_exception('delegationnotfound', 'quizaccess_presencial');
+            }
             if ($delegation->timerevoked) {
-                $transaction->allow_commit();
                 return false;
             }
 
@@ -180,11 +143,8 @@ final class delegation_manager {
             $delegation->timemodified = $now;
             $DB->update_record('quizaccess_presencial_delegation', $delegation);
             self::trigger_event($delegation, $actorid, 'revoked', $delegation->origin);
-            $transaction->allow_commit();
             return true;
-        } finally {
-            $lock->release();
-        }
+        });
     }
 
     /**
