@@ -39,7 +39,7 @@ final class metadata_test extends \basic_testcase {
         }
 
         $this->assertEqualsCanonicalizing(
-            ['quizaccess_presencial_delegation', 'quizaccess_presencial_invite'],
+            ['quizaccess_presencial_delegation', 'quizaccess_presencial_invite', 'quizaccess_presencial_req'],
             array_keys($items),
         );
         $this->assertEqualsCanonicalizing([
@@ -48,5 +48,8 @@ final class metadata_test extends \basic_testcase {
         $this->assertEqualsCanonicalizing([
             'createdby', 'generation', 'state', 'timecreated', 'timemodified', 'timeexpires',
         ], array_keys($items['quizaccess_presencial_invite']->get_privacy_fields()));
+        $this->assertEqualsCanonicalizing([
+            'quizid', 'userid', 'attemptnumber', 'state', 'timecreated', 'expiresat', 'timemodified',
+        ], array_keys($items['quizaccess_presencial_req']->get_privacy_fields()));
     }
 }

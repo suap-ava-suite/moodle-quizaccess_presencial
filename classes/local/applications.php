@@ -47,7 +47,7 @@ final class applications {
      * @param int $page Zero-based page number.
      * @param int $pagesize Items per page, limited to 100.
      * @return array Total and application items, ordered by authorization start and quiz id.
-     *     Each item includes state (current, future or teacher), canoperate and pendingcount (null when unavailable).
+     *     Each item includes state (current, future or teacher), canoperate and pendingcount.
      */
     public static function get_page(int $page = 0, int $pagesize = 20): array {
         return self::find(max(0, $page), max(1, min(100, $pagesize)));
@@ -151,9 +151,28 @@ final class applications {
             $item['canoperate'] = (int) $record->timeopen <= $now;
             $item['state'] = $record->delegated ? ($item['canoperate'] ? 'current' : 'future') : 'teacher';
             unset($item['delegated']);
-            // Release requests are introduced by issue #10; their count is not available in this delivery.
-            $item['pendingcount'] = null;
             $items[] = $item;
+        }
+        if ($items) {
+            // Count only the authorized quizzes on this page, using the same instant as discovery.
+            $visiblequizids = array_column($items, 'quizid');
+            [$requestinsql, $requestparams] = $DB->get_in_or_equal($visiblequizids, SQL_PARAMS_NAMED, 'pendingquiz');
+            $counts = $DB->get_records_sql(
+                "SELECT quizid, COUNT(id) AS pendingcount
+                   FROM {quizaccess_presencial_req}
+                  WHERE quizid {$requestinsql} AND state = :pendingstate AND active = 1
+                        AND expiresat > :requestnow
+               GROUP BY quizid",
+                array_merge($requestparams, [
+                    'pendingstate' => release_request::STATE_PENDING,
+                    'requestnow' => $now,
+                ]),
+            );
+            foreach ($items as &$item) {
+                $item['pendingcount'] = isset($counts[$item['quizid']])
+                    ? (int) $counts[$item['quizid']]->pendingcount : 0;
+            }
+            unset($item);
         }
         return ['total' => count($quizids), 'items' => $items];
     }
