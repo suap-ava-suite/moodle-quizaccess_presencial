@@ -40,7 +40,7 @@ O item **Minhas Aplicações** aparece no menu do usuário somente para Contas e
 
 Cada requisição verifica novamente a conta, a configuração, o período e a autoridade no Questionário. Revogação, expiração, suspensão da conta ou desabilitação da regra interrompe o acesso. Remover a suspensão recupera a mesma Delegação somente enquanto ela e o período continuam válidos; não há histórico pessoal de aplicações. Aplicações futuras mostram apenas informações de preparação, sem ações operacionais antes do início do período.
 
-Ao carregar ou atualizar **Minhas Aplicações**, a coluna de solicitações pendentes mostra a contagem real por Questionário. Somente solicitações ainda pendentes e dentro do prazo entram na soma, mesmo que a tarefa de expiração não tenha sido executada; zero significa que não há pendências válidas. A Fila operacional e as decisões sobre estudantes no painel permanecem para a issue #11. As Solicitações de liberação e a página de espera do estudante já estão disponíveis.
+Ao carregar ou atualizar **Minhas Aplicações**, a coluna de solicitações pendentes mostra a contagem real por Questionário. Somente solicitações ainda pendentes e dentro do prazo entram na soma, mesmo que a tarefa de expiração não tenha sido executada; zero significa que não há pendências válidas. O Painel do Aplicador mostra a Fila operacional daquele Questionário, com atualização manual e paginação de 20 solicitações no servidor. Pendências aparecem da mais antiga para a mais recente, seguidas das decisões ainda revisáveis da mais recente para a mais antiga. A identidade operacional contém nome completo, foto e somente os campos de identidade configurados e visíveis ao operador segundo as políticas do Moodle, sem link para o perfil.
 
 A mesma página reúne a gestão do **Convite** por link. O link completo aparece somente na resposta à geração, com um botão para copiá-lo. A página posterior mostra apenas o estado e a validade. Regenerar substitui imediatamente o segredo anterior; desativar impede seu uso. Desabilitar e reabilitar a regra também exige gerar outro convite.
 
@@ -50,7 +50,11 @@ O token usa 32 bytes de `random_bytes()`; somente sua derivação SHA-256 com id
 
 Para uma nova tentativa, o Moodle valida primeiro suas regras nativas. Depois, o plugin cria ou reutiliza uma Solicitação pendente sem criar `quiz_attempt`, e o estudante acompanha o estado numa página que consulta o servidor a cada cinco segundos. Solicitações pendentes expiram no instante absoluto persistido na criação; o prazo padrão é 15 minutos. Uma autorização transiciona a solicitação para `authorized` e o estudante pode então seguir pelo fluxo normal de início; uma autorização não utilizada também expira após o prazo global configurado (padrão: 5 minutos). Ao começar a criação normal da tentativa, a autorização passa por um lease curto de início e é consumida quando o Moodle persiste a tentativa. Se a regra for desabilitada durante esse lease, a criação já autorizada é concluída e consumida; solicitações pendentes e autorizações ainda não reclamadas são encerradas. Tentativas em andamento são retomadas sem Solicitação.
 
-A autorização pode ser concedida durante o Período de Autorização pela operação AJAX Moodle `quizaccess_presencial_authorize_request`, restrita a usuários autenticados com `mod/quiz:manage` no contexto do Questionário. A fila e a interface do Professor/Aplicador para operar essa ação permanecem fora desta entrega.
+Professores com `mod/quiz:manage` no contexto do Questionário e Aplicadores com Delegação vigente podem **Autorizar** ou **Rejeitar** pela fila, somente durante o Período de Autorização. Cada submissão usa POST e token de sessão e revalida a conta, a autoridade, o período e o estado da solicitação. A operação AJAX Moodle `quizaccess_presencial_authorize_request` aplica as mesmas regras, inclusive para Aplicadores sem matrícula.
+
+A rejeição exige justificativa somente quando a política global determinar. A explicação é preservada integralmente e apresentada ao estudante como texto. A espera continua consultando o estado automaticamente após rejeição ou autorização; uma alteração na decisão ou na justificativa atualiza a tela. **Autorizado** apresenta outro botão **Iniciar tentativa**, sem iniciar automaticamente.
+
+A última decisão substitui a anterior enquanto a solicitação ainda admitir revisão. Rejeitar invalida uma autorização não consumida; autorizar depois de rejeitar libera a mesma solicitação. Após rejeição ou expiração, o estudante pode voltar ao Questionário e clicar imediatamente em iniciar para criar outra Solicitação. A anterior deixa de admitir revisões. Solicitações cujo início já foi confirmado ou cuja autorização foi consumida também recusam decisões posteriores e saem da fila. Cada mudança de decisão emite um evento Moodle; a tabela operacional guarda somente a decisão vigente e sua justificativa.
 
 ## Testes
 
@@ -107,7 +111,7 @@ Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 A integração contínua executa lint, verificações do `moodle-plugin-ci`, PHPUnit e os cenários Behat em PostgreSQL e MariaDB.
 
-PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade. Também cobre autorização, paginação e visibilidade de **Minhas Aplicações**, fronteiras temporais, autoridade contextual do Professor e suspensão com recuperação da mesma Delegação.
+PHPUnit cobre Delegações (inclusão, idempotência, revogação e elegibilidade), geração e rejeição de tokens, estados do convite, concorrência, integração com configuração, navegação, CSRF e privacidade. Também cobre autorização, paginação e visibilidade de **Minhas Aplicações**, fronteiras temporais, autoridade contextual do Professor e suspensão com recuperação da mesma Delegação. Os testes da Fila operacional verificam ordenação, paginação, isolamento entre Questionários, identidade mínima, decisões por Aplicadores sem matrícula, revisão, justificativa, revogação, suspensão e início da tentativa. Behat cobre autorização e rejeição pelo painel e atualização automática da espera, inclusive uma revisão posterior à rejeição.
 
 Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, desativação e regeneração do link, além do retorno ao convite após login sem sessão ou como visitante, do aceite explícito e da confirmação. As jornadas de aceite usam Boost e uma conta sem matrícula, antes e durante o Período de Autorização, e verificam o HTML completo para impedir a exposição de dados e navegação acadêmicos.
 
@@ -120,18 +124,20 @@ moodle-plugin-ci phpunit --fail-on-warning
 moodle-plugin-ci behat --profile chrome --tags=@quizaccess_presencial
 ```
 
-Para execução local, inicialize PHPUnit e Behat com o mesmo código e versão do Moodle usados para executar os testes, em banco e diretórios de dados exclusivos para testes. Não reutilize um ambiente inicializado por outra versão do Moodle. A URL de Behat deve ser diferente da URL do site e acessível pelo navegador de testes. Após configurar os prefixos, diretórios e o perfil Chrome em `config.php`, execute a partir da raiz do Moodle 5.2:
+Para execução local, inicialize PHPUnit e Behat com o mesmo código e versão do Moodle usados para executar os testes, em banco e diretórios de dados exclusivos para testes. Não reutilize um ambiente inicializado por outra versão do Moodle. A URL de Behat deve ser diferente da URL do site e acessível pelo navegador de testes. Após configurar os prefixos, diretórios e o perfil Chrome em `config.php`, execute a partir da raiz do Moodle:
 
 ```bash
-php public/admin/tool/phpunit/cli/init.php
-php public/admin/tool/behat/cli/init.php
+php admin/tool/phpunit/cli/init.php
+php admin/tool/behat/cli/init.php
 vendor/bin/phpunit --testsuite quizaccess_presencial_testsuite
 vendor/bin/behat --config /CAMINHO/BEHAT/behatrun/behat/behat.yml --profile chrome --tags=@quizaccess_presencial
 ```
 
+No Moodle 5.1 ou posterior, os scripts administrativos ficam sob `public/admin/` na raiz do projeto.
+
 ## Privacidade
 
-O plugin armazena Delegações de aplicação, dados mínimos do ciclo de vida do Convite e Solicitações associadas ao estudante, Questionário, tentativa e estado. A Privacy API declara essas categorias, localiza usuários e contextos, exporta os dados sem segredos e atende à exclusão individual, em lote e por contexto. A exclusão preserva a configuração do Questionário e mantém os registros de auditoria sob responsabilidade dos subsistemas de logs do Moodle.
+O plugin armazena Delegações de aplicação, dados mínimos do ciclo de vida do Convite e Solicitações associadas ao estudante, Questionário, tentativa, estado e justificativa integral da rejeição vigente. A Privacy API declara essas categorias, localiza usuários e contextos, exporta os dados sem segredos e atende à exclusão individual, em lote e por contexto. A exclusão preserva a configuração do Questionário e mantém os registros de auditoria sob responsabilidade dos subsistemas de logs do Moodle.
 
 ## Licença
 

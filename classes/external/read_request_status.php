@@ -57,7 +57,7 @@ class read_request_status extends external_api {
         self::validate_context($context);
         require_capability('mod/quiz:attempt', $context);
         $request = $service->read_status($params['requestid'], (int) $USER->id);
-        return ['state' => $request->state, 'expiresat' => $request->expiresat];
+        return ['state' => $request->state, 'expiresat' => $request->expiresat, 'rejectionreason' => $request->rejectionreason];
     }
 
     /**
@@ -68,6 +68,7 @@ class read_request_status extends external_api {
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'state' => new external_value(PARAM_ALPHANUMEXT, 'Current release request state'),
+            'rejectionreason' => new external_value(PARAM_RAW, 'Complete plain-text rejection explanation'),
             'expiresat' => new external_value(PARAM_INT, 'Absolute expiry timestamp'),
         ]);
     }

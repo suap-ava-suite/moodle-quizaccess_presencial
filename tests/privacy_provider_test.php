@@ -155,6 +155,7 @@ final class privacy_provider_test extends \advanced_testcase {
         \quizaccess_presencial::save_settings($quiz);
         $student = self::getDataGenerator()->create_user();
         $request = (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
+        (new release_request_service($clock))->reject($request->id, 'Complete rejection explanation.');
         $context = \context_module::instance($cm->id);
 
         $contexts = provider::get_contexts_for_userid($student->id);
@@ -175,7 +176,8 @@ final class privacy_provider_test extends \advanced_testcase {
         $this->assertNotEmpty($export);
         $this->assertSame((int) $quiz->id, $export->quizid);
         $this->assertSame(1, $export->attemptnumber);
-        $this->assertSame('pending', $export->state);
+        $this->assertSame('rejected', $export->state);
+        $this->assertSame('Complete rejection explanation.', $export->rejectionreason);
         $this->assertSame(userdate($request->timecreated), $export->timecreated);
 
         provider::delete_data_for_user($approvedcontexts);

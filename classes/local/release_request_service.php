@@ -18,6 +18,7 @@ namespace quizaccess_presencial\local;
 
 use core\clock;
 use quizaccess_presencial\event\request_authorized;
+use quizaccess_presencial\event\request_rejected;
 use quizaccess_presencial\event\request_created;
 use quizaccess_presencial\event\request_consumed;
 use quizaccess_presencial\event\request_expired;
@@ -108,6 +109,11 @@ final class release_request_service {
             $active = null;
         }
 
+        if ($active && $active->state === release_request::STATE_REJECTED) {
+            // A new student click permanently retires the previous decision.
+            $DB->set_field('quizaccess_presencial_req', 'active', null, ['id' => $active->id]);
+            $active = null;
+        }
         if ($active) {
             $tx->allow_commit();
             return new release_request($active);
@@ -201,56 +207,104 @@ final class release_request_service {
     }
 
     /**
-     * Authorise a pending request. Repeated authorization is idempotent.
+     * Authorize an actionable request; an unchanged grant keeps its deadline.
      *
      * @param int $requestid Request id.
      * @return release_request Updated request.
      */
     public function authorize(int $requestid): release_request {
-        global $DB;
-        $now = $this->clock->time();
+        return $this->decide($requestid, release_request::STATE_AUTHORIZED, '');
+    }
+
+    /**
+     * Reject an actionable request using the current institutional policy.
+     *
+     * @param int $requestid Request id.
+     * @param string $reason Complete plain-text explanation for the student.
+     * @return release_request Updated request.
+     */
+    public function reject(int $requestid, string $reason = ''): release_request {
+        return $this->decide($requestid, release_request::STATE_REJECTED, $reason);
+    }
+
+    /**
+     * Replace the current decision atomically with delegation and configuration changes.
+     *
+     * @param int $requestid Request id.
+     * @param string $state New decision.
+     * @param string $reason Complete rejection explanation.
+     * @return release_request Updated request.
+     */
+    private function decide(int $requestid, string $state, string $reason): release_request {
+        global $DB, $USER;
+
         $existing = $this->get($requestid);
-        $cm = get_coursemodule_from_instance('quiz', $existing->quizid, 0, false, MUST_EXIST);
-        $context = \context_module::instance($cm->id);
-        require_capability('mod/quiz:manage', $context);
-        $tx = $DB->start_delegated_transaction();
-        // Serialize authorization against rule disablement and request creation.
-        $configuration = $DB->get_record_sql(
-            'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
-            ['quizid' => $existing->quizid],
-        );
-        if (
-            !$configuration || empty($configuration->enabled) ||
-                (int) $configuration->timeopen > $now || (int) $configuration->timeclose < $now
-        ) {
-            throw new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
-        }
-        $changed = false;
-        $record = $DB->get_record_sql(
-            'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
-            ['id' => $requestid],
-            MUST_EXIST,
-        );
-        if ($record->state === release_request::STATE_PENDING && (int) $record->expiresat > $now) {
-            $this->transition($record, release_request::STATE_AUTHORIZED, $now);
-            $validity = (int) get_config('quizaccess_presencial', 'authorisationvalidity');
-            if ($validity < 1) {
-                $validity = 5;
+        $result = quiz_lock::execute($existing->quizid, function () use ($requestid, $existing, $state, $reason, $DB, $USER) {
+            $now = $this->clock->time();
+            $cm = get_coursemodule_from_instance('quiz', $existing->quizid, 0, false, MUST_EXIST);
+            $context = \context_module::instance($cm->id);
+            if (!applicator_eligibility::is_eligible_user((int) $USER->id)) {
+                return new \moodle_exception('applicationaccessdenied', 'quizaccess_presencial');
             }
-            $record->expiresat = $now + $validity * MINSECS;
-            $DB->set_field('quizaccess_presencial_req', 'expiresat', $record->expiresat, ['id' => $requestid]);
-            $changed = true;
-        } else if ($record->state === release_request::STATE_PENDING) {
-            $this->transition($record, release_request::STATE_EXPIRED, $now);
-            $changed = true;
+            if (
+                !delegation_manager::is_active_applicator($existing->quizid, (int) $USER->id, $now) &&
+                    !has_capability('mod/quiz:manage', $context)
+            ) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
+            // Use the same configuration/request lock order as request creation.
+            $configuration = $DB->get_record_sql(
+                'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
+                ['quizid' => $existing->quizid],
+            );
+            if (
+                !$configuration || empty($configuration->enabled) ||
+                    (int) $configuration->timeopen > $now || (int) $configuration->timeclose <= $now
+            ) {
+                return new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
+            }
+            $record = $DB->get_record_sql(
+                'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
+                ['id' => $requestid],
+                MUST_EXIST,
+            );
+            if (
+                empty($record->active) || !in_array($record->state, [
+                release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED,
+                ], true)
+            ) {
+                return new \moodle_exception('requestnotrevisable', 'quizaccess_presencial');
+            }
+            if ((int) $record->expiresat <= $now) {
+                $this->transition($record, release_request::STATE_EXPIRED, $now);
+                $this->trigger_expired($requestid);
+                return $this->get($requestid);
+            }
+            if (
+                $state === release_request::STATE_REJECTED && trim($reason) === '' &&
+                    get_config('quizaccess_presencial', 'rejectionjustificationrequired')
+            ) {
+                return new \moodle_exception('rejectionreasonrequired', 'quizaccess_presencial');
+            }
+            if ($state === release_request::STATE_AUTHORIZED && $record->state === $state) {
+                return $this->get($requestid);
+            }
+            if ($state === release_request::STATE_AUTHORIZED) {
+                $validity = (int) get_config('quizaccess_presencial', 'authorisationvalidity');
+                $record->expiresat = $now + ($validity > 0 ? $validity : 5) * MINSECS;
+            }
+            $record->rejectionreason = $reason;
+            $this->transition($record, $state, $now);
+            $this->trigger_for_request(
+                $state === release_request::STATE_AUTHORIZED ? request_authorized::class : request_rejected::class,
+                $requestid,
+            );
+            return $this->get($requestid);
+        });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
         }
-        if ($changed && $record->state === release_request::STATE_AUTHORIZED) {
-            $this->trigger_authorized($requestid);
-        } else if ($changed) {
-            $this->trigger_expired($requestid);
-        }
-        $tx->allow_commit();
-        return $this->get($requestid);
+        return $result;
     }
 
     /**
@@ -373,11 +427,12 @@ final class release_request_service {
         $ids = $DB->get_fieldset_select(
             'quizaccess_presencial_req',
             'id',
-            'quizid = :quizid AND state IN (:pending, :authorized)',
+            'quizid = :quizid AND state IN (:pending, :authorized, :rejected)',
             [
                 'quizid' => $quizid,
                 'pending' => release_request::STATE_PENDING,
                 'authorized' => release_request::STATE_AUTHORIZED,
+                'rejected' => release_request::STATE_REJECTED,
             ],
         );
         $expired = 0;
@@ -519,15 +574,6 @@ final class release_request_service {
      */
     private function trigger_created(int $id): void {
         $this->trigger_for_request(request_created::class, $id);
-    }
-
-    /**
-     * Trigger authorization after the state transition.
-     *
-     * @param int $id Request id.
-     */
-    private function trigger_authorized(int $id): void {
-        $this->trigger_for_request(request_authorized::class, $id);
     }
 
     /**

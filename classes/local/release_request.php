@@ -28,6 +28,8 @@ final class release_request {
     public const STATE_PENDING = 'pending';
     /** @var string Request has been authorised. */
     public const STATE_AUTHORIZED = 'authorized';
+    /** @var string Request was rejected and may still be revised. */
+    public const STATE_REJECTED = 'rejected';
     /** @var string Moodle is creating the authorized attempt. */
     public const STATE_STARTING = 'starting';
     /** @var string Authorization was consumed by a created attempt. */
@@ -41,7 +43,7 @@ final class release_request {
      * @return string[] Active lifecycle states.
      */
     public static function active_states(): array {
-        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_STARTING];
+        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_REJECTED, self::STATE_STARTING];
     }
 
     /**
@@ -50,7 +52,7 @@ final class release_request {
      * @return string[] States that can expire when expiresat is reached.
      */
     public static function expirable_states(): array {
-        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_STARTING];
+        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_REJECTED, self::STATE_STARTING];
     }
 
     /** @var int */
@@ -65,6 +67,8 @@ final class release_request {
     public string $state;
     /** @var int */
     public int $timecreated;
+    /** @var string Complete plain-text rejection explanation. */
+    public string $rejectionreason;
     /** @var int Absolute Unix timestamp persisted at creation. */
     public int $expiresat;
 
@@ -80,6 +84,7 @@ final class release_request {
         $this->attemptnumber = (int) $record->attemptnumber;
         $this->state = (string) $record->state;
         $this->timecreated = (int) $record->timecreated;
+        $this->rejectionreason = (string) ($record->rejectionreason ?? '');
         $this->expiresat = (int) $record->expiresat;
     }
 }

@@ -649,4 +649,106 @@ class behat_quizaccess_presencial extends behat_base {
             throw new ExpectationException('The attempt did not consume its release request.', $this->getSession());
         }
     }
+    /**
+     * Inspect all rendered operational identities for profile links.
+     *
+     * @Then the operational identity should not link to student profiles
+     */
+    public function operational_identity_has_no_profile_links(): void {
+        $links = $this->getSession()->getPage()->findAll('css', '.presencial-queue a[href*="/user/"]');
+        if ($links) {
+            throw new ExpectationException('Operational identities must not link to profiles.', $this->getSession());
+        }
+    }
+
+    /**
+     * Return to the student's most recent request without creating another request.
+     *
+     * @When I open the latest release request for :quizname for :username
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function open_latest_release_request(string $quizname, string $username): void {
+        global $DB;
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $studentid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
+        $requests = $DB->get_records(
+            'quizaccess_presencial_req',
+            ['quizid' => $quizid, 'userid' => $studentid],
+            'id DESC',
+            'id',
+            0,
+            1
+        );
+        $request = reset($requests);
+        $url = new moodle_url('/mod/quiz/accessrule/presencial/wait.php', ['requestid' => $request->id]);
+        $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
+    }
+
+    /**
+     * An authenticated applicator changes a decision while the student's browser waits.
+     *
+     * @When applicator :operator rejects the request for :quizname for :username with :reason
+     * @When applicator :operator authorizes the request for :quizname for :username
+     * @param string $operator Applicator username.
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     * @param string|null $reason Explanation, or null to authorize.
+     */
+    public function applicator_decides_request(string $operator, string $quizname, string $username, ?string $reason = null): void {
+        global $DB, $USER;
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $studentid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
+        $applicator = $DB->get_record('user', ['username' => $operator], '*', MUST_EXIST);
+        $requests = $DB->get_records(
+            'quizaccess_presencial_req',
+            ['quizid' => $quizid, 'userid' => $studentid],
+            'id DESC',
+            'id',
+            0,
+            1
+        );
+        $request = reset($requests);
+        $previoususer = $USER;
+        try {
+            \core\session\manager::set_user($applicator);
+            $service = new \quizaccess_presencial\local\release_request_service();
+            if ($reason === null) {
+                $service->authorize($request->id);
+            } else {
+                $service->reject($request->id, $reason);
+            }
+        } finally {
+            \core\session\manager::set_user($previoususer);
+        }
+    }
+
+    /**
+     * Send a realistic multiline textarea explanation, including markup as plain text.
+     *
+     * @When applicator :operator rejects the request for :quizname for :username with a multiline explanation
+     * @param string $operator Applicator username.
+     * @param string $quizname Quiz name.
+     * @param string $username Student username.
+     */
+    public function applicator_rejects_with_multiline_explanation(string $operator, string $quizname, string $username): void {
+        $this->applicator_decides_request(
+            $operator,
+            $quizname,
+            $username,
+            "First line.\r\nSecond line.\r\n<script>alert('unsafe')</script>"
+        );
+    }
+
+    /**
+     * A status poll without a decision change must leave the current document intact.
+     *
+     * @Then the waiting page should remain stable across the next status poll
+     */
+    public function waiting_page_remains_stable(): void {
+        $this->getSession()->executeScript('window.setTimeout(() => { window.presencialStablePoll = true; }, 6000);');
+        if (!$this->getSession()->wait(8000, 'window.presencialStablePoll === true')) {
+            throw new ExpectationException('The waiting page reloaded without a decision change.', $this->getSession());
+        }
+    }
 }

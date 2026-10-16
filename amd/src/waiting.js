@@ -22,17 +22,20 @@ export const init = (requestId) => {
         return;
     }
     const renderedState = container.getAttribute('data-state');
+    // HTML normalizes textarea CRLF line endings; compare without changing the stored explanation.
+    const normalizeReason = (reason) => reason.replace(/\r\n?/g, '\n');
+    const renderedReason = normalizeReason(container.getAttribute('data-rejection-reason') || '');
 
     const poll = () => {
         Ajax.call([{
             methodname: 'quizaccess_presencial_read_request',
             args: {requestid: requestId},
         }])[0].then((result) => {
-            if (result.state !== renderedState) {
+            if (result.state !== renderedState || normalizeReason(result.rejectionreason) !== renderedReason) {
                 window.location.reload();
                 return result;
             }
-            if (['pending', 'authorized', 'starting'].includes(result.state)) {
+            if (['pending', 'authorized', 'rejected', 'starting'].includes(result.state)) {
                 window.setTimeout(poll, 5000);
                 return result;
             }
