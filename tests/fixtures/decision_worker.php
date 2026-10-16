@@ -35,12 +35,53 @@ fflush(STDOUT);
 $params = json_decode(fgets(STDIN), true, 512, JSON_THROW_ON_ERROR);
 \advanced_testcase::setUser($params['actorid']);
 require_once($CFG->dirroot . '/lib/testing/classes/frozen_clock.php');
-$service = new \quizaccess_presencial\local\release_request_service(new \frozen_clock(1_800_000_000));
+$clock = new \frozen_clock(1_800_000_000);
+if (!empty($params['clockfile'])) {
+    // Share only the test clock across processes; domain operations still use real connections.
+    $clock = new class ($params['clockfile']) implements \core\clock {
+        /** @var string File containing the current test timestamp. */
+        private string $path;
+
+        /**
+         * Construct a clock shared with the parent test process.
+         *
+         * @param string $path File containing the current test timestamp.
+         */
+        public function __construct(string $path) {
+            $this->path = $path;
+        }
+
+        /**
+         * Read the current shared test time.
+         *
+         * @return int Unix timestamp.
+         */
+        public function time(): int {
+            return (int) file_get_contents($this->path);
+        }
+
+        /**
+         * Read the current shared test time as a date.
+         *
+         * @return \DateTimeImmutable Current instant.
+         */
+        public function now(): \DateTimeImmutable {
+            return new \DateTimeImmutable('@' . $this->time());
+        }
+    };
+}
+if (!empty($params['preloadcmid'])) {
+    \core\di::set(\core\clock::class, $clock);
+    // Reproduce the panel's authorization check earlier in the same request.
+    \quizaccess_presencial\local\applications::get_application($params['preloadcmid']);
+}
+$service = new \quizaccess_presencial\local\release_request_service($clock);
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
 try {
-    if ($params['operation'] === 'reject') {
-        $result = ['state' => $service->reject($params['requestid'])->state];
+    if (in_array($params['operation'], ['authorize', 'reject'], true)) {
+        $operation = $params['operation'];
+        $result = ['state' => $service->$operation($params['requestid'])->state];
     } else {
         $result = ['started' => $service->begin_authorized_attempt($params['quizid'], $params['studentid'], 1)];
     }

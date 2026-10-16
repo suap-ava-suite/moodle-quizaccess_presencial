@@ -240,34 +240,35 @@ final class release_request_service {
 
         $existing = $this->get($requestid);
         $result = quiz_lock::execute($existing->quizid, function () use ($requestid, $existing, $state, $reason, $DB, $USER) {
-            $now = $this->clock->time();
             $cm = get_coursemodule_from_instance('quiz', $existing->quizid, 0, false, MUST_EXIST);
             $context = \context_module::instance($cm->id);
-            if (!applicator_eligibility::is_eligible_user((int) $USER->id)) {
-                return new \moodle_exception('applicationaccessdenied', 'quizaccess_presencial');
-            }
-            if (
-                !delegation_manager::is_active_applicator($existing->quizid, (int) $USER->id, $now) &&
-                    !has_capability('mod/quiz:manage', $context)
-            ) {
-                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
-            }
             // Use the same configuration/request lock order as request creation.
             $configuration = $DB->get_record_sql(
                 'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
                 ['quizid' => $existing->quizid],
             );
+            $record = $DB->get_record_sql(
+                'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
+                ['id' => $requestid],
+                MUST_EXIST,
+            );
+            // Lock waits can cross a deadline; evaluate authority and validity only after both waits.
+            $now = $this->clock->time();
+            if (!applicator_eligibility::is_eligible_user((int) $USER->id)) {
+                return new \moodle_exception('applicationaccessdenied', 'quizaccess_presencial');
+            }
+            if (
+                !delegation_manager::is_active_applicator($existing->quizid, (int) $USER->id, $now) &&
+                    !$this->can_manage_quiz($context)
+            ) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
             if (
                 !$configuration || empty($configuration->enabled) ||
                     (int) $configuration->timeopen > $now || (int) $configuration->timeclose <= $now
             ) {
                 return new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
             }
-            $record = $DB->get_record_sql(
-                'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
-                ['id' => $requestid],
-                MUST_EXIST,
-            );
             if (
                 empty($record->active) || !in_array($record->state, [
                 release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED,
@@ -275,7 +276,9 @@ final class release_request_service {
             ) {
                 return new \moodle_exception('requestnotrevisable', 'quizaccess_presencial');
             }
-            if ((int) $record->expiresat <= $now) {
+            if (
+                in_array($record->state, release_request::expirable_states(), true) && (int) $record->expiresat <= $now
+            ) {
                 $this->transition($record, release_request::STATE_EXPIRED, $now);
                 $this->trigger_expired($requestid);
                 return $this->get($requestid);
@@ -305,6 +308,35 @@ final class release_request_service {
             throw $result;
         }
         return $result;
+    }
+
+    /**
+     * Confirm management authority without trusting access data loaded before a lock wait.
+     *
+     * @param \context_module $context Quiz context.
+     * @return bool Whether the current account still has quiz management authority.
+     */
+    private function can_manage_quiz(\context_module $context): bool {
+        global $DB, $USER;
+
+        // Keep Moodle's session restrictions, including switching to a less privileged role.
+        if (!has_capability('mod/quiz:manage', $context)) {
+            return false;
+        }
+        // Site administrators have implicit privileges outside role assignments.
+        if (is_siteadmin()) {
+            return true;
+        }
+        // This public Moodle API reads current assignments and overrides instead of cached access data.
+        $authority = get_with_capability_join($context, 'mod/quiz:manage', 'u.id');
+        if ($authority->cannotmatchanyrows) {
+            return false;
+        }
+        return $DB->record_exists_sql(
+            "SELECT 1 FROM {user} u {$authority->joins}
+              WHERE u.id = :decisionactor AND ({$authority->wheres})",
+            array_merge($authority->params, ['decisionactor' => (int) $USER->id]),
+        );
     }
 
     /**
@@ -400,7 +432,7 @@ final class release_request_service {
         $ids = $DB->get_fieldset_select(
             'quizaccess_presencial_req',
             'id',
-            "state {$statesql} AND expiresat <= :now",
+            "active = 1 AND state {$statesql} AND expiresat <= :now",
             array_merge($stateparams, ['now' => $now]),
         );
         $expired = 0;
@@ -413,7 +445,7 @@ final class release_request_service {
     }
 
     /**
-     * End pending requests and unused grants when the quiz's in-person rule is disabled.
+     * Finalize current requests and unused grants when the quiz's in-person rule is disabled.
      *
      * A starting request has already crossed the authorization gate and is in Moodle's
      * normal attempt-creation path. Keep its short lease so the attempt-started observer
@@ -427,7 +459,7 @@ final class release_request_service {
         $ids = $DB->get_fieldset_select(
             'quizaccess_presencial_req',
             'id',
-            'quizid = :quizid AND state IN (:pending, :authorized, :rejected)',
+            'quizid = :quizid AND active = 1 AND state IN (:pending, :authorized, :rejected)',
             [
                 'quizid' => $quizid,
                 'pending' => release_request::STATE_PENDING,
@@ -516,7 +548,7 @@ final class release_request_service {
     }
 
     /**
-     * Perform one locked, conditional pending-to-expired transition.
+     * Perform one locked expiration or finalization of a current request.
      *
      * @param int $requestid Request id.
      * @param int $now Current Unix time.
@@ -535,8 +567,12 @@ final class release_request_service {
                 'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
                 ['id' => $requestid],
             );
+            // Disablement finalizes current rejections too, but deadlines never expire a rejection.
+            $states = $force
+                ? [release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED]
+                : release_request::expirable_states();
             if (
-                !$record || !in_array($record->state, release_request::expirable_states(), true) ||
+                !$record || empty($record->active) || !in_array($record->state, $states, true) ||
                     (!$force && (int) $record->expiresat > $now)
             ) {
                 $tx->allow_commit();

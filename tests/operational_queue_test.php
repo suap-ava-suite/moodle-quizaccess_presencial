@@ -81,7 +81,7 @@ final class operational_queue_test extends \advanced_testcase {
     /**
      * Rejection policy is checked on every submission, without truncating explanations.
      */
-    public function test_rejection_policy_events_and_expiry(): void {
+    public function test_rejection_policy_events_and_persistence(): void {
         $this->resetAfterTest();
         $clock = $this->mock_clock_with_frozen(1_800_000_000);
         [$quiz, $student, $operator] = $this->application();
@@ -107,7 +107,8 @@ final class operational_queue_test extends \advanced_testcase {
         $this->assertSame((int) $operator->id, (int) $events[0]->userid);
         $this->assertSame((int) $student->id, (int) $events[0]->relateduserid);
         $clock->bump(900);
-        $this->assertSame('expired', $service->read_status($request->id, $student->id)->state);
+        $this->assertSame('rejected', $service->read_status($request->id, $student->id)->state);
+        $this->assertSame($reason, $service->read_status($request->id, $student->id)->rejectionreason);
     }
 
     /**
@@ -161,7 +162,9 @@ final class operational_queue_test extends \advanced_testcase {
         $page = \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid, 1, 2);
         $this->assertSame([$third->id, $first->id], array_column($page['items'], 'id'));
         $clock->bump(900);
-        $this->assertSame(0, \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid)['total']);
+        $page = \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid);
+        $this->assertSame(1, $page['total']);
+        $this->assertSame([$third->id], array_column($page['items'], 'id'));
     }
 
     /**
@@ -384,6 +387,225 @@ final class operational_queue_test extends \advanced_testcase {
      */
     public static function winning_operation_provider(): array {
         return ['rejection commits first' => ['reject'], 'attempt start commits first' => ['start']];
+    }
+
+    /**
+     * Rejecting an almost expired grant preserves the explanation and permits revision.
+     */
+    public function test_rejection_survives_the_invalidated_authorization_deadline(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($operator);
+        $service->authorize($request->id);
+        $clock->bump(299);
+        $service->reject($request->id, 'Bring an identity document.');
+        $clock->bump(5);
+        $status = $service->read_status($request->id, $student->id);
+        $this->assertSame('rejected', $status->state);
+        $this->assertSame('Bring an identity document.', $status->rejectionreason);
+        $this->assertSame(0, $service->expire_due());
+        $page = \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid);
+        $this->assertSame([$request->id], array_column($page['items'], 'id'));
+        $authorized = $service->authorize($request->id);
+        $this->assertSame('authorized', $authorized->state);
+        $this->assertSame(1_800_000_604, $authorized->expiresat);
+        $this->assertSame('', $authorized->rejectionreason);
+    }
+
+    /**
+     * A replacement makes its previous rejection immutable for every expiration path.
+     */
+    public function test_superseded_rejections_are_not_changed_by_expiration_or_disablement(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $service = new release_request_service();
+        $first = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($operator);
+        $service->reject($first->id, 'First decision.');
+        $replacement = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->reject($replacement->id, 'Current decision.');
+        $clock->bump(901);
+        $sink = $this->redirectEvents();
+        $this->assertSame(0, $service->expire_due());
+        $this->assertSame('rejected', $service->read_status($first->id, $student->id)->state);
+        $this->setAdminUser();
+        $quiz->presencial_enabled = 0;
+        \quizaccess_presencial::save_settings($quiz);
+        $this->assertSame('rejected', $service->get($first->id)->state);
+        $this->assertSame('First decision.', $service->get($first->id)->rejectionreason);
+        $this->assertSame('expired', $service->get($replacement->id)->state);
+        $expired = array_values(array_filter(
+            $sink->get_events(),
+            fn($event) => $event instanceof \quizaccess_presencial\event\request_expired,
+        ));
+        $this->assertCount(1, $expired);
+        $this->assertSame($replacement->id, $expired[0]->objectid);
+        $quiz->presencial_enabled = 1;
+        \quizaccess_presencial::save_settings($quiz);
+        $this->setUser($operator);
+        $this->assertSame(0, \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid)['total']);
+    }
+
+    /**
+     * Deadlines must be checked after waiting for the request boundary's transaction.
+     *
+     * @dataProvider delayed_decision_provider
+     * @param string $operation Decision being submitted.
+     * @param int $elapsed Time elapsed while the competing transaction holds the request.
+     * @param bool $administrator Whether the actor is the site administrator.
+     * @param array $expected Expected public result after the lock becomes available.
+     * @param string $revocation Authority change committed while the operation waits.
+     */
+    public function test_waiting_decision_rechecks_deadlines(
+        string $operation,
+        int $elapsed,
+        bool $administrator,
+        array $expected,
+        string $revocation = '',
+    ): void {
+        global $CFG, $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open')) {
+            $this->markTestSkipped('This runtime cannot start competing connections.');
+        }
+        $this->preventResetByRollback();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $teacherroleid = null;
+        if ($revocation !== '') {
+            $delegation = array_values(delegation_manager::list_current($quiz->id, 1_800_000_000))[0];
+            delegation_manager::revoke($quiz->id, $delegation->id, get_admin()->id, 1_800_000_000);
+            self::getDataGenerator()->enrol_user($operator->id, $quiz->course, 'editingteacher');
+            $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'editingteacher'], MUST_EXIST);
+        }
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $clockfile = tempnam(make_request_directory(), 'decision-clock-');
+        file_put_contents($clockfile, '1800000000');
+        $bootstrap = <<<'PHP'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/decision_worker.php');
+        PHP;
+        $process = proc_open(
+            [PHP_BINARY, '-r', $bootstrap, $CFG->dirroot],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            stream_set_timeout($pipes[2], 30);
+            $this->assertSame("READY\n", fgets($pipes[1]));
+            $transaction = $DB->start_delegated_transaction();
+            $service->ensure_pending($quiz->id, $student->id, 1);
+            fwrite($pipes[0], json_encode([
+                'operation' => $operation,
+                'requestid' => $request->id,
+                'actorid' => (int) ($administrator ? get_admin()->id : $operator->id),
+                'preloadcmid' => (int) $quiz->cmid,
+                'clockfile' => $clockfile,
+            ], JSON_THROW_ON_ERROR) . "\n");
+            fflush($pipes[0]);
+            $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
+            $read = [$pipes[1]];
+            $write = $except = [];
+            $this->assertSame(0, stream_select($read, $write, $except, 0, 200000));
+            file_put_contents($clockfile, (string) (1_800_000_000 + $elapsed));
+            if ($revocation === 'role') {
+                role_unassign($teacherroleid, $operator->id, \context_course::instance($quiz->course)->id);
+            } else if ($revocation === 'capability') {
+                assign_capability('mod/quiz:manage', CAP_PREVENT, $teacherroleid, \context_module::instance($quiz->cmid));
+            }
+            $transaction->allow_commit();
+            $transaction = null;
+            $result = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame($expected, $result);
+            $this->assertSame('', stream_get_contents($pipes[2]));
+            $this->assertSame(isset($expected['state']) ? 'expired' : 'pending', $service->get($request->id)->state);
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Concurrent deadline test cleanup.'));
+                } catch (\Exception $ignored) {
+                    $transaction = null;
+                }
+            }
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            if (proc_get_status($process)['running']) {
+                proc_terminate($process);
+            }
+            proc_close($process);
+            unlink($clockfile);
+        }
+    }
+
+    /**
+     * Both decisions must respect the period and pending-request deadline after a wait.
+     *
+     * @return array Decision, elapsed seconds, actor kind and expected outcome.
+     */
+    public static function delayed_decision_provider(): array {
+        return [
+            'teacher authorizes after closing' => ['authorize', 10_000, true, ['error' => 'authorizationperiodinactive']],
+            'teacher rejects after closing' => ['reject', 10_000, true, ['error' => 'authorizationperiodinactive']],
+            'applicator rejects after closing' => ['reject', 10_000, false, ['error' => 'nopermissions']],
+            'teacher authorizes an expired request' => ['authorize', 900, true, ['state' => 'expired']],
+            'teacher rejects an expired request' => ['reject', 900, true, ['state' => 'expired']],
+            'teacher role revoked while waiting' => ['reject', 0, false, ['error' => 'nopermissions'], 'role'],
+            'teacher permission revoked while waiting' => ['authorize', 0, false, ['error' => 'nopermissions'], 'capability'],
+        ];
+    }
+
+    /**
+     * A Professor's real contextual authority remains valid after an earlier panel access check.
+     */
+    public function test_teacher_without_delegation_can_revise_decisions(): void {
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $teacher] = $this->application();
+        $delegation = array_values(delegation_manager::list_current($quiz->id, 1_800_000_000))[0];
+        delegation_manager::revoke($quiz->id, $delegation->id, get_admin()->id, 1_800_000_000);
+        self::getDataGenerator()->enrol_user($teacher->id, $quiz->course, 'editingteacher');
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($teacher);
+        \quizaccess_presencial\local\applications::get_application($quiz->cmid);
+        $this->assertSame('rejected', $service->reject($request->id, 'Check identity.')->state);
+        $this->assertSame('authorized', $service->authorize($request->id)->state);
+    }
+
+    /**
+     * A teacher viewing as a student must not use the real teacher role to decide.
+     */
+    public function test_teacher_switched_to_student_cannot_decide(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $teacher] = $this->application();
+        $delegation = array_values(delegation_manager::list_current($quiz->id, 1_800_000_000))[0];
+        delegation_manager::revoke($quiz->id, $delegation->id, get_admin()->id, 1_800_000_000);
+        self::getDataGenerator()->enrol_user($teacher->id, $quiz->course, 'editingteacher');
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        $this->setUser($teacher);
+        role_switch($studentroleid, \context_course::instance($quiz->course));
+        $this->expectException(\required_capability_exception::class);
+        $service->reject($request->id);
     }
 
     /**

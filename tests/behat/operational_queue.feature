@@ -107,3 +107,28 @@ Feature: Decide requests in the operational queue
     When applicator "applicator1" authorizes the request for "Quiz 1" for "student1"
     And I wait for the release request poll "authorized"
     Then I should see "Your request was authorized"
+
+  @javascript
+  Scenario: Rejection remains visible and revisable after the cancelled grant would expire
+    Given application account "applicator1" is delegated to the quizzes in course "C1"
+    And I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    And applicator "applicator1" authorizes the request for "Quiz 1" for "student1"
+    And I wait for the release request poll "authorized"
+    Given the time is frozen at "2030-01-02 12:04:59"
+    When applicator "applicator1" rejects the request for "Quiz 1" for "student1" with "Bring an identity document."
+    Given the time is frozen at "2030-01-02 12:05:04"
+    When I wait for the release request poll "rejected"
+    Then I should see "Bring an identity document."
+    And there should be no attempt for "Quiz 1" as "student1"
+    Given the time is frozen at "2030-01-02 12:15:01"
+    When I reload the page
+    Then I should see "Rejected"
+    And I should see "Bring an identity document."
+    When I log out
+    And I log in as "applicator1"
+    And I follow "My applications" in the user menu
+    And I follow "Open application"
+    Then I should see "Rejected" in the "Student One" "table_row"
+    When I click on "Authorize" "button" in the "Student One" "table_row"
+    Then I should see "Authorized" in the "Student One" "table_row"

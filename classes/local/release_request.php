@@ -52,7 +52,7 @@ final class release_request {
      * @return string[] States that can expire when expiresat is reached.
      */
     public static function expirable_states(): array {
-        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_REJECTED, self::STATE_STARTING];
+        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_STARTING];
     }
 
     /** @var int */
@@ -69,7 +69,7 @@ final class release_request {
     public int $timecreated;
     /** @var string Complete plain-text rejection explanation. */
     public string $rejectionreason;
-    /** @var int Absolute Unix timestamp persisted at creation. */
+    /** @var int Deadline applicable only to a pending request or an unused authorization. */
     public int $expiresat;
 
     /**

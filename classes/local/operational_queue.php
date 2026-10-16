@@ -42,8 +42,8 @@ final class operational_queue {
         $now = \core\di::get(\core\clock::class)->time();
         $from = "FROM {quizaccess_presencial_req} r
                  JOIN {user} u ON u.id = r.userid
-                WHERE r.quizid = :quizid AND r.active = 1 AND r.expiresat > :now
-                  AND r.state IN (:pending, :authorized, :rejected)
+                WHERE r.quizid = :quizid AND r.active = 1
+                  AND (r.state = :rejected OR (r.state IN (:pending, :authorized) AND r.expiresat > :now))
                   AND NOT EXISTS (SELECT 1 FROM {quiz_attempts} a
                        WHERE a.quiz = r.quizid AND a.userid = r.userid AND a.attempt = r.attemptnumber AND a.preview = 0)";
         $params = ['quizid' => $application['quizid'], 'now' => $now,
