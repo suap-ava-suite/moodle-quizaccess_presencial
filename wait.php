@@ -71,6 +71,8 @@ $data = [
     'state' => $state,
     'pending' => $pending,
     'authorized' => $state === release_request::STATE_AUTHORIZED,
+    'rejected' => $state === release_request::STATE_REJECTED,
+    'rejectionreason' => $request->rejectionreason,
     'expired' => $state === release_request::STATE_EXPIRED,
     'consumed' => $state === release_request::STATE_CONSUMED,
     'message' => get_string(
@@ -87,7 +89,7 @@ $data = [
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('requestwaittitle', 'quizaccess_presencial'));
 echo $OUTPUT->render_from_template('quizaccess_presencial/waiting', $data);
-if ($data['pending'] || $data['authorized']) {
+if ($data['pending'] || $data['authorized'] || $data['rejected']) {
     $PAGE->requires->js_call_amd('quizaccess_presencial/waiting', 'init', [$requestid]);
 }
 echo $OUTPUT->footer();

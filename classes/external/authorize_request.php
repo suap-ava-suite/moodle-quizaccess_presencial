@@ -23,7 +23,7 @@ use core_external\external_value;
 use quizaccess_presencial\local\release_request_service;
 
 /**
- * Authenticated operation for a Quiz manager to authorize a student's request.
+ * Authenticated operation for a Professor or delegated Applicator to authorize a student's request.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -44,7 +44,7 @@ class authorize_request extends external_api {
     /**
      * Authorize a pending request during the Quiz's configured authorization period.
      *
-     * The service validates mod/quiz:manage and serializes authorization with expiry.
+     * The service validates current quiz authority and serializes authorization with expiry.
      * Registration as an AJAX-only, login-required external function gives Moodle's
      * normal session and sesskey protections to this write operation.
      *
@@ -54,9 +54,8 @@ class authorize_request extends external_api {
     public static function execute(int $requestid): array {
         $params = self::validate_parameters(self::execute_parameters(), ['requestid' => $requestid]);
         $service = new release_request_service();
-        $request = $service->get($params['requestid']);
-        $cm = get_coursemodule_from_instance('quiz', $request->quizid, 0, false, MUST_EXIST);
-        self::validate_context(\context_module::instance($cm->id));
+        // Operational delegation does not grant course enrolment. The service checks quiz authority.
+        self::validate_context(\context_system::instance());
         $request = $service->authorize($params['requestid']);
         return ['state' => $request->state, 'expiresat' => $request->expiresat];
     }

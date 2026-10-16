@@ -24,6 +24,8 @@
     * state - The current request state.
     * pending - Whether the request is pending or an attempt start is being completed.
     * authorized - Whether the student may start the attempt.
+    * rejected - Whether the current decision is rejection.
+    * rejectionreason - Complete plain-text explanation.
     * expired - Whether the request or unused authorization has expired.
     * consumed - Whether the authorization has already created an attempt.
     * message - The localized state message.
@@ -47,8 +49,8 @@
         "sesskey": "example"
     }
 }}
-<div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}">
-    <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}"
+<div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}" data-rejection-reason="{{rejectionreason}}">
+    <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}{{#rejected}}alert-warning{{/rejected}}"
          role="status" aria-live="polite" data-region="request-status">
         {{message}}
     </div>
@@ -62,6 +64,10 @@
             <button type="submit" class="btn btn-primary">{{startlabel}}</button>
         </form>
     {{/authorized}}
+    {{#rejected}}
+        <div class="text-break presencial-rejection-reason">{{rejectionreason}}</div>
+        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
+    {{/rejected}}
     {{#expired}}
         <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
     {{/expired}}
