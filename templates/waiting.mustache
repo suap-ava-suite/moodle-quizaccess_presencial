@@ -30,7 +30,7 @@
     * consumed - Whether the authorization has already created an attempt.
     * message - The localized state message.
     * quizurl - URL to return to the quiz.
-    * starturl - URL to submit Moodle's normal attempt-start form.
+    * starturl - URL to confirm the authorization and run Moodle's native preflight.
     * startlabel - Localized attempt-start button label.
     * sesskey - Moodle session key for the start form.
 
@@ -44,7 +44,7 @@
         "consumed": false,
         "message": "Your release request is pending.",
         "quizurl": "/mod/quiz/view.php?id=1",
-        "starturl": "/mod/quiz/startattempt.php?cmid=1",
+        "starturl": "/mod/quiz/accessrule/presencial/start.php?requestid=1",
         "startlabel": "Start attempt",
         "sesskey": "example"
     }

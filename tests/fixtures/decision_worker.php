@@ -82,6 +82,9 @@ try {
     if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
         $result = ['state' => $service->$operation($params['requestid'])->state];
+    } else if ($params['operation'] === 'confirm') {
+        $attempt = $service->start_authorized_attempt($params['requestid']);
+        $result = ['attemptid' => $attempt ? (int) $attempt->id : null];
     } else {
         $result = ['started' => $service->begin_authorized_attempt($params['quizid'], $params['studentid'], 1)];
     }

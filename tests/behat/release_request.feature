@@ -41,10 +41,13 @@ Feature: Gate new quiz attempts with an in-person release request
     When I authorize the release request for "Quiz 1" for "student1"
     And I wait for the release request poll "authorized"
     Then I should see "Your request was authorized"
+    And there should be no attempt for "Quiz 1" as "student1"
     When I press "Start attempt"
     Then I should see "Question 1"
     And the release request for attempt 1 of "Quiz 1" for "student1" should be consumed
     And there should be no release request for attempt 2 of "Quiz 1" for "student1"
+    When I open the latest release request for "Quiz 1" for "student1"
+    Then I should see "Question 1"
     When I am on the "Quiz 1" "mod_quiz > View" page
     And I press "Continue your attempt"
     Then I should see "Question 1"
@@ -96,3 +99,49 @@ Feature: Gate new quiz attempts with an in-person release request
     And I should see "Your release request is pending"
     And the release request for "Quiz 1" for "student1" should be pending
     And there should be no attempt for "Quiz 1" as "student1"
+
+  @javascript
+  Scenario: An expired authorization needs a new request and decision before confirmation
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    And I authorize the release request for "Quiz 1" for "student1"
+    And I wait for the release request poll "authorized"
+    Then I should see "Your request was authorized"
+    And there should be no attempt for "Quiz 1" as "student1"
+    When I make the release request for "Quiz 1" for "student1" due
+    And I wait for the release request poll "expired"
+    Then I should see "This request or its unused authorization has expired"
+    When I follow "Return to the quiz"
+    And I press "Attempt quiz"
+    Then I should see "Your release request is pending"
+    And there should be no attempt for "Quiz 1" as "student1"
+    When I authorize the release request for "Quiz 1" for "student1"
+    And I wait for the release request poll "authorized"
+    And I press "Start attempt"
+    Then I should see "Question 1"
+    And the release request for attempt 1 of "Quiz 1" for "student1" should be consumed
+
+  @javascript
+  Scenario: Confirmation validates a quiz password again after a new login
+    Given the following "activities" exist:
+      | activity | name          | course | quizpassword | presencial_enabled | presencial_timeopen | presencial_timeclose |
+      | quiz     | Password quiz | C1     | secret   | 1                  | ## 1 January 2020 ## | ## 1 January 2099 ## |
+    And quiz "Password quiz" contains the following questions:
+      | question | page |
+      | Q1       | 1    |
+    And I am on the "Password quiz" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    And I set the field "Quiz password" to "secret"
+    And I press "Start attempt"
+    Then I should see "Your release request is pending"
+    When I authorize the release request for "Password quiz" for "student1"
+    And I log out
+    And I log in as "student1"
+    And I open the latest release request for "Password quiz" for "student1"
+    And I press "Start attempt"
+    Then I should see "Quiz password"
+    And there should be no attempt for "Password quiz" as "student1"
+    When I set the field "Quiz password" to "secret"
+    And I press "Start attempt"
+    Then I should see "Question 1"
+    And the release request for attempt 1 of "Password quiz" for "student1" should be consumed

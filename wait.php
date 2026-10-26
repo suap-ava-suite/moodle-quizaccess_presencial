@@ -81,7 +81,7 @@ $data = [
     ),
     'expiresat' => $request->expiresat,
     'quizurl' => $quizobj->view_url()->out(false),
-    'starturl' => $quizobj->start_attempt_url()->out(false),
+    'starturl' => (new moodle_url('/mod/quiz/accessrule/presencial/start.php', ['requestid' => $requestid]))->out(false),
     'startlabel' => get_string('requeststartattempt', 'quizaccess_presencial'),
     'sesskey' => sesskey(),
 ];

@@ -340,6 +340,76 @@ final class release_request_service {
     }
 
     /**
+     * Confirm a grant after native preflight, atomically creating its one Moodle attempt.
+     *
+     * Replays return the attempt identified by the original request, even after it closes.
+     * The quiz and request locks serialize confirmation with decisions and configuration changes.
+     *
+     * @param int $requestid Request confirmed by the current student.
+     * @return \stdClass|null Existing or newly started attempt, or null for an unusable grant.
+     */
+    public function start_authorized_attempt(int $requestid): ?\stdClass {
+        global $CFG, $DB, $USER;
+        require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+
+        $request = $this->get($requestid);
+        if ($request->userid !== (int) $USER->id) {
+            throw new \moodle_exception('requestnotfound', 'quizaccess_presencial');
+        }
+        $quizobj = \mod_quiz\quiz_settings::create($request->quizid, $USER->id);
+        require_capability('mod/quiz:attempt', $quizobj->get_context());
+
+        return quiz_lock::execute($request->quizid, function () use ($request, $quizobj, $DB) {
+            $configuration = $DB->get_record_sql(
+                'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
+                ['quizid' => $request->quizid],
+            );
+            $record = $DB->get_record_sql(
+                'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
+                ['id' => $request->id],
+                MUST_EXIST,
+            );
+            $existing = $this->find_attempt($request->quizid, $request->userid, $request->attemptnumber);
+            if ($existing) {
+                return $existing;
+            }
+            $now = $this->clock->time();
+            if (
+                !$configuration || empty($configuration->enabled) || empty($record->active) ||
+                    $record->state !== release_request::STATE_AUTHORIZED
+            ) {
+                return null;
+            }
+            if ((int) $record->expiresat <= $now) {
+                $this->transition($record, release_request::STATE_EXPIRED, $now);
+                $this->trigger_expired($request->id);
+                return null;
+            }
+
+            // Recheck Moodle access after lock waits, before consuming any authorization.
+            $accessmanager = $quizobj->get_access_manager(time());
+            [$currentid, $attemptnumber, $lastattempt, $messages] =
+                quiz_validate_new_attempt($quizobj, $accessmanager, false, -1, false);
+            if ($messages) {
+                throw new \moodle_exception('attempterror', 'quiz', $quizobj->view_url(), implode(' ', $messages));
+            }
+            if ($currentid || $attemptnumber !== $request->attemptnumber) {
+                return null;
+            }
+            $this->transition($record, release_request::STATE_STARTING, $now);
+            $this->trigger_attempt_starting($request->id);
+            $attempt = quiz_prepare_and_start_new_attempt($quizobj, $attemptnumber, $lastattempt);
+            // Event observers are best effort in Moodle. An explicit transition here also
+            // guarantees consumption when events are redirected or an observer fails.
+            $this->consume_for_attempt((int) $attempt->id);
+            if ($this->get($request->id)->state !== release_request::STATE_CONSUMED) {
+                throw new \coding_exception('Attempt creation must consume its authorization.');
+            }
+            return $attempt;
+        });
+    }
+
+    /**
      * Claim an unexpired authorization immediately before Moodle creates the attempt.
      *
      * The short starting lease prevents the scheduled expiry task from invalidating a

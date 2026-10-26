@@ -62,15 +62,12 @@ class quizaccess_presencial extends access_rule_base {
      */
     public function notify_preflight_check_passed($attemptid): void {
         global $USER;
-        if ($attemptid || $this->quizobj->is_preview_user()) {
+        if ($attemptid || $this->quizobj->is_preview_user() || !empty($GLOBALS['QUIZACCESS_PRESENCIAL_REQUEST_FLOW'])) {
             return;
         }
 
         $service = new release_request_service();
         $attemptnumber = $service->next_attempt_number((int) $this->quiz->id, (int) $USER->id);
-        if ($service->begin_authorized_attempt((int) $this->quiz->id, (int) $USER->id, $attemptnumber)) {
-            return;
-        }
         try {
             $request = $service->ensure_pending(
                 (int) $this->quiz->id,

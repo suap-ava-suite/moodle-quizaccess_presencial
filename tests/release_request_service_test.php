@@ -345,6 +345,9 @@ final class release_request_service_test extends \advanced_testcase {
         $authorized = $service->authorize($request->id);
         $clock->bump(301);
         $sink = $this->redirectEvents();
+        $task = new \quizaccess_presencial\task\expire_requests();
+        $task->execute();
+        $task->execute();
 
         $expired = $service->read_status($authorized->id, $student->id);
         $repeated = $service->read_status($authorized->id, $student->id);
@@ -503,6 +506,226 @@ final class release_request_service_test extends \advanced_testcase {
             $this->fail('A request was authorized outside the configured period.');
         } catch (\moodle_exception $exception) {
             $this->assertSame('authorizationperiodinactive', $exception->errorcode);
+        }
+    }
+
+    /**
+     * The student's confirmation creates one attempt and consumes the grant together.
+     */
+    public function test_confirming_authorization_starts_exactly_one_attempt(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($request->id);
+        $this->setUser($student);
+
+        $attempt = $service->start_authorized_attempt($request->id);
+        $repeated = $service->start_authorized_attempt($request->id);
+
+        $this->assertEquals($attempt->id, $repeated->id);
+        $this->assertCount(1, quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+        $this->assertSame(release_request::STATE_CONSUMED, $service->get($request->id)->state);
+        $this->assertFalse($service->is_authorized($quiz->id, $student->id, 2));
+
+        $attemptobj = \mod_quiz\quiz_attempt::create($attempt->id);
+        if (method_exists($attemptobj, 'process_submit')) {
+            $attemptobj->process_submit(time(), false);
+            $attemptobj->process_grade_submission(time());
+        } else {
+            // Moodle 4.5 combines submission and grading in this public method.
+            $attemptobj->process_finish(time(), false);
+        }
+        $finished = $service->start_authorized_attempt($request->id);
+        $this->assertEquals($attempt->id, $finished->id);
+        $this->assertSame(\mod_quiz\quiz_attempt::FINISHED, $finished->state);
+        $next = $service->ensure_pending($quiz->id, $student->id, 2);
+        $this->assertNull($service->start_authorized_attempt($next->id));
+        $this->assertCount(1, quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+    }
+
+    /**
+     * Rolling back confirmation rolls back both the attempt and authorization consumption.
+     */
+    public function test_confirmation_and_consumption_share_the_moodle_transaction(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->preventResetByRollback();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($request->id);
+        $this->setUser($student);
+        $transaction = $DB->start_delegated_transaction();
+        $service->start_authorized_attempt($request->id);
+        $this->assertSame(release_request::STATE_CONSUMED, $service->get($request->id)->state);
+
+        $failure = new \moodle_exception('invalidrequest');
+        try {
+            $transaction->rollback($failure);
+        } catch (\moodle_exception $exception) {
+            $this->assertSame($failure, $exception);
+        }
+
+        $this->assertSame(release_request::STATE_AUTHORIZED, $service->get($request->id)->state);
+        $this->assertEmpty(quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+        $this->assertNotNull($service->start_authorized_attempt($request->id));
+    }
+
+    /**
+     * Confirmation at the deadline requires a new request and a new operator decision.
+     */
+    public function test_expired_confirmation_requires_a_new_request_and_decision(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        set_config('authorisationvalidity', 2, 'quizaccess_presencial');
+        $authorized = $service->authorize($request->id);
+        $this->assertSame(1_800_000_120, $authorized->expiresat);
+        $clock->bump(120);
+        $this->setUser($student);
+        $sink = $this->redirectEvents();
+
+        $this->assertNull($service->start_authorized_attempt($request->id));
+        $task = new \quizaccess_presencial\task\expire_requests();
+        $task->execute();
+        $task->execute();
+        $this->assertSame(release_request::STATE_EXPIRED, $service->get($request->id)->state);
+        $this->assertCount(1, array_filter(
+            $sink->get_events(),
+            static fn($event): bool => $event instanceof request_expired,
+        ));
+        $newrequest = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->assertNotSame($request->id, $newrequest->id);
+        $this->assertNull($service->start_authorized_attempt($newrequest->id));
+        $this->assertEmpty(quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+
+        $this->setAdminUser();
+        $service->authorize($newrequest->id);
+        $this->setUser($student);
+        $this->assertNull($service->start_authorized_attempt($request->id));
+        $attempt = $service->start_authorized_attempt($newrequest->id);
+        $this->assertNotNull($attempt);
+        $this->assertSame(release_request::STATE_CONSUMED, $service->get($newrequest->id)->state);
+        $this->assertCount(1, array_filter(
+            $sink->get_events(),
+            static fn($event): bool => $event instanceof request_consumed,
+        ));
+    }
+
+    /**
+     * A question-engine failure leaves the grant available and no attempt behind.
+     */
+    public function test_failed_moodle_creation_does_not_consume_authorization(): void {
+        $this->resetAfterTest();
+        $this->preventResetByRollback();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        $quiz = $this->create_enabled_quiz(['preferredbehaviour' => 'informationitem']);
+        $student = self::getDataGenerator()->create_user();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($request->id);
+        $this->setUser($student);
+
+        try {
+            $service->start_authorized_attempt($request->id);
+            $this->fail('An unsuitable question behaviour must prevent attempt creation.');
+        } catch (\coding_exception $exception) {
+            $this->assertStringContainsString('not actually an archetypal one', $exception->getMessage());
+        }
+
+        $this->assertSame(release_request::STATE_AUTHORIZED, $service->get($request->id)->state);
+        $this->assertEmpty(quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+    }
+
+    /**
+     * A competing confirmation waits for the first transaction and resumes its attempt.
+     */
+    public function test_competing_confirmations_return_the_same_attempt(): void {
+        global $CFG, $DB;
+        $this->resetAfterTest();
+        if (!function_exists('proc_open')) {
+            $this->markTestSkipped('This runtime cannot start competing connections.');
+        }
+        $this->preventResetByRollback();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($request->id);
+        $bootstrap = <<<'PHP'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/decision_worker.php');
+        PHP;
+        $process = proc_open(
+            [PHP_BINARY, '-r', $bootstrap, $CFG->dirroot],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            stream_set_timeout($pipes[2], 30);
+            $this->assertSame("READY\n", fgets($pipes[1]));
+            $transaction = $DB->start_delegated_transaction();
+            $this->setUser($student);
+            $attempt = $service->start_authorized_attempt($request->id);
+            fwrite($pipes[0], json_encode([
+                'operation' => 'confirm',
+                'requestid' => $request->id,
+                'actorid' => (int) $student->id,
+            ], JSON_THROW_ON_ERROR) . "\n");
+            fflush($pipes[0]);
+            $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
+            $read = [$pipes[1]];
+            $write = $except = [];
+            $completedearly = stream_select($read, $write, $except, 0, 200000);
+            $transaction->allow_commit();
+            $transaction = null;
+            $result = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+
+            $this->assertSame(0, $completedearly, 'The second confirmation must wait for the transaction.');
+            $this->assertSame(['attemptid' => (int) $attempt->id], $result);
+            $this->assertCount(1, quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+            $this->assertSame(release_request::STATE_CONSUMED, $service->get($request->id)->state);
+            $this->assertSame('', stream_get_contents($pipes[2]));
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Concurrent confirmation test cleanup.'));
+                } catch (\Exception $ignored) {
+                    // Keep the original failure while releasing the transaction.
+                    $transaction = null;
+                }
+            }
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            if (proc_get_status($process)['running']) {
+                proc_terminate($process);
+            }
+            proc_close($process);
         }
     }
 
