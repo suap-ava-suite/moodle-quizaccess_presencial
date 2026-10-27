@@ -75,6 +75,10 @@ if (!empty($params['preloadcmid'])) {
     // Reproduce the panel's authorization check earlier in the same request.
     \quizaccess_presencial\local\applications::get_application($params['preloadcmid']);
 }
+if (!empty($params['reportconnection'])) {
+    echo json_encode(['connectionid' => (int) $DB->get_field_sql('SELECT pg_backend_pid()')], JSON_THROW_ON_ERROR) . "\n";
+    fflush(STDOUT);
+}
 $service = new \quizaccess_presencial\local\release_request_service($clock);
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);

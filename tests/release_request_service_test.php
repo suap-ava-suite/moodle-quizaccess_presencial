@@ -730,6 +730,132 @@ final class release_request_service_test extends \advanced_testcase {
     }
 
     /**
+     * Confirmation respects native restrictions changed while it waits for the quiz lock.
+     *
+     * @dataProvider confirmation_restrictions_provider
+     * @param string $setting Native quiz setting changed by the competing connection.
+     */
+    public function test_confirmation_rechecks_settings_after_waiting(string $setting): void {
+        global $CFG, $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open')) {
+            $this->markTestSkipped('This runtime cannot start competing connections.');
+        }
+        if ($DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test uses PostgreSQL lock monitoring to synchronize connections.');
+        }
+        $this->preventResetByRollback();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $firstrequest = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($firstrequest->id);
+        $this->setUser($student);
+        $firstattempt = $service->start_authorized_attempt($firstrequest->id);
+        $attemptobj = \mod_quiz\quiz_attempt::create($firstattempt->id);
+        if (method_exists($attemptobj, 'process_submit')) {
+            $attemptobj->process_submit(time(), false);
+            $attemptobj->process_grade_submission(time());
+        } else {
+            // Moodle 4.5 combines submission and grading in this public method.
+            $attemptobj->process_finish(time(), false);
+        }
+        $request = $service->ensure_pending($quiz->id, $student->id, 2);
+        $this->setAdminUser();
+        $service->authorize($request->id);
+        $bootstrap = <<<'PHP'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/decision_worker.php');
+        PHP;
+        $process = proc_open(
+            [PHP_BINARY, '-r', $bootstrap, $CFG->dirroot],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            stream_set_timeout($pipes[2], 30);
+            $this->assertSame("READY\n", fgets($pipes[1]));
+            $transaction = $DB->start_delegated_transaction();
+            \quizaccess_presencial\local\quiz_lock::execute($quiz->id, static function (): void {
+                // Keep the quiz locked until the outer transaction commits its new settings.
+            });
+            fwrite($pipes[0], json_encode([
+                'operation' => 'confirm',
+                'reportconnection' => true,
+                'requestid' => $request->id,
+                'actorid' => (int) $student->id,
+            ], JSON_THROW_ON_ERROR) . "\n");
+            fflush($pipes[0]);
+            $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
+            $deadline = microtime(true) + 10;
+            do {
+                // Observe database lock ownership only to synchronize the public operations.
+                $waiting = $DB->get_field_sql(
+                    'SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']],
+                );
+                if ($waiting) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            $this->assertNotFalse($waiting, 'Confirmation must reach the configuration lock before it changes.');
+            $DB->set_field('quiz', $setting, $setting === 'timeclose' ? time() - 60 : 1, ['id' => $quiz->id]);
+            $transaction->allow_commit();
+            $transaction = null;
+            $line = fgets($pipes[1]);
+            $this->assertNotFalse($line, 'The competing confirmation did not finish within 30 seconds.');
+            $result = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+
+            $this->assertSame(['error' => 'attempterror'], $result);
+            $this->assertCount(1, quiz_get_user_attempts($quiz->id, $student->id, 'all'));
+            $this->assertSame(release_request::STATE_AUTHORIZED, $service->get($request->id)->state);
+            $this->assertSame('', stream_get_contents($pipes[2]));
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Concurrent configuration test cleanup.'));
+                } catch (\Exception $ignored) {
+                    // Keep the original failure while releasing the transaction.
+                    $transaction = null;
+                }
+            }
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            if (proc_get_status($process)['running']) {
+                proc_terminate($process);
+            }
+            proc_close($process);
+        }
+    }
+
+    /**
+     * Native restrictions that can invalidate a previously authorized next attempt.
+     *
+     * @return array Named test cases.
+     */
+    public static function confirmation_restrictions_provider(): array {
+        return [
+            'quiz closed' => ['timeclose'],
+            'attempt limit reduced' => ['attempts'],
+        ];
+    }
+
+    /**
      * A newly created Moodle attempt consumes its authorization once.
      */
     public function test_attempt_creation_consumes_authorization(): void {

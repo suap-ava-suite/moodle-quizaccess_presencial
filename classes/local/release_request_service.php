@@ -356,10 +356,9 @@ final class release_request_service {
         if ($request->userid !== (int) $USER->id) {
             throw new \moodle_exception('requestnotfound', 'quizaccess_presencial');
         }
-        $quizobj = \mod_quiz\quiz_settings::create($request->quizid, $USER->id);
-        require_capability('mod/quiz:attempt', $quizobj->get_context());
-
-        return quiz_lock::execute($request->quizid, function () use ($request, $quizobj, $DB) {
+        return quiz_lock::execute($request->quizid, function () use ($request, $DB, $USER) {
+            $quizobj = \mod_quiz\quiz_settings::create($request->quizid, $USER->id);
+            require_capability('mod/quiz:attempt', $quizobj->get_context());
             $configuration = $DB->get_record_sql(
                 'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
                 ['quizid' => $request->quizid],
