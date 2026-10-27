@@ -146,6 +146,7 @@ $string['queueactions'] = 'Decisões';
 $string['queueauthorize'] = 'Autorizar';
 $string['queueempty'] = 'Não há solicitações que admitam ação.';
 $string['queuereject'] = 'Rejeitar';
+$string['queuerejectconfirm'] = 'Confirmar rejeição';
 $string['queuerequested'] = 'Solicitado em';
 $string['queuestateauthorized'] = 'Autorizado';
 $string['queuestatepending'] = 'Pendente';
