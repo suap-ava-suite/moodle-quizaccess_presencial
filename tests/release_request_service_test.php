@@ -659,6 +659,9 @@ final class release_request_service_test extends \advanced_testcase {
         if (!function_exists('proc_open')) {
             $this->markTestSkipped('This runtime cannot start competing connections.');
         }
+        if ($DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test uses PostgreSQL lock monitoring to synchronize connections.');
+        }
         $this->preventResetByRollback();
         $clock = $this->mock_clock_with_frozen(1_800_000_000);
         [$quiz, $student] = $this->create_enabled_quiz_and_student();
@@ -693,19 +696,30 @@ final class release_request_service_test extends \advanced_testcase {
             $attempt = $service->start_authorized_attempt($request->id);
             fwrite($pipes[0], json_encode([
                 'operation' => 'confirm',
+                'reportconnection' => true,
                 'requestid' => $request->id,
                 'actorid' => (int) $student->id,
             ], JSON_THROW_ON_ERROR) . "\n");
             fflush($pipes[0]);
+            $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
             $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
-            $read = [$pipes[1]];
-            $write = $except = [];
-            $completedearly = stream_select($read, $write, $except, 0, 200000);
+            $deadline = microtime(true) + 10;
+            do {
+                // Observe database lock ownership only to synchronize the public operations.
+                $waiting = $DB->get_field_sql(
+                    'SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']],
+                );
+                if ($waiting) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            $this->assertNotFalse($waiting, 'The second confirmation must be blocked by the first transaction.');
             $transaction->allow_commit();
             $transaction = null;
             $result = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
 
-            $this->assertSame(0, $completedearly, 'The second confirmation must wait for the transaction.');
             $this->assertSame(['attemptid' => (int) $attempt->id], $result);
             $this->assertCount(1, quiz_get_user_attempts($quiz->id, $student->id, 'all'));
             $this->assertSame(release_request::STATE_CONSUMED, $service->get($request->id)->state);
