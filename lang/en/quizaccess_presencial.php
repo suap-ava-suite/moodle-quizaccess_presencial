@@ -144,6 +144,7 @@ $string['queueactions'] = 'Decisions';
 $string['queueauthorize'] = 'Authorize';
 $string['queueempty'] = 'There are no actionable requests.';
 $string['queuereject'] = 'Reject';
+$string['queuerejectconfirm'] = 'Confirm rejection';
 $string['queuerequested'] = 'Requested at';
 $string['queuestateauthorized'] = 'Authorized';
 $string['queuestatepending'] = 'Pending';

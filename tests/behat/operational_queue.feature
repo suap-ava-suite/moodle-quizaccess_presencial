@@ -65,10 +65,15 @@ Feature: Decide requests in the operational queue
     And I log in as "applicator1"
     And I follow "My applications" in the user menu
     And I follow "Open application"
-    And I click on "Reject" "button" in the "Student One" "table_row"
+    Then "Rejection reason" "field" should not be visible
+    When I click on ".presencial-rejection > summary" "css_element" in the "Student One" "table_row"
+    Then "Rejection reason" "field" should be visible
+    And I should see "Pending" in the "Student One" "table_row"
+    When I click on "Confirm rejection" "button" in the "Student One" "table_row"
     Then I should see "Enter a reason for rejecting this request"
+    And "Rejection reason" "field" should be visible
     When I set the field "Rejection reason" to "Please bring your identification."
-    And I click on "Reject" "button" in the "Student One" "table_row"
+    And I click on "Confirm rejection" "button" in the "Student One" "table_row"
     Then I should see "Rejected" in the "Student One" "table_row"
     When I log out
     And I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"

@@ -37,7 +37,7 @@ Feature: Find and open standalone applications
     And I should see "Pending requests"
     And I should see "0" in the ".presencial-applications tbody tr td:nth-child(6)" "css_element"
     When I follow "Open application"
-    Then I should see "Application panel" in the "h2" "css_element"
+    Then I should see "Application panel" in the "h1" "css_element"
     And I should see "Quiz 1"
     And I should see "There are no actionable requests."
     And academic access to "Quiz 1" should still require enrolment
@@ -66,7 +66,7 @@ Feature: Find and open standalone applications
   Scenario: A professor opens the same panel without receiving a delegation
     Given I am on the "quiz1" "Activity" page logged in as "teacher1"
     When I follow "Application panel"
-    Then I should see "Application panel" in the "h2" "css_element"
+    Then I should see "Application panel" in the "h1" "css_element"
     And I should see "Quiz 1"
     And I should see "There are no actionable requests."
 
@@ -84,12 +84,12 @@ Feature: Find and open standalone applications
     When I reach "Open application" "link" using only the keyboard
     Then the focused element is "Open application" "link"
     When I press the enter key
-    Then I should see "Application panel" in the "h2" "css_element"
+    Then I should see "Application panel" in the "h1" "css_element"
     And I should see "Quiz 1"
     When I reach "Refresh" "link" using only the keyboard
     Then the focused element is "Refresh" "link"
     When I press the enter key
-    Then I should see "Application panel" in the "h2" "css_element"
+    Then I should see "Application panel" in the "h1" "css_element"
     When I reach "Refresh" "link" using only the keyboard
     And I press the tab key
     Then the focused element is "My applications" "link" in the "#region-main" "css_element"
@@ -141,5 +141,5 @@ Feature: Find and open standalone applications
     And I reach "Open application" "link" using only the keyboard
     Then the focused element is "Open application" "link"
     When I press the enter key
-    Then I should see "Application panel" in the "h2" "css_element"
+    Then I should see "Application panel" in the "h1" "css_element"
     And I should see "Keyboard quiz 20"

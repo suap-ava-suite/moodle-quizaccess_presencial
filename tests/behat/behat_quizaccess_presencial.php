@@ -577,7 +577,7 @@ class behat_quizaccess_presencial extends behat_base {
             'quizid' => $quiz->id,
             'userid' => $user->id,
             'attemptnumber' => 1,
-            'state' => 'pending',
+            'active' => 1,
         ], '*', MUST_EXIST);
         $now = \core\di::get(\core\clock::class)->time();
         $DB->set_field('quizaccess_presencial_req', 'expiresat', $now - 1, ['id' => $request->id]);
@@ -640,12 +640,13 @@ class behat_quizaccess_presencial extends behat_base {
         global $DB;
         $quiz = $DB->get_record('quiz', ['name' => $quizname], '*', MUST_EXIST);
         $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
-        $request = $DB->get_record('quizaccess_presencial_req', [
+        $requests = $DB->get_records('quizaccess_presencial_req', [
             'quizid' => $quiz->id,
             'userid' => $user->id,
             'attemptnumber' => $attemptnumber,
-        ], '*', MUST_EXIST);
-        if ($request->state !== 'consumed') {
+        ], 'id DESC', '*', 0, 1);
+        $request = reset($requests);
+        if (!$request || $request->state !== 'consumed') {
             throw new ExpectationException('The attempt did not consume its release request.', $this->getSession());
         }
     }

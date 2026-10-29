@@ -73,7 +73,6 @@ $PAGE->navbar->add(get_string('myapplications', 'quizaccess_presencial'), $listu
 $PAGE->navbar->add(get_string('applicationpanel', 'quizaccess_presencial'));
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('applicationpanel', 'quizaccess_presencial'));
 echo html_writer::tag('p', format_string(
     $application['coursename'],
     true,
@@ -83,7 +82,7 @@ echo $OUTPUT->heading(format_string(
     $application['quizname'],
     true,
     ['context' => context_module::instance($cmid)],
-), 3);
+), 2);
 echo html_writer::tag('p', get_string('applicationperiod', 'quizaccess_presencial', (object) [
     'start' => userdate($application['timeopen']),
     'end' => userdate($application['timeclose']),
@@ -108,33 +107,28 @@ if (!$application['canoperate']) {
         foreach ($item['identity'] as $field) {
             $identity .= html_writer::tag('div', s($field['label']) . ': ' . s($field['value']));
         }
-        $reasonid = 'rejectionreason-' . $item['id'];
         $reason = $submittedid === $item['id'] ? $submittedreason : $item['rejectionreason'];
-        $form = html_writer::start_tag('form', ['method' => 'post', 'action' => $url]);
-        foreach (['cmid' => $cmid, 'page' => $page, 'requestid' => $item['id'], 'sesskey' => sesskey()] as $name => $value) {
-            $form .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
-        }
-        $form .= html_writer::tag('label', get_string('rejectionreason', 'quizaccess_presencial'), ['for' => $reasonid]);
-        $form .= html_writer::tag('textarea', s($reason), ['name' => 'reason', 'id' => $reasonid,
-            'rows' => 2, 'class' => 'form-control']);
-        foreach (['authorize', 'reject'] as $decision) {
-            $form .= html_writer::tag(
-                'button',
-                get_string('queue' . $decision, 'quizaccess_presencial'),
-                ['type' => 'submit', 'name' => 'decision', 'value' => $decision, 'class' => 'btn btn-secondary mt-1']
-            );
-        }
-        $form .= html_writer::end_tag('form');
+        $form = $OUTPUT->render_from_template('quizaccess_presencial/queue_actions', [
+            'actionurl' => $url->out(false),
+            'cmid' => $cmid,
+            'page' => $page,
+            'requestid' => $item['id'],
+            'sesskey' => sesskey(),
+            'reason' => $reason,
+            'showreason' => $error !== null && $submittedid === $item['id'],
+        ]);
         $table->data[] = [$identity, get_string('queuestate' . $item['state'], 'quizaccess_presencial'),
             userdate($item['timecreated']), $form];
     }
     if ($queue['total']) {
-        echo html_writer::table($table);
+        echo html_writer::div(html_writer::table($table), 'table-responsive');
         echo $OUTPUT->paging_bar($queue['total'], $page, 20, $url);
     } else {
         echo html_writer::tag('p', get_string('queueempty', 'quizaccess_presencial'));
     }
 }
-echo html_writer::link(new moodle_url($url, ['page' => $page]), get_string('refresh'));
-echo html_writer::tag('p', html_writer::link($listurl, get_string('myapplications', 'quizaccess_presencial')));
+echo html_writer::start_div('presencial-panel-navigation');
+echo html_writer::link(new moodle_url($url, ['page' => $page]), get_string('refresh'), ['class' => 'btn btn-secondary']);
+echo html_writer::link($listurl, get_string('myapplications', 'quizaccess_presencial'), ['class' => 'btn btn-secondary']);
+echo html_writer::end_div();
 echo $OUTPUT->footer();

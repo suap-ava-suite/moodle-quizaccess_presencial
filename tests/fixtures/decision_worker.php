@@ -75,6 +75,10 @@ if (!empty($params['preloadcmid'])) {
     // Reproduce the panel's authorization check earlier in the same request.
     \quizaccess_presencial\local\applications::get_application($params['preloadcmid']);
 }
+if (!empty($params['reportconnection'])) {
+    echo json_encode(['connectionid' => (int) $DB->get_field_sql('SELECT pg_backend_pid()')], JSON_THROW_ON_ERROR) . "\n";
+    fflush(STDOUT);
+}
 $service = new \quizaccess_presencial\local\release_request_service($clock);
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
@@ -82,6 +86,9 @@ try {
     if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
         $result = ['state' => $service->$operation($params['requestid'])->state];
+    } else if ($params['operation'] === 'confirm') {
+        $attempt = $service->start_authorized_attempt($params['requestid']);
+        $result = ['attemptid' => $attempt ? (int) $attempt->id : null];
     } else {
         $result = ['started' => $service->begin_authorized_attempt($params['quizid'], $params['studentid'], 1)];
     }
