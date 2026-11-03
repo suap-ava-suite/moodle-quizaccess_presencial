@@ -744,6 +744,186 @@ final class release_request_service_test extends \advanced_testcase {
     }
 
     /**
+     * Decisions and real Moodle attempt creation serialize until the outer transaction commits.
+     *
+     * @dataProvider decision_races_provider
+     * @param string $first First operation, held in an outer transaction.
+     * @param string $second Competing operation on an independent connection.
+     * @param string $expectedstate Final request state.
+     * @param int $decisioncount Number of confirmed changes, excluding the initial grant.
+     * @param string $firstreason First rejection explanation.
+     * @param string $secondreason Competing rejection explanation.
+     */
+    public function test_concurrent_decisions_and_attempt_creation(
+        string $first,
+        string $second,
+        string $expectedstate,
+        int $decisioncount,
+        string $firstreason = '',
+        string $secondreason = '',
+    ): void {
+        global $CFG, $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test synchronizes independent connections using PostgreSQL lock monitoring.');
+        }
+        $this->preventResetByRollback();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student] = $this->create_enabled_quiz_and_student();
+        $this->remove_core_quiz_time_gates($quiz);
+        self::getDataGenerator()->enrol_user($student->id, $quiz->course, 'student');
+        $service = new release_request_service($clock);
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        if ($first === 'confirm' || $second === 'confirm') {
+            $service->authorize($request->id);
+        }
+        $bootstrap = <<<'WORKER'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/decision_worker.php');
+        WORKER;
+        $process = proc_open(
+            [PHP_BINARY, '-r', $bootstrap, $CFG->dirroot],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            stream_set_timeout($pipes[2], 30);
+            $this->assertSame("READY\n", fgets($pipes[1]));
+            $sink = $this->redirectEvents();
+            $transaction = $DB->start_delegated_transaction();
+            $attempt = null;
+            if ($first === 'confirm') {
+                $this->setUser($student);
+                $attempt = $service->start_authorized_attempt($request->id);
+                $this->assertNotNull($attempt);
+            } else if ($first === 'reject') {
+                $service->reject($request->id, $firstreason);
+            } else {
+                $service->authorize($request->id);
+            }
+            fwrite($pipes[0], json_encode([
+                'operation' => $second,
+                'requestid' => $request->id,
+                'actorid' => $second === 'confirm' ? (int) $student->id : (int) get_admin()->id,
+                'reportconnection' => true,
+                'reportevents' => true,
+                'reason' => $secondreason,
+            ], JSON_THROW_ON_ERROR) . "\n");
+            fflush($pipes[0]);
+            $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame("ATTEMPTING\n", fgets($pipes[1]));
+            $deadline = microtime(true) + 10;
+            do {
+                // Monitor lock ownership only to synchronize the competing public operations.
+                $waiting = $DB->get_field_sql(
+                    'SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']],
+                );
+                if ($waiting) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            $this->assertNotFalse($waiting, 'The competing operation must wait for the outer transaction.');
+            $transaction->allow_commit();
+            $transaction = null;
+            $line = fgets($pipes[1]);
+            $this->assertNotFalse($line, 'The competing operation did not finish within 30 seconds.');
+            $result = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+            $expectedresult = match (true) {
+                $second === 'confirm' => ['attemptid' => null],
+                $first === 'confirm' => ['error' => 'requestnotrevisable'],
+                default => ['state' => $expectedstate],
+            };
+            $this->assertSame($expectedresult, $result['result']);
+            $current = $service->get($request->id);
+            $this->assertSame($expectedstate, $current->state);
+            $expectedreason = $expectedstate === 'rejected'
+                ? ($second === 'reject' ? $secondreason : $firstreason)
+                : '';
+            $this->assertSame($expectedreason, $current->rejectionreason);
+            $decisions = array_values(array_filter($sink->get_events(), static fn($event): bool =>
+                $event instanceof \quizaccess_presencial\event\request_authorized ||
+                $event instanceof \quizaccess_presencial\event\request_rejected));
+            $this->assertCount($decisioncount, array_merge($decisions, $result['decisions']));
+            foreach ($result['decisions'] as $decision) {
+                $this->assertSame($request->id, $decision['requestid']);
+            }
+            $attempts = quiz_get_user_attempts($quiz->id, $student->id, 'all');
+            $this->assertCount($attempt ? 1 : 0, $attempts);
+            if ($attempt) {
+                $this->assertSame((int) $attempt->id, (int) reset($attempts)->id);
+                $this->assertSame((int) $attempt->id, (int) $service->start_authorized_attempt($request->id)->id);
+            }
+            $this->setAdminUser();
+            if ($attempt) {
+                foreach (['authorize', 'reject'] as $operation) {
+                    try {
+                        $service->$operation($request->id);
+                        $this->fail('A consumed request must refuse every later decision.');
+                    } catch (\moodle_exception $exception) {
+                        $this->assertSame('requestnotrevisable', $exception->errorcode);
+                    }
+                }
+                $this->assertSame(release_request::STATE_CONSUMED, $service->get($request->id)->state);
+            }
+            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $quiz->course);
+            $queue = \quizaccess_presencial\local\operational_queue::get_page($cm->id);
+            $this->assertSame($attempt ? 0 : 1, $queue['total']);
+            if (!$attempt) {
+                $this->assertSame($request->id, $queue['items'][0]['id']);
+                $this->assertSame($expectedstate, $queue['items'][0]['state']);
+            }
+            $this->assertSame('', stream_get_contents($pipes[2]));
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Concurrent decision test cleanup.'));
+                } catch (\Exception $ignored) {
+                    // Preserve the original test failure after releasing the transaction.
+                    $transaction = null;
+                }
+            }
+            if (proc_get_status($process)['running']) {
+                proc_terminate($process);
+            }
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            proc_close($process);
+        }
+    }
+
+    /**
+     * Both commit orders and idempotent decision replays on independent connections.
+     *
+     * @return array Named concurrency cases.
+     */
+    public static function decision_races_provider(): array {
+        return [
+            'rejection wins over real attempt creation' => ['reject', 'confirm', 'rejected', 1],
+            'real attempt creation wins over rejection' => ['confirm', 'reject', 'consumed', 0],
+            'approval replaces concurrent rejection' => ['reject', 'authorize', 'authorized', 2],
+            'rejection replaces concurrent approval' => ['authorize', 'reject', 'rejected', 2],
+            'identical approvals are idempotent' => ['authorize', 'authorize', 'authorized', 1],
+            'identical rejections are idempotent' => ['reject', 'reject', 'rejected', 1],
+            'latest rejection reason replaces the previous one' => [
+                'reject', 'reject', 'rejected', 2, 'Check identity.', 'Bring an identity document.',
+            ],
+        ];
+    }
+
+    /**
      * Confirmation respects native restrictions changed while it waits for the quiz lock.
      *
      * @dataProvider confirmation_restrictions_provider

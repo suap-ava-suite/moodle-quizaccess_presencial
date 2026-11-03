@@ -79,6 +79,123 @@ final class operational_queue_test extends \advanced_testcase {
     }
 
     /**
+     * Replaying an unchanged rejection is idempotent, while editing its reason is a new decision.
+     */
+    public function test_rejection_replay_emits_no_event_but_a_changed_reason_does(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($operator);
+        $sink = $this->redirectEvents();
+
+        $first = $service->reject($request->id, 'Check identity.');
+        $clock->bump(10);
+        $this->assertEquals($first, $service->reject($request->id, 'Check identity.'));
+        $service->reject($request->id, 'Bring an identity document.');
+
+        $events = array_values(array_filter(
+            $sink->get_events(),
+            static fn($event): bool => $event instanceof \quizaccess_presencial\event\request_rejected,
+        ));
+        $this->assertCount(2, $events);
+        $this->assertSame('Bring an identity document.', $service->get($request->id)->rejectionreason);
+        $this->assertSame(1, \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid)['total']);
+    }
+
+    /**
+     * Each decision event preserves the value it confirmed after later operational replacements.
+     */
+    public function test_decision_events_preserve_each_confirmed_value(): void {
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($operator);
+        $sink = $this->redirectEvents();
+
+        $service->authorize($request->id);
+        $service->reject($request->id, 'Check identity.');
+        $service->reject($request->id, 'Bring an identity document.');
+        $service->authorize($request->id);
+
+        $events = $sink->get_events();
+        $this->assertCount(4, $events);
+        $this->assertSame(['authorized', 'rejected', 'rejected', 'authorized'], array_map(
+            static fn($event): string => $event->other['state'],
+            $events,
+        ));
+        $this->assertSame(['', 'Check identity.', 'Bring an identity document.', ''], array_map(
+            static fn($event): string => $event->other['rejectionreason'],
+            $events,
+        ));
+        foreach ($events as $event) {
+            $this->assertSame($request->id, $event->objectid);
+            $this->assertSame((int) $operator->id, (int) $event->userid);
+            $this->assertSame((int) $student->id, (int) $event->relateduserid);
+            $this->assertSame(1, $event->other['attemptnumber']);
+        }
+        $current = $service->get($request->id);
+        $this->assertSame('authorized', $current->state);
+        $this->assertSame('', $current->rejectionreason);
+        $this->assertSame($current->expiresat, $events[3]->other['expiresat']);
+        $queue = \quizaccess_presencial\local\operational_queue::get_page($quiz->cmid);
+        $this->assertSame(1, $queue['total']);
+        $this->assertSame($request->id, $queue['items'][0]['id']);
+    }
+
+    /**
+     * Only committed decisions reach Moodle's real log, even when operations use nested transactions.
+     */
+    public function test_rolled_back_decision_preserves_the_previous_grant_and_audit(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->preventResetByRollback();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        [$quiz, $student, $operator] = $this->application();
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $student->id, 1);
+        $this->setUser($operator);
+        set_config('enabled_stores', 'logstore_standard', 'tool_log');
+        set_config('buffersize', 0, 'logstore_standard');
+        $manager = get_log_manager(true);
+        $store = $manager->get_readers()['logstore_standard'];
+        try {
+            $authorized = $service->authorize($request->id);
+            $transaction = $DB->start_delegated_transaction();
+            $service->reject($request->id, 'Uncommitted correction.');
+            $this->assertFalse($service->is_authorized($quiz->id, $student->id, 1));
+            $failure = new \moodle_exception('invalidrequest');
+            try {
+                $transaction->rollback($failure);
+            } catch (\moodle_exception $exception) {
+                $this->assertSame($failure, $exception);
+            }
+
+            $this->assertEquals($authorized, $service->get($request->id));
+            $this->assertTrue($service->is_authorized($quiz->id, $student->id, 1));
+            $where = 'component = :component AND objectid = :requestid';
+            $params = ['component' => 'quizaccess_presencial', 'requestid' => $request->id];
+            $this->assertCount(1, $store->get_events_select($where, $params, 'id ASC', 0, 0));
+            $service->reject($request->id, 'Confirmed correction.');
+            $service->authorize($request->id);
+            $events = array_values($store->get_events_select($where, $params, 'id ASC', 0, 0));
+            $this->assertCount(3, $events);
+            $this->assertSame(['authorized', 'rejected', 'authorized'], array_map(
+                static fn($event): string => $event->other['state'],
+                $events,
+            ));
+            $this->assertSame('Confirmed correction.', $events[1]->other['rejectionreason']);
+            $this->assertSame('', $service->get($request->id)->rejectionreason);
+        } finally {
+            get_log_manager(true);
+        }
+    }
+
+    /**
      * Rejection policy is checked on every submission, without truncating explanations.
      */
     public function test_rejection_policy_events_and_persistence(): void {
