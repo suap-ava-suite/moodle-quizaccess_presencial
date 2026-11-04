@@ -33,6 +33,40 @@ use quizaccess_presencial\external\authorize_request as authorize_request_endpoi
  * Steps for application-team management, invitations, and release requests.
  */
 class behat_quizaccess_presencial extends behat_base {
+    /**
+     * Remember the URL represented by the student's QR without a physical camera.
+     *
+     * @When I remember the authorization QR URL
+     */
+    public function remember_authorization_qr_url(): void {
+        self::require_javascript_in_session($this->getSession());
+        $script = "(() => { const img = document.querySelector('[data-region=\"request-qr-image\"]');" .
+            "if (!img || !img.src.startsWith('data:image/svg+xml;base64,')) return '';" .
+            "return new DOMParser().parseFromString(atob(img.src.split(',')[1]), 'image/svg+xml')" .
+            ".querySelector('desc').textContent; })()";
+        for ($i = 0; $i < 20; $i++) {
+            $url = $this->evaluate_script($script);
+            if ($url) {
+                $this->previouslink = $url;
+                return;
+            }
+            usleep(250000);
+        }
+        throw new ExpectationException('The authorization QR was not displayed.', $this->getSession());
+    }
+
+    /**
+     * Open the remembered QR as the current operator.
+     *
+     * @When I open the remembered authorization QR URL
+     */
+    public function open_authorization_qr_url(): void {
+        if (!$this->previouslink) {
+            throw new ExpectationException('No authorization QR URL was remembered.', $this->getSession());
+        }
+        $this->getSession()->visit($this->previouslink);
+    }
+
     /** @var string|null A link observed in the browser, retained only by this test. */
     private ?string $previouslink = null;
 

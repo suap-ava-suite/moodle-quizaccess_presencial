@@ -46,5 +46,26 @@ export const init = (requestId) => {
         });
     };
 
+    const qrRegion = document.querySelector('[data-region="request-qr"]');
+    const qrImage = document.querySelector('[data-region="request-qr-image"]');
+    const refreshQr = () => {
+        const startedAt = Date.now();
+        qrRegion.hidden = true;
+        Ajax.call([{
+            methodname: 'quizaccess_presencial_issue_qr',
+            args: {requestid: requestId},
+        }])[0].then((result) => {
+            qrImage.src = result.image;
+            qrRegion.hidden = false;
+            window.setTimeout(refreshQr, Math.max(0, 60000 - (Date.now() - startedAt)));
+            return result;
+        }).catch(() => {
+            qrRegion.hidden = true;
+            window.setTimeout(refreshQr, 5000);
+        });
+    };
+    if (['pending', 'authorized', 'rejected'].includes(renderedState) && qrRegion && qrImage) {
+        refreshQr();
+    }
     window.setTimeout(poll, 5000);
 };

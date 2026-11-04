@@ -25,6 +25,14 @@
 defined('MOODLE_INTERNAL') || die();
 
 $functions = [
+    'quizaccess_presencial_issue_qr' => [
+        'classname' => '\\quizaccess_presencial\\external\\issue_qr',
+        'methodname' => 'execute',
+        'description' => 'Issue a QR code for the current student.',
+        'type' => 'write',
+        'ajax' => true,
+        'loginrequired' => true,
+    ],
     'quizaccess_presencial_read_request' => [
         'classname' => '\\quizaccess_presencial\\external\\read_request_status',
         'methodname' => 'execute',

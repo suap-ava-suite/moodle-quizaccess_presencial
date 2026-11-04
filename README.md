@@ -146,3 +146,7 @@ O plugin armazena Delegações de aplicação, dados mínimos do ciclo de vida d
 ## Licença
 
 GNU GPL v3 ou posterior. Consulte `LICENSE`.
+
+### Autorização por QR Code
+
+Na espera da Solicitação, o estudante apresenta o QR Code temporário ao Professor ou Aplicador. O código é substituído automaticamente a cada 60 segundos; cada código válido pode ser usado uma única vez. Após a leitura, o operador autenticado autoriza a Solicitação imediatamente, e o estudante ainda confirma o início da tentativa. A leitura usa JavaScript, armazenamento de sessão e os cabeçalhos Fetch Metadata do navegador. O site deve usar HTTPS, salvo em `localhost`; navegadores e aplicativos leitores que não enviem esses cabeçalhos não conseguem usar o fluxo.
