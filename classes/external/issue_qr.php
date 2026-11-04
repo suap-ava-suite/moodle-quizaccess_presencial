@@ -1,5 +1,18 @@
 <?php
 // This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace quizaccess_presencial\external;
 
@@ -17,10 +30,21 @@ use quizaccess_presencial\local\qr_authorization;
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class issue_qr extends external_api {
+    /**
+     * Describe the issuance parameters.
+     *
+     * @return external_function_parameters Parameters for issuance.
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters(['requestid' => new external_value(PARAM_INT, 'Release request id')]);
     }
 
+    /**
+     * Issue the current student's temporary QR image.
+     *
+     * @param int $requestid Release request identifier.
+     * @return array QR image as a data URI.
+     */
     public static function execute(int $requestid): array {
         global $CFG;
         $params = self::validate_parameters(self::execute_parameters(), ['requestid' => $requestid]);
@@ -36,6 +60,11 @@ final class issue_qr extends external_api {
         return ['image' => 'data:image/svg+xml;base64,' . base64_encode($qr->getBarcodeSVGcode(4, 4))];
     }
 
+    /**
+     * Describe the issuance result.
+     *
+     * @return external_single_structure Result containing the QR image.
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure(['image' => new external_value(PARAM_RAW, 'QR image')]);
     }

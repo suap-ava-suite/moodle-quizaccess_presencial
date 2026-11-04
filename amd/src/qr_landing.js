@@ -1,5 +1,9 @@
 // This file is part of Moodle - http://moodle.org/
-/** Preserve the secret across login without transmitting it in a URL. */
+/**
+ * Preserve the secret across login without transmitting it in a URL.
+ *
+ * @param {number} requestId Release request identifier.
+ */
 export const init = (requestId) => {
     const token = window.location.hash.substring(1);
     window.sessionStorage.setItem(`presencial-qr-${requestId}`, token);

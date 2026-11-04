@@ -1,7 +1,28 @@
 <?php
 // This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/** Store the secret in this browser before authentication, without sending it in a URL. */
+/**
+ * Preserve the QR secret in the browser before authentication.
+ *
+ * @package    quizaccess_presencial
+ * @copyright  2026 SUAP AVA Suite
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+// phpcs:ignore moodle.Files.RequireLogin.Missing -- This public page preserves the fragment before qr.php requires login.
 require_once(__DIR__ . '/../../../../config.php');
 $requestid = required_param('requestid', PARAM_INT);
 $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';

@@ -70,8 +70,8 @@ if (!empty($params['clockfile'])) {
         }
     };
 }
+\core\di::set(\core\clock::class, $clock);
 if (!empty($params['preloadcmid'])) {
-    \core\di::set(\core\clock::class, $clock);
     // Reproduce the panel's authorization check earlier in the same request.
     \quizaccess_presencial\local\applications::get_application($params['preloadcmid']);
 }
@@ -83,7 +83,12 @@ $service = new \quizaccess_presencial\local\release_request_service($clock);
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
 try {
-    if (in_array($params['operation'], ['authorize', 'reject'], true)) {
+    if ($params['operation'] === 'authorizeqr') {
+        $result = ['state' => \quizaccess_presencial\local\qr_authorization::authorize(
+            $params['requestid'],
+            $params['token'],
+        )->state];
+    } else if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
         $result = ['state' => $service->$operation($params['requestid'])->state];
     } else if ($params['operation'] === 'confirm') {
