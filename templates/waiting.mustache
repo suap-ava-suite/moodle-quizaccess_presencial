@@ -51,7 +51,8 @@
 }}
 <div data-region="request-qr" hidden>
     <p>{{#str}}qrwaiting, quizaccess_presencial{{/str}}</p>
-    <img data-region="request-qr-image" alt="{{#str}}qrwaiting, quizaccess_presencial{{/str}}">
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+         data-region="request-qr-image" alt="{{#str}}qrwaiting, quizaccess_presencial{{/str}}">
 </div>
 <div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}" data-rejection-reason="{{rejectionreason}}">
     <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}{{#rejected}}alert-warning{{/rejected}}"
