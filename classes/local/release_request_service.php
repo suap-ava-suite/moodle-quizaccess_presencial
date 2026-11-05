@@ -284,7 +284,7 @@ final class release_request_service {
             ) {
                 return new \moodle_exception('rejectionreasonrequired', 'quizaccess_presencial');
             }
-            if ($state === release_request::STATE_AUTHORIZED && $record->state === $state) {
+            if ($record->state === $state && (string) ($record->rejectionreason ?? '') === $reason) {
                 return $this->get($requestid);
             }
             if ($state === release_request::STATE_AUTHORIZED) {
@@ -714,11 +714,18 @@ final class release_request_service {
         global $DB;
         $request = $DB->get_record('quizaccess_presencial_req', ['id' => $id], '*', MUST_EXIST);
         $cm = get_coursemodule_from_instance('quiz', $request->quizid, 0, false, MUST_EXIST);
+        $other = ['attemptnumber' => (int) $request->attemptnumber];
+        if (in_array($eventclass, [request_authorized::class, request_rejected::class], true)) {
+            // Preserve the confirmed decision in the log even when this operational row is revised later.
+            $other['state'] = $request->state;
+            $other['rejectionreason'] = (string) ($request->rejectionreason ?? '');
+            $other['expiresat'] = (int) $request->expiresat;
+        }
         $event = $eventclass::create([
             'context' => \context_module::instance($cm->id),
             'objectid' => $id,
             'relateduserid' => (int) $request->userid,
-            'other' => ['attemptnumber' => (int) $request->attemptnumber],
+            'other' => $other,
         ]);
         $event->trigger();
     }

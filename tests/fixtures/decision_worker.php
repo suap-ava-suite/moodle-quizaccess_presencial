@@ -80,6 +80,7 @@ if (!empty($params['reportconnection'])) {
     fflush(STDOUT);
 }
 $service = new \quizaccess_presencial\local\release_request_service($clock);
+$sink = !empty($params['reportevents']) ? \phpunit_util::start_event_redirection() : null;
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
 try {
@@ -90,7 +91,10 @@ try {
         )->state];
     } else if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
-        $result = ['state' => $service->$operation($params['requestid'])->state];
+        $request = $operation === 'reject'
+            ? $service->reject($params['requestid'], $params['reason'] ?? '')
+            : $service->authorize($params['requestid']);
+        $result = ['state' => $request->state];
     } else if ($params['operation'] === 'confirm') {
         $attempt = $service->start_authorized_attempt($params['requestid']);
         $result = ['attemptid' => $attempt ? (int) $attempt->id : null];
@@ -101,5 +105,14 @@ try {
     $result = ['error' => $exception->errorcode];
 } finally {
     \quizaccess_presencial\local\attempt_start_guard::release($params['requestid']);
+}
+if ($sink) {
+    $events = array_values(array_filter($sink->get_events(), static fn($event): bool =>
+        $event instanceof \quizaccess_presencial\event\request_authorized ||
+        $event instanceof \quizaccess_presencial\event\request_rejected));
+    $result = ['result' => $result, 'decisions' => array_map(
+        static fn($event): array => ['requestid' => (int) $event->objectid, 'state' => $event->other['state']],
+        $events,
+    )];
 }
 echo json_encode($result, JSON_THROW_ON_ERROR) . "\n";
