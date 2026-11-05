@@ -23,7 +23,7 @@ namespace quizaccess_presencial\event;
  * @copyright 2026 SUAP AVA Suite
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class qr_invalid extends \core\event\base {
+class qr_invalid extends \core\event\base {
     /**
      * Initialize event data.
      */

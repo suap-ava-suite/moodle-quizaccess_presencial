@@ -53,3 +53,13 @@ Feature: Authorize a release request with a QR code
     And I open the remembered authorization QR URL
     And I log in as "applicator1"
     Then I should see "The request was authorized"
+
+  @javascript
+  Scenario: A link in Moodle content cannot authorize a request
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    And I remember the authorization QR URL
+    And I log out
+    And I log in as "applicator1"
+    And I follow the remembered QR URL from Moodle content
+    Then the release request for "Quiz 1" for "student1" should be pending

@@ -91,7 +91,7 @@ final class qr_authorization {
                         !hash_equals($record->qrtokenhash, self::hash($token)) ||
                         (int) $record->qrexpiresat <= $now || !self::revisable($record, $now)
                 ) {
-                    self::log_invalid();
+                    self::log_invalid($request);
                     return null;
                 }
                 try {
@@ -100,19 +100,26 @@ final class qr_authorization {
                     return $exception;
                 }
                 if ($result->state !== release_request::STATE_AUTHORIZED) {
+                    self::log_invalid($request);
                     return null;
                 }
                 $DB->update_record('quizaccess_presencial_req', (object) [
                     'id' => $requestid, 'qrtokenhash' => null, 'qrexpiresat' => 0,
                 ]);
+                $cm = get_coursemodule_from_instance('quiz', $request->quizid, 0, false, MUST_EXIST);
+                \quizaccess_presencial\event\qr_authorized::create([
+                    'context' => \context_module::instance($cm->id),
+                    'objectid' => $request->id,
+                    'relateduserid' => $request->userid,
+                ])->trigger();
                 return $result;
             });
         } catch (\moodle_exception $exception) {
-            self::log_invalid();
+            self::log_invalid($request);
             throw $exception;
         }
         if ($result instanceof \moodle_exception) {
-            self::log_invalid();
+            self::log_invalid($request);
             throw $result;
         }
         if ($result === null) {
@@ -137,9 +144,26 @@ final class qr_authorization {
 
     /**
      * Record an invalid use without retaining its secret.
+     *
+     * @param release_request|null $request Known request, if available.
      */
-    private static function log_invalid(): void {
-        \quizaccess_presencial\event\qr_invalid::create(['context' => \context_system::instance()])->trigger();
+    private static function log_invalid(?release_request $request = null): void {
+        $data = ['context' => \context_system::instance()];
+        if ($request) {
+            $cm = get_coursemodule_from_instance('quiz', $request->quizid, 0, false, IGNORE_MISSING);
+            if ($cm) {
+                $context = \context_module::instance($cm->id, IGNORE_MISSING);
+                if ($context) {
+                    $data['context'] = $context;
+                    $data['objectid'] = $request->id;
+                    $data['relateduserid'] = $request->userid;
+                }
+            }
+        }
+        $eventclass = isset($data['objectid'])
+            ? \quizaccess_presencial\event\qr_request_invalid::class
+            : \quizaccess_presencial\event\qr_invalid::class;
+        $eventclass::create($data)->trigger();
     }
 
     /**

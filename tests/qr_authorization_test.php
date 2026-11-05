@@ -30,6 +30,88 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @covers     \quizaccess_presencial\local\qr_authorization
  */
 final class qr_authorization_test extends \advanced_testcase {
+    /**
+     * Every valid use is auditable, including an unchanged authorization.
+     */
+    public function test_each_valid_qr_use_emits_a_scoped_event_without_the_secret(): void {
+        [$request, $student, $operator, , $quiz] = $this->request_fixture();
+        $sink = $this->redirectEvents();
+        for ($i = 0; $i < 2; $i++) {
+            $this->setUser($student);
+            $token = \quizaccess_presencial\local\qr_authorization::issue($request->id);
+            $this->setUser($operator);
+            \quizaccess_presencial\local\qr_authorization::authorize($request->id, $token);
+            $events = array_values(array_filter(
+                $sink->get_events(),
+                fn($event) => $event instanceof \quizaccess_presencial\event\qr_authorized,
+            ));
+            $this->assertCount($i + 1, $events);
+            $data = $events[$i]->get_data();
+            $this->assertSame(\context_module::instance($quiz->cmid)->id, (int) $data['contextid']);
+            $this->assertSame($request->id, (int) $data['objectid']);
+            $this->assertSame((int) $student->id, (int) $data['relateduserid']);
+            $this->assertSame((int) $operator->id, (int) $data['userid']);
+            $serialized = json_encode($data, JSON_THROW_ON_ERROR);
+            $this->assertStringNotContainsString($token, $serialized);
+            $this->assertStringNotContainsString(hash('sha256', 'quizaccess_presencial:qr:' . $token), $serialized);
+        }
+        $sink->close();
+    }
+
+    /**
+     * Invalid codes with a known request are visible in the activity log.
+     */
+    public function test_expired_qr_use_emits_a_scoped_event_without_changing_the_request(): void {
+        [$request, $student, $operator, $requests, $quiz] = $this->request_fixture();
+        $this->setUser($student);
+        $token = \quizaccess_presencial\local\qr_authorization::issue($request->id);
+        \core\di::get(\core\clock::class)->bump(60);
+        $this->setUser($operator);
+        $sink = $this->redirectEvents();
+        try {
+            \quizaccess_presencial\local\qr_authorization::authorize($request->id, $token);
+            $this->fail('Expired QR must be rejected.');
+        } catch (\moodle_exception $exception) {
+            $this->assertSame('qrinvalid', $exception->errorcode);
+        }
+        $events = array_values(array_filter(
+            $sink->get_events(),
+            fn($event) => $event instanceof \quizaccess_presencial\event\qr_invalid,
+        ));
+        $this->assertCount(1, $events);
+        $data = $events[0]->get_data();
+        $this->assertSame(\context_module::instance($quiz->cmid)->id, (int) $data['contextid']);
+        $this->assertSame($request->id, (int) $data['objectid']);
+        $this->assertSame((int) $student->id, (int) $data['relateduserid']);
+        $this->assertSame((int) $operator->id, (int) $data['userid']);
+        $serialized = json_encode($data, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString($token, $serialized);
+        $this->assertStringNotContainsString(hash('sha256', 'quizaccess_presencial:qr:' . $token), $serialized);
+        $this->assertSame('pending', $requests->get($request->id)->state);
+        $sink->close();
+    }
+
+    /**
+     * Unknown requests are logged without assuming an activity context.
+     */
+    public function test_unknown_request_emits_a_system_scoped_invalid_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $sink = $this->redirectEvents();
+        try {
+            \quizaccess_presencial\local\qr_authorization::authorize(99999999, 'q1_invalid');
+            $this->fail('An unknown request must be rejected.');
+        } catch (\moodle_exception $exception) {
+            $events = array_values(array_filter(
+                $sink->get_events(),
+                fn($event) => $event instanceof \quizaccess_presencial\event\qr_invalid,
+            ));
+            $this->assertCount(1, $events);
+            $this->assertSame(\context_system::instance()->id, (int) $events[0]->contextid);
+        }
+        $sink->close();
+    }
+
     public function test_qr_is_single_use_and_authorizes_the_request(): void {
         [$request, $student, $operator, $requests] = $this->request_fixture();
         $this->setUser($student);

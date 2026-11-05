@@ -26,7 +26,8 @@
 require_once(__DIR__ . '/../../../../config.php');
 $requestid = required_param('requestid', PARAM_INT);
 $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
-if (!in_array($site, ['none', 'same-origin'], true)) {
+// Moodle content can contain student-controlled links; only direct navigation is allowed.
+if ($site !== 'none') {
     throw new moodle_exception('qrinvalid', 'quizaccess_presencial');
 }
 $PAGE->set_url('/mod/quiz/accessrule/presencial/qr_landing.php', ['requestid' => $requestid]);
