@@ -33,6 +33,74 @@ use quizaccess_presencial\external\authorize_request as authorize_request_endpoi
  * Steps for application-team management, invitations, and release requests.
  */
 class behat_quizaccess_presencial extends behat_base {
+    /**
+     * Remember the URL represented by the student's QR without a physical camera.
+     *
+     * @When I remember the authorization QR URL
+     */
+    public function remember_authorization_qr_url(): void {
+        self::require_javascript_in_session($this->getSession());
+        $script = "(() => { const img = document.querySelector('[data-region=\"request-qr-image\"]');" .
+            "if (!img || !img.src.startsWith('data:image/svg+xml;base64,')) return '';" .
+            "return new DOMParser().parseFromString(atob(img.src.split(',')[1]), 'image/svg+xml')" .
+            ".querySelector('desc').textContent; })()";
+        for ($i = 0; $i < 20; $i++) {
+            $url = $this->evaluate_script($script);
+            if ($url) {
+                $this->previouslink = $url;
+                return;
+            }
+            usleep(250000);
+        }
+        throw new ExpectationException('The authorization QR was not displayed.', $this->getSession());
+    }
+
+    /**
+     * Open the remembered QR as the current operator.
+     *
+     * @When I open the remembered authorization QR URL
+     */
+    public function open_authorization_qr_url(): void {
+        if (!$this->previouslink) {
+            throw new ExpectationException('No authorization QR URL was remembered.', $this->getSession());
+        }
+        $this->getSession()->visit($this->previouslink);
+    }
+
+    /**
+     * Follow the remembered QR URL as a link in Moodle content.
+     *
+     * @When I follow the remembered QR URL from Moodle content
+     */
+    public function follow_authorization_qr_from_moodle(): void {
+        self::require_javascript_in_session($this->getSession());
+        if (!$this->previouslink) {
+            throw new ExpectationException('No authorization QR URL was remembered.', $this->getSession());
+        }
+        $url = json_encode($this->previouslink, JSON_THROW_ON_ERROR);
+        $previousurl = $this->getSession()->getCurrentUrl();
+        $this->execute_script("const link = document.createElement('a'); link.id = 'test-qr-link'; " .
+            "link.href = {$url}; link.textContent = 'QR'; " .
+            "link.style.cssText = 'position:fixed;top:10px;left:50px;z-index:99999;background:white'; " .
+            "document.body.appendChild(link);");
+        try {
+            $this->getSession()->getPage()->find('css', '#test-qr-link')->click();
+        } catch (\Exception $exception) {
+            if (!str_contains($exception->getMessage(), get_string('qrinvalid', 'quizaccess_presencial'))) {
+                throw $exception;
+            }
+        }
+        $this->getSession()->wait(3000, "document.body.innerText.includes('The request was authorized')");
+        $error = $this->getSession()->getPage()->find('css', '[data-rel="fatalerror"]');
+        if ($error) {
+            if (!str_contains($error->getText(), get_string('qrinvalid', 'quizaccess_presencial'))) {
+                throw new ExpectationException('Unexpected error opening the QR link.', $this->getSession());
+            }
+            // Leave the expected error page before Moodle checks for unexpected exceptions.
+            $this->getSession()->visit($previousurl);
+        }
+    }
+
     /** @var string|null A link observed in the browser, retained only by this test. */
     private ?string $previouslink = null;
 

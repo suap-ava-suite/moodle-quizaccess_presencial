@@ -50,6 +50,7 @@ final class metadata_test extends \basic_testcase {
         ], array_keys($items['quizaccess_presencial_invite']->get_privacy_fields()));
         $this->assertEqualsCanonicalizing([
             'quizid', 'userid', 'attemptnumber', 'state', 'rejectionreason', 'timecreated', 'expiresat', 'timemodified',
+            'qrtokenhash', 'qrexpiresat',
         ], array_keys($items['quizaccess_presencial_req']->get_privacy_fields()));
     }
 }
