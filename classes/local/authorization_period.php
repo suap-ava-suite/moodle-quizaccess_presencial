@@ -25,6 +25,18 @@ namespace quizaccess_presencial\local;
  */
 final class authorization_period {
     /**
+     * Check whether the enabled configuration currently permits operational decisions.
+     *
+     * @param \stdClass|null $configuration Current quiz configuration.
+     * @param int $now Current Unix time.
+     * @return bool Whether the authorization period is active.
+     */
+    public static function is_active(?\stdClass $configuration, int $now): bool {
+        return $configuration && !empty($configuration->enabled) &&
+            (int) $configuration->timeopen <= $now && (int) $configuration->timeclose > $now;
+    }
+
+    /**
      * Validate a proposed authorization period against quiz availability.
      *
      * @param bool $enabled Whether the rule is enabled.

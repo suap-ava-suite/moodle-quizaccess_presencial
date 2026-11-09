@@ -55,6 +55,15 @@ final class release_request {
         return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_STARTING];
     }
 
+    /**
+     * States that may receive another decision while the request remains current.
+     *
+     * @return string[] Revisable lifecycle states.
+     */
+    public static function revisable_states(): array {
+        return [self::STATE_PENDING, self::STATE_AUTHORIZED, self::STATE_REJECTED];
+    }
+
     /** @var int */
     public int $id;
     /** @var int */
