@@ -160,9 +160,8 @@ final class release_request_service {
         if ($request->userid !== $userid) {
             throw new \moodle_exception('requestnotfound', 'quizaccess_presencial');
         }
-        $now = $this->clock->time();
         if (in_array($request->state, release_request::active_states(), true)) {
-            $this->expire_one($requestid, $now);
+            $this->expire_one($requestid);
         }
         return $this->get($requestid);
     }
@@ -527,7 +526,7 @@ final class release_request_service {
         );
         $expired = 0;
         foreach ($ids as $id) {
-            if ($this->expire_one((int) $id, $now)) {
+            if ($this->expire_one((int) $id)) {
                 $expired++;
             }
         }
@@ -559,7 +558,7 @@ final class release_request_service {
         );
         $expired = 0;
         foreach ($ids as $id) {
-            if ($this->expire_one((int) $id, $this->clock->time(), true)) {
+            if ($this->expire_one((int) $id, true)) {
                 $expired++;
             }
         }
@@ -640,47 +639,50 @@ final class release_request_service {
      * Perform one locked expiration or finalization of a current request.
      *
      * @param int $requestid Request id.
-     * @param int $now Current Unix time.
      * @param bool $force End even if not due (for disabled quiz).
      * @return bool Whether the row changed.
      */
-    private function expire_one(int $requestid, int $now, bool $force = false): bool {
+    private function expire_one(int $requestid, bool $force = false): bool {
         global $DB;
-        if (!attempt_start_guard::acquire($requestid)) {
+        $quizid = $DB->get_field('quizaccess_presencial_req', 'quizid', ['id' => $requestid]);
+        if (!$quizid) {
             return false;
         }
-        $tx = null;
-        try {
-            $tx = $DB->start_delegated_transaction();
-            $record = $DB->get_record_sql(
-                'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
-                ['id' => $requestid],
-            );
-            $configuration = $record
-                ? $DB->get_record('quizaccess_presencial', ['quizid' => $record->quizid]) : false;
-            $force = $force || !$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now;
-            if ($record && $record->state === release_request::STATE_STARTING) {
-                // An abandoned claim still expires by its own lease, even after disablement.
-                $force = false;
-            }
-            // Ending the rule or period finalizes current rejections too.
-            $states = $force
-                ? [release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED]
-                : release_request::expirable_states();
-            if (
-                !$record || empty($record->active) || !in_array($record->state, $states, true) ||
-                    (!$force && (int) $record->expiresat > $now)
-            ) {
-                $tx->allow_commit();
+        return quiz_lock::execute((int) $quizid, function () use ($requestid, $force, $DB): bool {
+            // Never wait for an attempt's guard while holding the quiz lock: its owner may need that lock.
+            if (!attempt_start_guard::acquire($requestid)) {
                 return false;
             }
-            $this->transition($record, release_request::STATE_EXPIRED, $now);
-            $this->trigger_expired($requestid);
-            $tx->allow_commit();
-            return true;
-        } finally {
-            attempt_start_guard::release($requestid);
-        }
+            try {
+                $record = $DB->get_record_sql(
+                    'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
+                    ['id' => $requestid],
+                );
+                $configuration = $record
+                    ? $DB->get_record('quizaccess_presencial', ['quizid' => $record->quizid]) : false;
+                $now = $this->clock->time();
+                $force = $force || !$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now;
+                if ($record && $record->state === release_request::STATE_STARTING) {
+                    // An abandoned claim still expires by its own lease, even after disablement.
+                    $force = false;
+                }
+                // Ending the rule or period finalizes current rejections too.
+                $states = $force
+                    ? [release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED]
+                    : release_request::expirable_states();
+                if (
+                    !$record || empty($record->active) || !in_array($record->state, $states, true) ||
+                        (!$force && (int) $record->expiresat > $now)
+                ) {
+                    return false;
+                }
+                $this->transition($record, release_request::STATE_EXPIRED, $now);
+                $this->trigger_expired($requestid);
+                return true;
+            } finally {
+                attempt_start_guard::release($requestid);
+            }
+        });
     }
 
     /**
