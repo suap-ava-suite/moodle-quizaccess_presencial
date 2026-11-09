@@ -27,6 +27,9 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 
+#[\PHPUnit\Framework\Attributes\CoversClass(\quizaccess_presencial::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(delegation_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(release_request_service::class)]
 /**
  * Configuration transitions through the public Moodle integration boundaries.
  *
@@ -37,7 +40,6 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @covers     \quizaccess_presencial\local\delegation_manager
  * @covers     \quizaccess_presencial\local\release_request_service
  */
-#[\PHPUnit\Framework\Attributes\CoversNothing]
 final class configuration_lifecycle_test extends \advanced_testcase {
     /**
      * A shortened period preserves access until the new end and never extends an old grant.
