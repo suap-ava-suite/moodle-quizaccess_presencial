@@ -752,4 +752,37 @@ class behat_quizaccess_presencial extends behat_base {
             throw new ExpectationException('The waiting page reloaded without a decision change.', $this->getSession());
         }
     }
+    /**
+     * Change quiz settings as a professor while preserving the browser's user session.
+     *
+     * @When the in-person release rule for :quizname becomes :state
+     * @param string $quizname Quiz name.
+     * @param string $state Disabled, enabled, future or ended.
+     */
+    public function change_release_configuration(string $quizname, string $state): void {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $previoususer = $USER;
+        try {
+            \core\session\manager::set_user(get_admin());
+            $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+            $quiz->coursemodule = get_coursemodule_from_instance('quiz', $quizid)->id;
+            $quiz->presencial_enabled = $state === 'disabled' ? 0 : 1;
+            $now = \core\di::get(\core\clock::class)->time();
+            if ($state === 'future') {
+                $quiz->presencial_timeopen = $now + HOURSECS;
+                $quiz->presencial_timeclose = $now + 2 * HOURSECS;
+            } else if ($state === 'ended') {
+                $quiz->presencial_timeopen = $now - HOURSECS;
+                $quiz->presencial_timeclose = $now - 1;
+            } else if (!in_array($state, ['disabled', 'enabled'], true)) {
+                throw new coding_exception('Unknown release configuration state: ' . $state);
+            }
+            \quizaccess_presencial::save_settings($quiz);
+        } finally {
+            \core\session\manager::set_user($previoususer);
+        }
+    }
 }

@@ -68,11 +68,17 @@ final class release_request_service {
 
         // This existing row serializes requests for the quiz on both supported DBs.
         $configuration = $DB->get_record_sql(
-            'SELECT id, enabled FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
+            'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
             ['quizid' => $quizid],
         );
+        $now = $this->clock->time();
         if (!$configuration || empty($configuration->enabled)) {
             throw new \moodle_exception('ruleisdisabled', 'quizaccess_presencial');
+        }
+
+        if ((int) $configuration->timeclose <= $now) {
+            $tx->allow_commit();
+            throw new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
         }
 
         if (
@@ -130,7 +136,7 @@ final class release_request_service {
             'state' => release_request::STATE_PENDING,
             'active' => 1,
             'timecreated' => $now,
-            'expiresat' => $now + $validity * MINSECS,
+            'expiresat' => min($now + $validity * MINSECS, (int) $configuration->timeclose),
             'timemodified' => $now,
         ]);
         $createdid = (int) $id;
@@ -155,7 +161,7 @@ final class release_request_service {
             throw new \moodle_exception('requestnotfound', 'quizaccess_presencial');
         }
         $now = $this->clock->time();
-        if (in_array($request->state, release_request::expirable_states(), true) && $request->expiresat <= $now) {
+        if (in_array($request->state, release_request::active_states(), true)) {
             $this->expire_one($requestid, $now);
         }
         return $this->get($requestid);
@@ -267,6 +273,9 @@ final class release_request_service {
                 !$configuration || empty($configuration->enabled) ||
                     (int) $configuration->timeopen > $now || (int) $configuration->timeclose <= $now
             ) {
+                if (!$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now) {
+                    $this->expire_for_quiz($existing->quizid);
+                }
                 return new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
             }
             if (
@@ -294,7 +303,7 @@ final class release_request_service {
             }
             if ($state === release_request::STATE_AUTHORIZED) {
                 $validity = (int) get_config('quizaccess_presencial', 'authorisationvalidity');
-                $record->expiresat = $now + ($validity > 0 ? $validity : 5) * MINSECS;
+                $record->expiresat = min($now + ($validity > 0 ? $validity : 5) * MINSECS, (int) $configuration->timeclose);
             }
             $record->rejectionreason = $reason;
             $this->transition($record, $state, $now);
@@ -379,7 +388,7 @@ final class release_request_service {
             ) {
                 return null;
             }
-            if ((int) $record->expiresat <= $now) {
+            if ((int) $record->expiresat <= $now || (int) $configuration->timeclose <= $now) {
                 $this->transition($record, release_request::STATE_EXPIRED, $now);
                 $this->trigger_expired($request->id);
                 return null;
@@ -421,67 +430,74 @@ final class release_request_service {
      */
     public function begin_authorized_attempt(int $quizid, int $userid, int $attemptnumber): bool {
         global $DB;
-        $now = $this->clock->time();
-        $requestid = $DB->get_field('quizaccess_presencial_req', 'id', [
-            'quizid' => $quizid,
-            'userid' => $userid,
-            'attemptnumber' => $attemptnumber,
-            'active' => 1,
-            'state' => release_request::STATE_AUTHORIZED,
-        ]);
-        if (!$requestid || !attempt_start_guard::acquire((int) $requestid)) {
-            return false;
-        }
-        $tx = null;
-        try {
-            $tx = $DB->start_delegated_transaction();
-            $record = $DB->get_record_sql(
-                'SELECT * FROM {quizaccess_presencial_req}
-                  WHERE quizid = :quizid AND userid = :userid AND attemptnumber = :attemptnumber
-                    AND active = 1 AND state = :state FOR UPDATE',
-                [
-                    'quizid' => $quizid,
-                    'userid' => $userid,
-                    'attemptnumber' => $attemptnumber,
-                    'state' => release_request::STATE_AUTHORIZED,
-                ],
-            );
-            if (!$record) {
-                $tx->allow_commit();
-                attempt_start_guard::release((int) $requestid);
+        return quiz_lock::execute($quizid, function () use ($quizid, $userid, $attemptnumber, $DB): bool {
+            $now = $this->clock->time();
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid]);
+            if (!$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now) {
+                $this->expire_for_quiz($quizid);
                 return false;
             }
-            if (
-                $DB->record_exists('quiz_attempts', [
-                    'quiz' => $quizid,
-                    'userid' => $userid,
-                    'attempt' => $attemptnumber,
-                    'preview' => 0,
-                ])
-            ) {
-                $tx->allow_commit();
-                attempt_start_guard::release((int) $requestid);
+            $requestid = $DB->get_field('quizaccess_presencial_req', 'id', [
+                'quizid' => $quizid,
+                'userid' => $userid,
+                'attemptnumber' => $attemptnumber,
+                'active' => 1,
+                'state' => release_request::STATE_AUTHORIZED,
+            ]);
+            if (!$requestid || !attempt_start_guard::acquire((int) $requestid)) {
                 return false;
             }
-            if ((int) $record->expiresat <= $now) {
-                $this->transition($record, release_request::STATE_EXPIRED, $now);
-                $this->trigger_expired((int) $record->id);
+            $tx = null;
+            try {
+                $tx = $DB->start_delegated_transaction();
+                $record = $DB->get_record_sql(
+                    'SELECT * FROM {quizaccess_presencial_req}
+                      WHERE quizid = :quizid AND userid = :userid AND attemptnumber = :attemptnumber
+                        AND active = 1 AND state = :state FOR UPDATE',
+                    [
+                        'quizid' => $quizid,
+                        'userid' => $userid,
+                        'attemptnumber' => $attemptnumber,
+                        'state' => release_request::STATE_AUTHORIZED,
+                    ],
+                );
+                if (!$record) {
+                    $tx->allow_commit();
+                    attempt_start_guard::release((int) $requestid);
+                    return false;
+                }
+                if (
+                    $DB->record_exists('quiz_attempts', [
+                        'quiz' => $quizid,
+                        'userid' => $userid,
+                        'attempt' => $attemptnumber,
+                        'preview' => 0,
+                    ])
+                ) {
+                    $tx->allow_commit();
+                    attempt_start_guard::release((int) $requestid);
+                    return false;
+                }
+                if ((int) $record->expiresat <= $now) {
+                    $this->transition($record, release_request::STATE_EXPIRED, $now);
+                    $this->trigger_expired((int) $record->id);
+                    $tx->allow_commit();
+                    attempt_start_guard::release((int) $requestid);
+                    return false;
+                }
+                $record->state = release_request::STATE_STARTING;
+                $record->expiresat = $now + 2 * MINSECS;
+                $record->timemodified = $now;
+                $DB->update_record('quizaccess_presencial_req', $record);
+                $this->trigger_attempt_starting((int) $record->id);
                 $tx->allow_commit();
+                // The lock remains held until attempt_started consumes the authorization.
+                return true;
+            } catch (\Throwable $exception) {
                 attempt_start_guard::release((int) $requestid);
-                return false;
+                throw $exception;
             }
-            $record->state = release_request::STATE_STARTING;
-            $record->expiresat = $now + 2 * MINSECS;
-            $record->timemodified = $now;
-            $DB->update_record('quizaccess_presencial_req', $record);
-            $this->trigger_attempt_starting((int) $record->id);
-            $tx->allow_commit();
-            // The lock remains held until attempt_started consumes the authorization.
-            return true;
-        } catch (\Throwable $exception) {
-            attempt_start_guard::release((int) $requestid);
-            throw $exception;
-        }
+        });
     }
 
     /**
@@ -498,11 +514,16 @@ final class release_request_service {
             SQL_PARAMS_NAMED,
             'state',
         );
-        $ids = $DB->get_fieldset_select(
-            'quizaccess_presencial_req',
-            'id',
-            "active = 1 AND state {$statesql} AND expiresat <= :now",
-            array_merge($stateparams, ['now' => $now]),
+        $ids = $DB->get_fieldset_sql(
+            "SELECT r.id FROM {quizaccess_presencial_req} r
+              JOIN {quizaccess_presencial} p ON p.quizid = r.quizid
+             WHERE r.active = 1 AND (
+                 (r.state {$statesql} AND r.expiresat <= :now)
+                 OR (r.state <> :starting AND (p.enabled = 0 OR p.timeclose <= :periodend))
+             )",
+            array_merge($stateparams, [
+                'now' => $now, 'starting' => release_request::STATE_STARTING, 'periodend' => $now,
+            ]),
         );
         $expired = 0;
         foreach ($ids as $id) {
@@ -562,11 +583,10 @@ final class release_request_service {
             'active' => 1,
             'state' => release_request::STATE_AUTHORIZED,
         ]);
-        if ($record && (int) $record->expiresat <= $this->clock->time()) {
-            $this->expire_one((int) $record->id, $this->clock->time());
+        if (!$record) {
             return false;
         }
-        return (bool) $record;
+        return $this->read_status((int) $record->id, $userid)->state === release_request::STATE_AUTHORIZED;
     }
 
     /**
@@ -636,7 +656,14 @@ final class release_request_service {
                 'SELECT * FROM {quizaccess_presencial_req} WHERE id = :id FOR UPDATE',
                 ['id' => $requestid],
             );
-            // Disablement finalizes current rejections too, but deadlines never expire a rejection.
+            $configuration = $record
+                ? $DB->get_record('quizaccess_presencial', ['quizid' => $record->quizid]) : false;
+            $force = $force || !$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now;
+            if ($record && $record->state === release_request::STATE_STARTING) {
+                // An abandoned claim still expires by its own lease, even after disablement.
+                $force = false;
+            }
+            // Ending the rule or period finalizes current rejections too.
             $states = $force
                 ? [release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED]
                 : release_request::expirable_states();

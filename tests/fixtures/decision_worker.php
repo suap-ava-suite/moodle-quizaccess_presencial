@@ -70,8 +70,8 @@ if (!empty($params['clockfile'])) {
         }
     };
 }
+\core\di::set(\core\clock::class, $clock);
 if (!empty($params['preloadcmid'])) {
-    \core\di::set(\core\clock::class, $clock);
     // Reproduce the panel's authorization check earlier in the same request.
     \quizaccess_presencial\local\applications::get_application($params['preloadcmid']);
 }
@@ -84,7 +84,12 @@ $sink = !empty($params['reportevents']) ? \phpunit_util::start_event_redirection
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
 try {
-    if (in_array($params['operation'], ['authorize', 'reject'], true)) {
+    if ($params['operation'] === 'active') {
+        $result = ['active' => \quizaccess_presencial\local\delegation_manager::is_active_applicator(
+            $params['quizid'],
+            $params['actorid'],
+        )];
+    } else if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
         $request = $operation === 'reject'
             ? $service->reject($params['requestid'], $params['reason'] ?? '')

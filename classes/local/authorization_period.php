@@ -25,6 +25,19 @@ namespace quizaccess_presencial\local;
  */
 final class authorization_period {
     /**
+     * Distinguish a new period from a correction to an ongoing period's start.
+     *
+     * @param \stdClass $previous Previous configuration.
+     * @param \stdClass $current Proposed configuration.
+     * @param int $now Current timestamp.
+     * @return bool Whether the transition must start with a new application team.
+     */
+    public static function starts_new_period(\stdClass $previous, \stdClass $current, int $now): bool {
+        return (int) $previous->timeopen !== (int) $current->timeopen &&
+            ((int) $current->timeopen > $now || (int) $previous->timeclose <= $now);
+    }
+
+    /**
      * Validate a proposed authorization period against quiz availability.
      *
      * @param bool $enabled Whether the rule is enabled.

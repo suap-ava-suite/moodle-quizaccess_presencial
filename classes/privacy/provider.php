@@ -64,6 +64,7 @@ class provider implements
                 'timecreated' => 'privacy:metadata:delegation:timecreated',
                 'timemodified' => 'privacy:metadata:delegation:timemodified',
                 'timerevoked' => 'privacy:metadata:delegation:timerevoked',
+                'timeexpired' => 'privacy:metadata:delegation:timeexpired',
                 'revokedby' => 'privacy:metadata:delegation:revokedby',
             ],
             'privacy:metadata:delegation',
@@ -207,6 +208,7 @@ class provider implements
                         'timecreated' => transform::datetime($record->timecreated),
                         'timemodified' => transform::datetime($record->timemodified),
                         'timerevoked' => $record->timerevoked ? transform::datetime($record->timerevoked) : null,
+                        'timeexpired' => $record->timeexpired ? transform::datetime($record->timeexpired) : null,
                         'revokedby' => $record->revokedby,
                     ],
                 );

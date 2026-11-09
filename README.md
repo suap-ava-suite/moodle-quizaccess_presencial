@@ -40,6 +40,8 @@ No menu **Mais** do Questionário, o Professor com `mod/quiz:manage` no contexto
 
 O item **Minhas Aplicações** aparece no menu do usuário somente para Contas elegíveis com Delegação atual ou futura. A página lista disciplina, Questionário, Período de Autorização, estado da Delegação, quantidade pendente e a ação **Abrir aplicação**, com paginação de 20 itens no servidor. O Aplicador pode abrir essa página e o **Painel do Aplicador** sem matrícula, mantendo bloqueado o acesso acadêmico à disciplina e ao Questionário. O Professor acessa o mesmo painel pelo menu do Questionário, sem precisar receber uma Delegação.
 
+Desabilitar a regra suspende as Delegações ainda válidas e encerra definitivamente as Solicitações pendentes e as Autorizações não reclamadas. Reabilitar a mesma configuração recupera somente Delegações que não tenham expirado nem sido revogadas; o convite anterior permanece inválido. Reduzir o fim do Período de Autorização limita a vigência das Delegações existentes, sem interrompê-las antes desse novo fim. Uma ampliação posterior não estende essa vigência. Configurar um novo período com início futuro encerra a equipe, as Solicitações vigentes e o convite anteriores; o Professor precisa conceder novas Delegações e gerar outro convite. Correções ao início de um período já em andamento preservam a equipe e as Solicitações vigentes. A validação sob demanda e as tarefas agendadas registram cada expiração uma única vez no log do Moodle. Tentativas já criadas continuam retomáveis.
+
 Cada requisição verifica novamente a conta, a configuração, o período e a autoridade no Questionário. Revogação, expiração, suspensão da conta ou desabilitação da regra interrompe o acesso. Remover a suspensão recupera a mesma Delegação somente enquanto ela e o período continuam válidos; não há histórico pessoal de aplicações. Aplicações futuras mostram apenas informações de preparação, sem ações operacionais antes do início do período.
 
 Ao carregar ou atualizar **Minhas Aplicações**, a coluna de solicitações pendentes mostra a contagem real por Questionário. Somente solicitações ainda pendentes e dentro do prazo entram na soma, mesmo que a tarefa de expiração não tenha sido executada; zero significa que não há pendências válidas. O Painel do Aplicador mostra a Fila operacional daquele Questionário, com atualização manual e paginação de 20 solicitações no servidor. Pendências aparecem da mais antiga para a mais recente, seguidas das decisões ainda revisáveis da mais recente para a mais antiga. A identidade operacional contém nome completo, foto e somente os campos de identidade configurados e visíveis ao operador segundo as políticas do Moodle, sem link para o perfil.
@@ -109,7 +111,57 @@ docker compose down
 ```
 
 Os dados ficam nos volumes Docker `database` e `moodledata` deste projeto Compose.
-Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
+O volume `testdata` guarda os dados exclusivos de PHPUnit e Behat e os diagnósticos de falhas do Behat.
+
+### Execução manual de PHPUnit e Behat no Docker
+
+Para construir a imagem, iniciar os serviços, aplicar as atualizações atuais do plugin e
+inicializar os dois ambientes de teste, execute na raiz deste repositório:
+
+```bash
+sh docker/bootstrap.sh
+```
+
+O bootstrap pode ser executado novamente depois de mudanças no plugin. Ele atualiza o
+site local e reinicializa os ambientes de testes conforme necessário. A primeira execução
+baixa as dependências Composer e a imagem do Chrome/Selenium e pode demorar alguns minutos.
+O código atual do plugin, incluindo arquivos ainda sem commit, é usado diretamente pela
+montagem do repositório. Para apenas atualizar o site após alterações de versão ou esquema,
+execute `docker compose restart moodle`.
+
+Execute as suítes manualmente:
+
+```bash
+docker compose exec moodle moodle-tests phpunit
+docker compose exec moodle moodle-tests behat
+```
+
+É possível repassar argumentos aos executores, por exemplo:
+
+```bash
+docker compose exec moodle moodle-tests phpunit --filter configuration_lifecycle_test
+docker compose exec moodle moodle-tests behat --name='Nome do cenário'
+```
+
+PHPUnit usa o prefixo `phpu_` e Behat usa `bht_`, com diretórios de dados separados
+entre si e do site local (`mdl_`). Ambos usam o PostgreSQL do Compose. O Behat acessa
+`http://moodle` pela rede Docker, com o perfil `chrome`, conforme a
+[configuração recomendada pelo Moodle](https://moodledev.io/general/development/tools/behat/running).
+Não execute duas instâncias da mesma suíte simultaneamente.
+
+Para acompanhar o navegador do Behat, abra <http://localhost:7905> e conecte-se pelo
+noVNC. Essa porta pode ser alterada com `SELENIUM_VNC_PORT`. Os diagnósticos de falha
+ficam em `/var/www/testdata/behat_faildump` no contêiner. Para copiá-los:
+
+```bash
+docker compose cp moodle:/var/www/testdata/behat_faildump /tmp/presencial-behat-faildump
+```
+
+Para reinicializar apenas os testes, com os serviços já disponíveis:
+
+```bash
+docker compose exec moodle moodle-tests init
+```
 
 ### Testes automatizados
 

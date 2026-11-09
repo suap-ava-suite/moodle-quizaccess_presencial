@@ -19,6 +19,7 @@ use mod_quiz\form\preflight_check_form;
 use mod_quiz\quiz_settings;
 use quizaccess_presencial\event\configuration_updated;
 use quizaccess_presencial\local\authorization_period;
+use quizaccess_presencial\local\delegation_manager;
 use quizaccess_presencial\local\invitation;
 use quizaccess_presencial\local\quiz_lock;
 use quizaccess_presencial\local\release_request_service;
@@ -278,11 +279,19 @@ class quizaccess_presencial extends access_rule_base {
 
         $existing = $DB->get_record('quizaccess_presencial', ['quizid' => $quiz->id]) ?: null;
         $previousend = (int) ($existing->timeclose ?? 0);
+        delegation_manager::synchronize_configuration((int) $quiz->id);
+        if (
+            $existing && (!$existing->enabled || (int) $existing->timeclose <=
+                \core\di::get(\core\clock::class)->time())
+        ) {
+            (new release_request_service())->expire_for_quiz((int) $quiz->id);
+        }
         if (empty($quiz->presencial_enabled)) {
             if (!$existing) {
                 return;
             }
 
+            $previousconfiguration = clone $existing;
             $previous = self::configuration_state($existing);
             $existing->enabled = 0;
             $existing->timeopen = isset($quiz->presencial_timeopen)
@@ -296,9 +305,10 @@ class quizaccess_presencial extends access_rule_base {
                 return;
             }
 
-            $existing->timemodified = time();
+            $existing->timemodified = \core\di::get(\core\clock::class)->time();
             $DB->update_record('quizaccess_presencial', $existing);
             invitation::synchronize_configuration($quiz->coursemodule, $previousend);
+            delegation_manager::synchronize_configuration((int) $quiz->id, $previousconfiguration);
             self::trigger_configuration_event(
                 $quiz,
                 $previous['enabled'] ? 'disabled' : 'period_changed',
@@ -311,7 +321,7 @@ class quizaccess_presencial extends access_rule_base {
             return;
         }
 
-        $now = time();
+        $now = \core\di::get(\core\clock::class)->time();
         $start = (int) ($quiz->presencial_timeopen ?? 0);
         $end = (int) ($quiz->presencial_timeclose ?? 0);
         if (!$existing) {
@@ -343,8 +353,16 @@ class quizaccess_presencial extends access_rule_base {
             $DB->insert_record('quizaccess_presencial', $record);
             $action = 'enabled';
         }
+        if ($existing && authorization_period::starts_new_period($existing, $record, $now)) {
+            (new release_request_service())->expire_for_quiz((int) $quiz->id);
+        }
         self::trigger_configuration_event($quiz, $action, $previous, $current);
         invitation::synchronize_configuration($quiz->coursemodule, $previousend);
+        delegation_manager::synchronize_configuration((int) $quiz->id, $existing);
+        if ($existing && authorization_period::starts_new_period($existing, $record, $now)) {
+            $status = invitation::get_status($quiz->coursemodule);
+            invitation::disable($quiz->coursemodule, $status['generation']);
+        }
     }
 
     /**

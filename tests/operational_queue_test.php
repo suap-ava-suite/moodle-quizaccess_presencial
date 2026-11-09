@@ -650,7 +650,8 @@ final class operational_queue_test extends \advanced_testcase {
             $result = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
             $this->assertSame($expected, $result);
             $this->assertSame('', stream_get_contents($pipes[2]));
-            $this->assertSame(isset($expected['state']) ? 'expired' : 'pending', $service->get($request->id)->state);
+            $expired = isset($expected['state']) || ($expected['error'] ?? '') === 'authorizationperiodinactive';
+            $this->assertSame($expired ? 'expired' : 'pending', $service->get($request->id)->state);
         } finally {
             if ($transaction) {
                 try {

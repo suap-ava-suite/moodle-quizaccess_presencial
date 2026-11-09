@@ -55,20 +55,21 @@ final class delegation_manager {
     ): array {
         global $DB;
 
-        $now ??= time();
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
 
-        return quiz_lock::execute($quizid, function () use ($quizid, $userids, $actorid, $origin, $now, $DB): array {
+        $result = quiz_lock::execute($quizid, function () use ($quizid, $userids, $actorid, $origin, $now, $DB) {
+            $now ??= \core\di::get(\core\clock::class)->time();
+            self::synchronize_configuration($quizid, null, $now);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
             if (!$configuration->enabled || $configuration->timeclose <= $now) {
-                throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
+                return new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
             }
 
             $userids = array_values(array_unique(array_filter(array_map('intval', $userids))));
             foreach ($userids as $userid) {
                 if (!self::is_eligible_user($userid)) {
-                    throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
+                    return new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
                 }
             }
 
@@ -80,6 +81,10 @@ final class delegation_manager {
             }
             return $result;
         });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
+        }
+        return $result;
     }
 
     /**
@@ -97,18 +102,23 @@ final class delegation_manager {
     public static function accept_invitation(int $quizid, int $userid, ?int $now = null): array {
         global $DB;
 
-        $now ??= time();
-        return quiz_lock::execute($quizid, function () use ($quizid, $userid, $now, $DB): array {
+        $result = quiz_lock::execute($quizid, function () use ($quizid, $userid, $now, $DB) {
+            $now ??= \core\di::get(\core\clock::class)->time();
             if (!self::is_eligible_user($userid)) {
-                throw new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
+                return new \moodle_exception('ineligibleuser', 'quizaccess_presencial');
             }
+            self::synchronize_configuration($quizid, null, $now);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
             if (!$configuration->enabled || $configuration->timeclose <= $now) {
-                throw new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
+                return new \moodle_exception('delegationperiodclosed', 'quizaccess_presencial');
             }
 
             return self::create_or_find($quizid, $userid, $userid, 'invite', $configuration, $now);
         });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
+        }
+        return $result;
     }
 
     /**
@@ -123,16 +133,16 @@ final class delegation_manager {
     public static function revoke(int $quizid, int $delegationid, int $actorid, ?int $now = null): bool {
         global $DB;
 
-        $now ??= time();
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
-        return quiz_lock::execute($quizid, function () use ($quizid, $delegationid, $actorid, $now, $DB): bool {
+        $result = quiz_lock::execute($quizid, function () use ($quizid, $delegationid, $actorid, $now, $DB) {
+            $now ??= \core\di::get(\core\clock::class)->time();
             $delegation = $DB->get_record('quizaccess_presencial_delegation', [
                 'id' => $delegationid,
                 'quizid' => $quizid,
             ]);
             if (!$delegation) {
-                throw new \moodle_exception('delegationnotfound', 'quizaccess_presencial');
+                return new \moodle_exception('delegationnotfound', 'quizaccess_presencial');
             }
             if ($delegation->timerevoked) {
                 return false;
@@ -145,6 +155,10 @@ final class delegation_manager {
             self::trigger_event($delegation, $actorid, 'revoked', $delegation->origin);
             return true;
         });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
+        }
+        return $result;
     }
 
     /**
@@ -157,21 +171,21 @@ final class delegation_manager {
     public static function list_current(int $quizid, ?int $now = null): array {
         global $DB;
 
-        $now ??= time();
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context);
+        self::synchronize_configuration($quizid, null, $now);
+        $now ??= \core\di::get(\core\clock::class)->time();
         $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid]);
         if (!$configuration || !$configuration->enabled) {
             return [];
         }
         return $DB->get_records_select(
             'quizaccess_presencial_delegation',
-            'quizid = :quizid AND timerevoked = 0 AND timeclose > :now AND timeopen = :timeopen AND timeclose = :timeclose',
+            'quizid = :quizid AND timerevoked = 0 AND timeexpired = 0 AND timeclose > :now AND timeopen = :timeopen',
             [
                 'quizid' => $quizid,
                 'now' => $now,
                 'timeopen' => $configuration->timeopen,
-                'timeclose' => $configuration->timeclose,
             ],
             'timecreated ASC',
         );
@@ -188,28 +202,101 @@ final class delegation_manager {
     public static function is_active_applicator(int $quizid, int $userid, ?int $now = null): bool {
         global $DB;
 
-        $now ??= time();
         if (!self::is_eligible_user($userid)) {
             return false;
         }
+        self::synchronize_configuration($quizid, null, $now);
+        $now ??= \core\di::get(\core\clock::class)->time();
         $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid]);
         if (!$configuration || !$configuration->enabled || $now < $configuration->timeopen || $now >= $configuration->timeclose) {
             return false;
         }
         return $DB->record_exists_select(
             'quizaccess_presencial_delegation',
-            'quizid = :quizid AND userid = :userid AND timerevoked = 0
-                AND timeopen = :timeopen AND timeclose = :timeclose
+            'quizid = :quizid AND userid = :userid AND timerevoked = 0 AND timeexpired = 0
+                AND timeopen = :timeopen
                 AND timeopen <= :nowopen AND timeclose > :nowclose',
             [
                 'quizid' => $quizid,
                 'userid' => $userid,
                 'timeopen' => $configuration->timeopen,
-                'timeclose' => $configuration->timeclose,
                 'nowopen' => $now,
                 'nowclose' => $now,
             ],
         );
+    }
+
+    /**
+     * Materialize irreversible delegation transitions under the quiz lock.
+     *
+     * Shortening a period never extends a delegation's original deadline. A new future
+     * start retires its team; corrections to an ongoing start preserve current delegations.
+     * Disablement alone suspends valid delegations without ending them.
+     *
+     * @param int $quizid Quiz id.
+     * @param \stdClass|null $previous Previous configuration when saving settings.
+     * @param int|null $now Current timestamp.
+     */
+    public static function synchronize_configuration(int $quizid, ?\stdClass $previous = null, ?int $now = null): void {
+        global $DB, $USER;
+
+        quiz_lock::execute($quizid, function () use ($quizid, $previous, $now, $DB, $USER): void {
+            $now ??= \core\di::get(\core\clock::class)->time();
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid]);
+            if (!$configuration) {
+                return;
+            }
+            $delegations = $DB->get_records('quizaccess_presencial_delegation', [
+                'quizid' => $quizid, 'timerevoked' => 0, 'timeexpired' => 0,
+            ]);
+            $newperiod = $previous && authorization_period::starts_new_period($previous, $configuration, $now);
+            foreach ($delegations as $delegation) {
+                $end = min((int) $delegation->timeclose, (int) $configuration->timeclose);
+                $action = null;
+                $startchanged = (int) $delegation->timeopen !== (int) $configuration->timeopen;
+                $retired = $startchanged && (!$previous || $newperiod ||
+                    (int) $delegation->timeopen !== (int) $previous->timeopen);
+                if ($end <= $now || $retired) {
+                    $delegation->timeexpired = $now;
+                    $action = 'expired';
+                } else if ($end < (int) $delegation->timeclose) {
+                    $action = 'shortened';
+                } else if ($startchanged) {
+                    $action = 'period_changed';
+                } else if ($previous && (bool) $previous->enabled !== (bool) $configuration->enabled) {
+                    $action = $configuration->enabled ? 'resumed' : 'suspended';
+                }
+                if ($action !== null) {
+                    if (!$delegation->timeexpired) {
+                        $delegation->timeopen = $configuration->timeopen;
+                    }
+                    $delegation->timeclose = $end;
+                    $delegation->timemodified = $now;
+                    $DB->update_record('quizaccess_presencial_delegation', $delegation);
+                    self::trigger_event($delegation, (int) $USER->id, $action, $delegation->origin);
+                }
+            }
+        });
+    }
+
+    /**
+     * Expire due delegations through the same transition used by access validation.
+     */
+    public static function expire_due(): void {
+        global $DB;
+
+        $now = \core\di::get(\core\clock::class)->time();
+        $quizids = $DB->get_fieldset_sql(
+            'SELECT DISTINCT d.quizid
+               FROM {quizaccess_presencial_delegation} d
+               JOIN {quizaccess_presencial} p ON p.quizid = d.quizid
+              WHERE d.timerevoked = 0 AND d.timeexpired = 0
+                    AND (d.timeclose <= :now OR p.timeclose <= :periodend OR d.timeopen <> p.timeopen)',
+            ['now' => $now, 'periodend' => $now],
+        );
+        foreach ($quizids as $quizid) {
+            self::synchronize_configuration((int) $quizid);
+        }
     }
 
     /**
@@ -256,14 +343,13 @@ final class delegation_manager {
 
         $current = $DB->get_record_select(
             'quizaccess_presencial_delegation',
-            'quizid = :quizid AND userid = :userid AND timerevoked = 0 AND timeclose > :now
-                AND timeopen = :timeopen AND timeclose = :timeclose',
+            'quizid = :quizid AND userid = :userid AND timerevoked = 0 AND timeexpired = 0 AND timeclose > :now
+                AND timeopen = :timeopen',
             [
                 'quizid' => $quizid,
                 'userid' => $userid,
                 'now' => $now,
                 'timeopen' => $configuration->timeopen,
-                'timeclose' => $configuration->timeclose,
             ],
             '*',
         );
@@ -281,6 +367,7 @@ final class delegation_manager {
             'timemodified' => $now,
             'timerevoked' => 0,
             'revokedby' => 0,
+            'timeexpired' => 0,
         ];
         $delegation->id = $DB->insert_record('quizaccess_presencial_delegation', $delegation);
         self::trigger_event($delegation, $actorid, 'created', $origin);

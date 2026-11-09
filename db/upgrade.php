@@ -134,5 +134,13 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026101600, 'quizaccess', 'presencial');
     }
+    if ($oldversion < 2026110500) {
+        $table = new xmldb_table('quizaccess_presencial_delegation');
+        $field = new xmldb_field('timeexpired', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'revokedby');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2026110500, 'quizaccess', 'presencial');
+    }
     return true;
 }
