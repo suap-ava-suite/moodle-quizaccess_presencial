@@ -283,6 +283,99 @@ final class configuration_lifecycle_test extends \advanced_testcase {
     }
 
     /**
+     * Refusing a new request after the period ends immediately audits all unused releases once.
+     */
+    public function test_ended_period_refusal_materializes_request_expiration(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+        $quiz->presencial_timeclose = 1_800_000_120;
+        \quizaccess_presencial::save_settings($quiz);
+        $pendingstudent = self::getDataGenerator()->create_user();
+        $authorizedstudent = self::getDataGenerator()->create_user();
+        $newstudent = self::getDataGenerator()->create_user();
+        $service = new release_request_service();
+        $pending = $service->ensure_pending($quiz->id, $pendingstudent->id, 1);
+        $authorized = $service->ensure_pending($quiz->id, $authorizedstudent->id, 1);
+        $service->authorize($authorized->id);
+        $this->assertSame(release_request::STATE_PENDING, $service->get($pending->id)->state);
+        $this->assertSame(release_request::STATE_AUTHORIZED, $service->get($authorized->id)->state);
+        $this->assertEquals(0, $quiz->timeclose);
+        $sink = $this->redirectEvents();
+
+        $clock->bump(120);
+        $this->assert_refused(fn() => $service->ensure_pending($quiz->id, $newstudent->id, 1), 'authorizationperiodinactive');
+        // Read persisted state before any query that could itself materialize expiration.
+        foreach ([$pending, $authorized] as $request) {
+            $this->assertSame(release_request::STATE_EXPIRED, $service->get($request->id)->state);
+            $this->assertCount(1, array_filter($sink->get_events(), fn($event) =>
+                $event instanceof \quizaccess_presencial\event\request_expired && $event->objectid == $request->id));
+        }
+
+        $task = new \quizaccess_presencial\task\expire_requests();
+        foreach ([$pending, $authorized] as $request) {
+            $this->assertSame(release_request::STATE_EXPIRED, $service->read_status($request->id, $request->userid)->state);
+            $this->assert_refused(fn() => $service->ensure_pending($quiz->id, $request->userid, 1), 'authorizationperiodinactive');
+        }
+        $task->execute();
+        $task->execute();
+        $quiz->presencial_timeclose = 1_800_003_600;
+        \quizaccess_presencial::save_settings($quiz);
+        foreach ([$pending, $authorized] as $request) {
+            $this->assertSame(release_request::STATE_EXPIRED, $service->get($request->id)->state);
+            $this->assertNotSame($request->id, $service->ensure_pending($quiz->id, $request->userid, 1)->id);
+        }
+        $this->assertCount(2, array_filter($sink->get_events(), fn($event) =>
+            $event instanceof \quizaccess_presencial\event\request_expired));
+    }
+
+    /**
+     * Period-end refusal protects claimed authorizations and keeps created attempts resumable.
+     */
+    public function test_ended_period_refusal_preserves_attempt_creation_and_resumption(): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(1_800_000_000);
+        $this->setAdminUser();
+        $quiz = $this->create_quiz();
+        $quiz->presencial_timeclose = 1_800_000_120;
+        \quizaccess_presencial::save_settings($quiz);
+        $student = self::getDataGenerator()->create_user();
+        $claimant = self::getDataGenerator()->create_user();
+        foreach ([$student, $claimant] as $user) {
+            self::getDataGenerator()->enrol_user($user->id, $quiz->course, 'student');
+        }
+        $service = new release_request_service();
+        $created = $service->ensure_pending($quiz->id, $student->id, 1);
+        $service->authorize($created->id);
+        $this->setUser($student);
+        $attempt = $service->start_authorized_attempt($created->id);
+        $this->assertNotNull($attempt);
+        $this->setAdminUser();
+        $claimed = $service->ensure_pending($quiz->id, $claimant->id, 1);
+        $service->authorize($claimed->id);
+        $this->assertTrue($service->begin_authorized_attempt($quiz->id, $claimant->id, 1));
+        $sink = $this->redirectEvents();
+
+        $clock->bump(181);
+        $this->assert_refused(fn() => $service->ensure_pending($quiz->id, $student->id, 2), 'authorizationperiodinactive');
+        (new \quizaccess_presencial\task\expire_requests())->execute();
+        $this->assertSame(release_request::STATE_STARTING, $service->read_status($claimed->id, $claimant->id)->state);
+        $this->setUser($claimant);
+        $claimedattempt = self::getDataGenerator()->get_plugin_generator('mod_quiz')->create_attempt($quiz->id, $claimant->id);
+        $service->consume_for_attempt($claimedattempt->id);
+        $this->assertSame(release_request::STATE_CONSUMED, $service->get($claimed->id)->state);
+        $this->setUser($student);
+        $quizobj = \mod_quiz\quiz_settings::create($quiz->id, $student->id);
+        $rule = new \quizaccess_presencial($quizobj, $clock->time());
+        $this->assertFalse($rule->is_preflight_check_required($attempt->id));
+        $this->assertEquals($attempt->id, $service->start_authorized_attempt($created->id)->id);
+        $this->assertSame(release_request::STATE_CONSUMED, $service->get($created->id)->state);
+        $this->assertEmpty(array_filter($sink->get_events(), fn($event) =>
+            $event instanceof \quizaccess_presencial\event\request_expired));
+    }
+
+    /**
      * Changing rule settings or period never adds a release gate to an existing attempt.
      */
     public function test_created_attempt_remains_resumable_after_all_configuration_transitions(): void {

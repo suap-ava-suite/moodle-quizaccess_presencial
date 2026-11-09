@@ -66,17 +66,19 @@ final class release_request_service {
         $expiredid = null;
         $tx = $DB->start_delegated_transaction();
 
-        // This existing row serializes requests for the quiz on both supported DBs.
-        $configuration = $DB->get_record_sql(
+        // Lock the quiz before its configuration, matching configuration changes and expiration.
+        // The outer transaction retains both locks until all request transitions commit.
+        $configuration = quiz_lock::execute($quizid, fn() => $DB->get_record_sql(
             'SELECT * FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
             ['quizid' => $quizid],
-        );
+        ));
         $now = $this->clock->time();
         if (!$configuration || empty($configuration->enabled)) {
             throw new \moodle_exception('ruleisdisabled', 'quizaccess_presencial');
         }
 
         if ((int) $configuration->timeclose <= $now) {
+            $this->expire_for_quiz($quizid);
             $tx->allow_commit();
             throw new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
         }
