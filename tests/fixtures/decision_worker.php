@@ -89,6 +89,11 @@ try {
             $params['quizid'],
             $params['actorid'],
         )];
+    } else if ($params['operation'] === 'authorizeqr') {
+        $result = ['state' => \quizaccess_presencial\local\qr_authorization::authorize(
+            $params['requestid'],
+            $params['token'],
+        )->state];
     } else if (in_array($params['operation'], ['authorize', 'reject'], true)) {
         $operation = $params['operation'];
         $request = $operation === 'reject'

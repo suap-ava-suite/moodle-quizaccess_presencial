@@ -270,19 +270,14 @@ final class release_request_service {
             ) {
                 return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
             }
-            if (
-                !$configuration || empty($configuration->enabled) ||
-                    (int) $configuration->timeopen > $now || (int) $configuration->timeclose <= $now
-            ) {
+            if (!authorization_period::is_active($configuration ?: null, $now)) {
                 if (!$configuration || !$configuration->enabled || (int) $configuration->timeclose <= $now) {
                     $this->expire_for_quiz($existing->quizid);
                 }
                 return new \moodle_exception('authorizationperiodinactive', 'quizaccess_presencial');
             }
             if (
-                empty($record->active) || !in_array($record->state, [
-                release_request::STATE_PENDING, release_request::STATE_AUTHORIZED, release_request::STATE_REJECTED,
-                ], true)
+                empty($record->active) || !in_array($record->state, release_request::revisable_states(), true)
             ) {
                 return new \moodle_exception('requestnotrevisable', 'quizaccess_presencial');
             }

@@ -83,6 +83,8 @@ class provider implements
             'attemptnumber' => 'privacy:metadata:request:attemptnumber',
             'state' => 'privacy:metadata:request:state',
             'rejectionreason' => 'privacy:metadata:request:rejectionreason',
+            'qrtokenhash' => 'privacy:metadata:request:qrtokenhash',
+            'qrexpiresat' => 'privacy:metadata:request:qrexpiresat',
             'timecreated' => 'privacy:metadata:request:timecreated',
             'expiresat' => 'privacy:metadata:request:expiresat',
             'timemodified' => 'privacy:metadata:request:timemodified',
@@ -250,6 +252,7 @@ class provider implements
                         'rejectionreason' => (string) ($request->rejectionreason ?? ''),
                         'timecreated' => transform::datetime($request->timecreated),
                         'expiresat' => transform::datetime($request->expiresat),
+                        'qrexpiresat' => empty($request->qrexpiresat) ? null : transform::datetime($request->qrexpiresat),
                         'timemodified' => transform::datetime($request->timemodified),
                     ],
                 );

@@ -134,6 +134,18 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026101600, 'quizaccess', 'presencial');
     }
+    if ($oldversion < 2026110400) {
+        $table = new xmldb_table('quizaccess_presencial_req');
+        $hash = new xmldb_field('qrtokenhash', XMLDB_TYPE_CHAR, '64', null, null, null, null, 'rejectionreason');
+        $expiry = new xmldb_field('qrexpiresat', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'qrtokenhash');
+        if (!$dbman->field_exists($table, $hash)) {
+            $dbman->add_field($table, $hash);
+        }
+        if (!$dbman->field_exists($table, $expiry)) {
+            $dbman->add_field($table, $expiry);
+        }
+        upgrade_plugin_savepoint(true, 2026110400, 'quizaccess', 'presencial');
+    }
     if ($oldversion < 2026110500) {
         $table = new xmldb_table('quizaccess_presencial_delegation');
         $field = new xmldb_field('timeexpired', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'revokedby');
