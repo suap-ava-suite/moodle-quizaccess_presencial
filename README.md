@@ -111,57 +111,7 @@ docker compose down
 ```
 
 Os dados ficam nos volumes Docker `database` e `moodledata` deste projeto Compose.
-O volume `testdata` guarda os dados exclusivos de PHPUnit e Behat e os diagnósticos de falhas do Behat.
-
-### Execução manual de PHPUnit e Behat no Docker
-
-Para construir a imagem, iniciar os serviços, aplicar as atualizações atuais do plugin e
-inicializar os dois ambientes de teste, execute na raiz deste repositório:
-
-```bash
-sh docker/bootstrap.sh
-```
-
-O bootstrap pode ser executado novamente depois de mudanças no plugin. Ele atualiza o
-site local e reinicializa os ambientes de testes conforme necessário. A primeira execução
-baixa as dependências Composer e a imagem do Chrome/Selenium e pode demorar alguns minutos.
-O código atual do plugin, incluindo arquivos ainda sem commit, é usado diretamente pela
-montagem do repositório. Para apenas atualizar o site após alterações de versão ou esquema,
-execute `docker compose restart moodle`.
-
-Execute as suítes manualmente:
-
-```bash
-docker compose exec moodle moodle-tests phpunit
-docker compose exec moodle moodle-tests behat
-```
-
-É possível repassar argumentos aos executores, por exemplo:
-
-```bash
-docker compose exec moodle moodle-tests phpunit --filter configuration_lifecycle_test
-docker compose exec moodle moodle-tests behat --name='Nome do cenário'
-```
-
-PHPUnit usa o prefixo `phpu_` e Behat usa `bht_`, com diretórios de dados separados
-entre si e do site local (`mdl_`). Ambos usam o PostgreSQL do Compose. O Behat acessa
-`http://moodle` pela rede Docker, com o perfil `chrome`, conforme a
-[configuração recomendada pelo Moodle](https://moodledev.io/general/development/tools/behat/running).
-Não execute duas instâncias da mesma suíte simultaneamente.
-
-Para acompanhar o navegador do Behat, abra <http://localhost:7905> e conecte-se pelo
-noVNC. Essa porta pode ser alterada com `SELENIUM_VNC_PORT`. Os diagnósticos de falha
-ficam em `/var/www/testdata/behat_faildump` no contêiner. Para copiá-los:
-
-```bash
-docker compose cp moodle:/var/www/testdata/behat_faildump /tmp/presencial-behat-faildump
-```
-
-Para reinicializar apenas os testes, com os serviços já disponíveis:
-
-```bash
-docker compose exec moodle moodle-tests init
-```
+Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
 
 ### Testes automatizados
 

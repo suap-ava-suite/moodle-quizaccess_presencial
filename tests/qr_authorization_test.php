@@ -222,7 +222,12 @@ final class qr_authorization_test extends \advanced_testcase {
             stream_set_timeout($pipes[2], 30);
             $this->assertSame("READY\n", fgets($pipes[1]));
             $transaction = $DB->start_delegated_transaction();
-            // Pause request creation after its configuration lock, before its request lock.
+            // Match request creation's quiz/configuration order before pausing ahead of its request lock.
+            $DB->get_record_sql(
+                'SELECT id FROM {quiz} WHERE id = :quizid FOR UPDATE',
+                ['quizid' => $request->quizid],
+                MUST_EXIST,
+            );
             $DB->get_record_sql(
                 'SELECT id FROM {quizaccess_presencial} WHERE quizid = :quizid FOR UPDATE',
                 ['quizid' => $request->quizid],
