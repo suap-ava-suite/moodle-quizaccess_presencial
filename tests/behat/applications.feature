@@ -5,7 +5,8 @@ Feature: Find and open standalone applications
   I need My applications in my user menu and a protected standalone panel
 
   Background:
-    Given the following "users" exist:
+    Given the time is no longer frozen
+    And the following "users" exist:
       | username    | firstname | lastname | email                   |
       | teacher1    | Teacher   | One      | teacher1@example.com    |
       | applicator1 | Operator  | One      | applicator1@example.com |

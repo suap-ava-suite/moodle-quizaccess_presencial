@@ -84,7 +84,12 @@ $sink = !empty($params['reportevents']) ? \phpunit_util::start_event_redirection
 fwrite(STDOUT, "ATTEMPTING\n");
 fflush(STDOUT);
 try {
-    if ($params['operation'] === 'authorizeqr') {
+    if ($params['operation'] === 'active') {
+        $result = ['active' => \quizaccess_presencial\local\delegation_manager::is_active_applicator(
+            $params['quizid'],
+            $params['actorid'],
+        )];
+    } else if ($params['operation'] === 'authorizeqr') {
         $result = ['state' => \quizaccess_presencial\local\qr_authorization::authorize(
             $params['requestid'],
             $params['token'],

@@ -37,6 +37,7 @@ final class applications {
         if (!applicator_eligibility::is_eligible_user((int) $USER->id)) {
             return false;
         }
+        self::synchronize_delegations((int) $USER->id);
         [$from, $delegated, $params] = self::query((int) $USER->id, \core\di::get(\core\clock::class)->time());
         return $DB->record_exists_sql("SELECT 1 {$from} AND {$delegated}", $params);
     }
@@ -64,7 +65,7 @@ final class applications {
         $delegated = "EXISTS (
                         SELECT 1 FROM {quizaccess_presencial_delegation} d
                          WHERE d.quizid = q.id AND d.userid = :userid AND d.timerevoked = 0
-                               AND d.timeopen = p.timeopen AND d.timeclose = p.timeclose
+                               AND d.timeopen = p.timeopen AND d.timeexpired = 0 AND d.timeclose > :delegationnow
                     )";
         $from = "FROM {quizaccess_presencial} p
                JOIN {quiz} q ON q.id = p.quizid
@@ -78,7 +79,26 @@ final class applications {
             'contextlevel' => CONTEXT_MODULE,
             'now' => $now,
             'userid' => $userid,
+            'delegationnow' => $now,
         ]];
+    }
+
+    /**
+     * Record due transitions before discovering this account's applications.
+     * @param int $userid Account whose panel is being read.
+     */
+    private static function synchronize_delegations(int $userid): void {
+        global $DB;
+        $quizids = $DB->get_fieldset_sql(
+            'SELECT DISTINCT d.quizid FROM {quizaccess_presencial_delegation} d
+               JOIN {quizaccess_presencial} p ON p.quizid = d.quizid
+              WHERE d.userid = :userid AND d.timerevoked = 0 AND d.timeexpired = 0
+                    AND (d.timeclose <= :now OR p.timeclose < d.timeclose OR d.timeopen <> p.timeopen)',
+            ['userid' => $userid, 'now' => \core\di::get(\core\clock::class)->time()],
+        );
+        foreach ($quizids as $quizid) {
+            delegation_manager::synchronize_configuration((int) $quizid);
+        }
     }
 
     /**
@@ -105,6 +125,7 @@ final class applications {
         if (!applicator_eligibility::is_eligible_user((int) $USER->id)) {
             return ['total' => 0, 'items' => []];
         }
+        self::synchronize_delegations((int) $USER->id);
         $now = \core\di::get(\core\clock::class)->time();
         [$from, $delegated, $params] = self::query((int) $USER->id, $now);
         if ($cmid !== null) {

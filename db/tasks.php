@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled lifecycle maintenance for requests and invitations.
+ * Scheduled lifecycle maintenance for delegations, requests and invitations.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -25,6 +25,15 @@
 defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
+    [
+        'classname' => '\\quizaccess_presencial\\task\\expire_delegations',
+        'blocking' => 0,
+        'minute' => '*',
+        'hour' => '*',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*',
+    ],
     [
         'classname' => 'quizaccess_presencial\task\expire_invitations',
         'blocking' => 0,

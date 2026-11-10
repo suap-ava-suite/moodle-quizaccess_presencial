@@ -43,7 +43,8 @@ final class metadata_test extends \basic_testcase {
             array_keys($items),
         );
         $this->assertEqualsCanonicalizing([
-            'quizid', 'userid', 'timeopen', 'timeclose', 'origin', 'timecreated', 'timemodified', 'timerevoked', 'revokedby',
+            'quizid', 'userid', 'timeopen', 'timeclose', 'origin', 'timecreated', 'timemodified', 'timerevoked',
+            'revokedby', 'timeexpired',
         ], array_keys($items['quizaccess_presencial_delegation']->get_privacy_fields()));
         $this->assertEqualsCanonicalizing([
             'createdby', 'generation', 'state', 'timecreated', 'timemodified', 'timeexpires',

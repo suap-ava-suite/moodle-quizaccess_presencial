@@ -335,6 +335,7 @@ final class invitation {
         } else if ($changed) {
             $record->timemodified = \core\di::get(\core\clock::class)->time();
             $DB->update_record('quizaccess_presencial_invite', $record);
+            self::transition_event($cm, $record, 'shortened');
         }
     }
 
