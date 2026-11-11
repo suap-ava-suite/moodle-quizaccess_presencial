@@ -143,7 +143,7 @@ No Moodle 5.1 ou posterior, os scripts administrativos ficam sob `public/admin/`
 
 ## Privacidade
 
-O plugin armazena Delegações de aplicação, dados mínimos do ciclo de vida do Convite e Solicitações associadas ao estudante, Questionário, tentativa, estado e justificativa integral da rejeição vigente. A Privacy API declara essas categorias, localiza usuários e contextos, exporta os dados sem segredos e atende à exclusão individual, em lote e por contexto. A exclusão preserva a configuração do Questionário e mantém os registros de auditoria sob responsabilidade dos subsistemas de logs do Moodle.
+O plugin armazena Delegações de aplicação, dados mínimos do ciclo de vida do Convite e Solicitações associadas ao estudante, Questionário, tentativa, estado e justificativa integral da rejeição vigente. A Privacy API declara essas categorias, localiza usuários e contextos, exporta os dados sem segredos e atende à exclusão individual, em lote e por contexto. A exportação indica se cada Solicitação ainda está ativa. A exclusão é transacional por Questionário, preserva sua configuração e mantém os registros de auditoria sob responsabilidade dos subsistemas de logs do Moodle.
 
 ## Licença
 

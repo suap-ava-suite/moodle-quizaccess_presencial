@@ -34,6 +34,77 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  */
 final class expiration_concurrency_test extends \advanced_testcase {
     /**
+     * Privacy erasure waits for an ongoing quiz operation before removing any personal data.
+     */
+    public function test_privacy_erasure_waits_for_quiz_operation(): void {
+        global $DB, $USER;
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test requires processes and PostgreSQL lock monitoring.');
+        }
+        $this->preventResetByRollback();
+        $this->mock_clock_with_frozen(1_800_000_000);
+        $this->setAdminUser();
+        $course = self::getDataGenerator()->create_course();
+        $quiz = self::getDataGenerator()->create_module('quiz', ['course' => $course->id]);
+        $quiz->coursemodule = $quiz->cmid;
+        $quiz->presencial_enabled = 1;
+        $quiz->presencial_timeopen = 1_799_999_000;
+        $quiz->presencial_timeclose = 1_800_003_600;
+        \quizaccess_presencial::save_settings($quiz);
+        $applicator = self::getDataGenerator()->create_user();
+        $student = self::getDataGenerator()->create_user();
+        \quizaccess_presencial\local\delegation_manager::include_users($quiz->id, [$applicator->id], $USER->id);
+        $context = \context_module::instance($quiz->cmid);
+        $transaction = $DB->start_delegated_transaction();
+        $worker = null;
+        try {
+            (new release_request_service())->ensure_pending($quiz->id, $student->id, 1);
+            $worker = $this->start_worker([
+                'operation' => 'privacy', 'actorid' => $USER->id,
+                'userid' => $applicator->id, 'contextid' => $context->id,
+            ]);
+            [$process, $pipes] = $worker;
+            $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $deadline = microtime(true) + 10;
+            do {
+                $waiting = $DB->get_field_sql('SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']]);
+                if ($waiting) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            $this->assertNotFalse($waiting);
+            $this->assertEquals([$context->id],
+                \quizaccess_presencial\privacy\provider::get_contexts_for_userid($applicator->id)->get_contextids());
+            $transaction->allow_commit();
+            $transaction = null;
+            $this->assertNotFalse(fgets($pipes[1]));
+            $this->assertSame('', stream_get_contents($pipes[2]));
+            $this->assertEmpty(\quizaccess_presencial\privacy\provider::get_contexts_for_userid($applicator->id)->get_contextids());
+        } finally {
+            if ($worker) {
+                [$process, $pipes] = $worker;
+                if (proc_get_status($process)['running']) {
+                    proc_terminate($process);
+                }
+                foreach ($pipes as $pipe) {
+                    fclose($pipe);
+                }
+                proc_close($process);
+            }
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Privacy race cleanup.'));
+                } catch (\Exception $ignored) {
+                    // Preserve the original test failure after releasing the lock.
+                }
+            }
+        }
+    }
+
+    /**
      * Disablement cannot skip a request while a status poll waits for its row.
      *
      * @dataProvider request_states

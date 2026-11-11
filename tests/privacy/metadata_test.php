@@ -47,11 +47,11 @@ final class metadata_test extends \basic_testcase {
             'revokedby', 'timeexpired',
         ], array_keys($items['quizaccess_presencial_delegation']->get_privacy_fields()));
         $this->assertEqualsCanonicalizing([
-            'createdby', 'generation', 'state', 'timecreated', 'timemodified', 'timeexpires',
+            'quizid', 'createdby', 'generation', 'state', 'timecreated', 'timemodified', 'timeexpires', 'tokenhash',
         ], array_keys($items['quizaccess_presencial_invite']->get_privacy_fields()));
         $this->assertEqualsCanonicalizing([
             'quizid', 'userid', 'attemptnumber', 'state', 'rejectionreason', 'timecreated', 'expiresat', 'timemodified',
-            'qrtokenhash', 'qrexpiresat',
+            'qrtokenhash', 'qrexpiresat', 'active',
         ], array_keys($items['quizaccess_presencial_req']->get_privacy_fields()));
     }
 }

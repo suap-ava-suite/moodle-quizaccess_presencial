@@ -134,10 +134,12 @@ final class delegation_invitation_integration_test extends provider_testcase {
         $invitationdata = $writer->get_data([get_string('pluginname', 'quizaccess_presencial')]);
         $this->assertSame('active', $invitationdata->state);
         $this->assertSame(1, $invitationdata->generation);
-        $delegationdata = $writer->get_data(['delegations', 1]);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial')];
+        $delegationdata = $writer->get_data([...$path, 1]);
         $this->assertSame((int) $revoked->id, (int) $delegationdata->userid);
         $this->assertSame((int) $teacher->id, (int) $delegationdata->revokedby);
-        $this->assertSame([], (array) $writer->get_data(['delegations', 2]));
+        $this->assertSame([], (array) $writer->get_data([...$path, 2]));
         $this->assertStringNotContainsString($issued['token'], json_encode([$invitationdata, $delegationdata]));
     }
 
@@ -158,7 +160,9 @@ final class delegation_invitation_integration_test extends provider_testcase {
         $this->assertTrue(delegation_manager::is_active_applicator($quiz->id, $current->id));
         $this->assertEmpty(provider::get_contexts_for_userid($teacher->id)->get_contextids());
         provider::export_user_data(new approved_contextlist($revoked, 'quizaccess_presencial', [$context->id]));
-        $this->assertSame(0, (int) writer::with_context($context)->get_data(['delegations', 1])->revokedby);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial'), 1];
+        $this->assertSame(0, (int) writer::with_context($context)->get_data($path)->revokedby);
 
         $replacement = invitation::generate($quiz->cmid, 1);
         $this->assertSame(2, $replacement['generation']);
