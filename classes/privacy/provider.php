@@ -194,34 +194,38 @@ class provider implements
             if (!$quizid) {
                 continue;
             }
-            $records = $DB->get_records_select(
+            $records = $DB->get_recordset_select(
                 'quizaccess_presencial_delegation',
                 'quizid = :quizid AND (userid = :userid OR revokedby = :userid2)',
                 ['quizid' => $quizid, 'userid' => $userid, 'userid2' => $userid],
                 'id ASC',
             );
             $index = 0;
-            foreach ($records as $record) {
-                $index++;
-                writer::with_context($context)->export_data(
-                    [
-                        get_string('pluginname', 'quizaccess_presencial'),
-                        get_string('privacy:exportpath:delegation', 'quizaccess_presencial'),
-                        $index,
-                    ],
-                    (object) [
-                        'quizid' => $record->quizid,
-                        'userid' => $record->userid,
-                        'timeopen' => transform::datetime($record->timeopen),
-                        'timeclose' => transform::datetime($record->timeclose),
-                        'origin' => $record->origin,
-                        'timecreated' => transform::datetime($record->timecreated),
-                        'timemodified' => transform::datetime($record->timemodified),
-                        'timerevoked' => $record->timerevoked ? transform::datetime($record->timerevoked) : null,
-                        'timeexpired' => $record->timeexpired ? transform::datetime($record->timeexpired) : null,
-                        'revokedby' => $record->revokedby,
-                    ],
-                );
+            try {
+                foreach ($records as $record) {
+                    $index++;
+                    writer::with_context($context)->export_data(
+                        [
+                            get_string('pluginname', 'quizaccess_presencial'),
+                            get_string('privacy:exportpath:delegation', 'quizaccess_presencial'),
+                            $index,
+                        ],
+                        (object) [
+                            'quizid' => $record->quizid,
+                            'userid' => $record->userid,
+                            'timeopen' => transform::datetime($record->timeopen),
+                            'timeclose' => transform::datetime($record->timeclose),
+                            'origin' => $record->origin,
+                            'timecreated' => transform::datetime($record->timecreated),
+                            'timemodified' => transform::datetime($record->timemodified),
+                            'timerevoked' => $record->timerevoked ? transform::datetime($record->timerevoked) : null,
+                            'timeexpired' => $record->timeexpired ? transform::datetime($record->timeexpired) : null,
+                            'revokedby' => $record->revokedby,
+                        ],
+                    );
+                }
+            } finally {
+                $records->close();
             }
 
             $record = $DB->get_record('quizaccess_presencial_invite', [
@@ -240,31 +244,35 @@ class provider implements
                     $data,
                 );
             }
-            $requests = $DB->get_records('quizaccess_presencial_req', [
+            $requests = $DB->get_recordset('quizaccess_presencial_req', [
                 'quizid' => $quizid,
                 'userid' => $userid,
             ], 'timecreated ASC');
             $index = 0;
-            foreach ($requests as $request) {
-                $index++;
-                writer::with_context($context)->export_data(
-                    [
-                        get_string('pluginname', 'quizaccess_presencial'),
-                        get_string('privacy:exportpath:request', 'quizaccess_presencial'),
-                        $index,
-                    ],
-                    (object) [
-                        'quizid' => (int) $request->quizid,
-                        'attemptnumber' => (int) $request->attemptnumber,
-                        'active' => transform::yesno(!empty($request->active)),
-                        'state' => $request->state,
-                        'rejectionreason' => (string) ($request->rejectionreason ?? ''),
-                        'timecreated' => transform::datetime($request->timecreated),
-                        'expiresat' => transform::datetime($request->expiresat),
-                        'qrexpiresat' => empty($request->qrexpiresat) ? null : transform::datetime($request->qrexpiresat),
-                        'timemodified' => transform::datetime($request->timemodified),
-                    ],
-                );
+            try {
+                foreach ($requests as $request) {
+                    $index++;
+                    writer::with_context($context)->export_data(
+                        [
+                            get_string('pluginname', 'quizaccess_presencial'),
+                            get_string('privacy:exportpath:request', 'quizaccess_presencial'),
+                            $index,
+                        ],
+                        (object) [
+                            'quizid' => (int) $request->quizid,
+                            'attemptnumber' => (int) $request->attemptnumber,
+                            'active' => transform::yesno(!empty($request->active)),
+                            'state' => $request->state,
+                            'rejectionreason' => (string) ($request->rejectionreason ?? ''),
+                            'timecreated' => transform::datetime($request->timecreated),
+                            'expiresat' => transform::datetime($request->expiresat),
+                            'qrexpiresat' => empty($request->qrexpiresat) ? null : transform::datetime($request->qrexpiresat),
+                            'timemodified' => transform::datetime($request->timemodified),
+                        ],
+                    );
+                }
+            } finally {
+                $requests->close();
             }
         }
     }
