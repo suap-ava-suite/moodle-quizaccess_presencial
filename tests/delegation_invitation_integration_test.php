@@ -101,14 +101,18 @@ final class delegation_invitation_integration_test extends provider_testcase {
             $path = [get_string('pluginname', 'quizaccess_presencial'),
                 get_string('privacy:exportpath:delegation', 'quizaccess_presencial'), 1];
             $this->assertEquals($teacher->id, writer::with_context($context)->get_data($path)->revokedby);
-            $this->assertEquals($events, $store->get_events_select($eventfilter, $eventparams, 'id ASC', 0, 0),
-                'Rolled-back erasure must not publish an invitation invalidation.');
+            $this->assertEquals(
+                $events,
+                $store->get_events_select($eventfilter, $eventparams, 'id ASC', 0, 0),
+                'Rolled-back erasure must not publish an invitation invalidation.',
+            );
         } finally {
             if ($transaction) {
                 try {
                     $transaction->rollback(new \moodle_exception('invalidrequest'));
                 } catch (\moodle_exception $ignored) {
                     // Release the enclosing transaction without masking an earlier assertion failure.
+                    $transaction = null;
                 }
             }
             $manager->dispose();

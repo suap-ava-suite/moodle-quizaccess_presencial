@@ -68,16 +68,20 @@ final class expiration_concurrency_test extends \advanced_testcase {
             $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
             $deadline = microtime(true) + 10;
             do {
-                $waiting = $DB->get_field_sql('SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
-                    ['connectionid' => $connection['connectionid']]);
+                $waiting = $DB->get_field_sql(
+                    'SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']],
+                );
                 if ($waiting) {
                     break;
                 }
                 usleep(10000);
             } while (microtime(true) < $deadline);
             $this->assertNotFalse($waiting);
-            $this->assertEquals([$context->id],
-                \quizaccess_presencial\privacy\provider::get_contexts_for_userid($applicator->id)->get_contextids());
+            $this->assertEquals(
+                [$context->id],
+                \quizaccess_presencial\privacy\provider::get_contexts_for_userid($applicator->id)->get_contextids(),
+            );
             $transaction->allow_commit();
             $transaction = null;
             $this->assertNotFalse(fgets($pipes[1]));
@@ -99,6 +103,7 @@ final class expiration_concurrency_test extends \advanced_testcase {
                     $transaction->rollback(new \Exception('Privacy race cleanup.'));
                 } catch (\Exception $ignored) {
                     // Preserve the original test failure after releasing the lock.
+                    $transaction = null;
                 }
             }
         }
