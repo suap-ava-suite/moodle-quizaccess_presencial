@@ -138,6 +138,7 @@ $string['privacy:metadata:invite:timecreated'] = 'When the invitation was genera
 $string['privacy:metadata:invite:timeexpires'] = 'The latest time at which the invitation can be used.';
 $string['privacy:metadata:invite:timemodified'] = 'When the invitation was last changed.';
 $string['privacy:metadata:invite:tokenhash'] = 'A one-way hash of the invitation token.';
+$string['privacy:metadata:log'] = 'In-person release actions, including user identifiers and rejection reasons, are recorded in Moodle logs for auditing.';
 $string['privacy:metadata:request'] = 'A release request links a student to a quiz and a numbered attempt, with its current state and timestamps.';
 $string['privacy:metadata:request:active'] = 'Whether the request is the active request for the attempt.';
 $string['privacy:metadata:request:attemptnumber'] = 'The next quiz attempt number covered by this request.';

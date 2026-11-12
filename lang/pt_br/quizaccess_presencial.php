@@ -140,6 +140,7 @@ $string['privacy:metadata:invite:timecreated'] = 'Quando o convite foi gerado.';
 $string['privacy:metadata:invite:timeexpires'] = 'O instante limite para utilização do convite.';
 $string['privacy:metadata:invite:timemodified'] = 'Quando o convite foi alterado pela última vez.';
 $string['privacy:metadata:invite:tokenhash'] = 'Uma derivação não reversível do token do Convite.';
+$string['privacy:metadata:log'] = 'As ações de Liberação Presencial, incluindo identificadores dos usuários e justificativas de rejeição, são registradas nos logs do Moodle para auditoria.';
 $string['privacy:metadata:request'] = 'Uma solicitação associa estudante, Questionário e número de tentativa, com estado e datas.';
 $string['privacy:metadata:request:active'] = 'Indica se a Solicitação está ativa para a tentativa.';
 $string['privacy:metadata:request:attemptnumber'] = 'O número da próxima tentativa do Questionário coberta pela solicitação.';

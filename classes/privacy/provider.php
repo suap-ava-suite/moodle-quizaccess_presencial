@@ -93,6 +93,7 @@ class provider implements
             'expiresat' => 'privacy:metadata:request:expiresat',
             'timemodified' => 'privacy:metadata:request:timemodified',
         ], 'privacy:metadata:request');
+        $collection->add_subsystem_link('tool_log', [], 'privacy:metadata:log');
         return $collection;
     }
 

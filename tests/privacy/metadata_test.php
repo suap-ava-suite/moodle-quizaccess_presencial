@@ -20,7 +20,7 @@ use core_privacy\local\metadata\collection;
 
 #[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 /**
- * Delegation and invitation metadata without Moodle database state.
+ * Personal data and logging metadata without Moodle database state.
  *
  * @package    quizaccess_presencial
  * @copyright  2026 SUAP AVA Suite
@@ -29,9 +29,9 @@ use core_privacy\local\metadata\collection;
  */
 final class metadata_test extends \basic_testcase {
     /**
-     * The registry describes the delegation data and the invitation creator and lifecycle data.
+     * The registry describes the stored personal data and the logging subsystem used for auditing.
      */
-    public function test_metadata_describes_delegation_and_invitation_personal_data(): void {
+    public function test_metadata_describes_personal_data_and_logging_subsystem(): void {
         $collection = provider::get_metadata(new collection('quizaccess_presencial'));
         $items = [];
         foreach ($collection->get_collection() as $item) {
@@ -39,7 +39,7 @@ final class metadata_test extends \basic_testcase {
         }
 
         $this->assertEqualsCanonicalizing(
-            ['quizaccess_presencial_delegation', 'quizaccess_presencial_invite', 'quizaccess_presencial_req'],
+            ['quizaccess_presencial_delegation', 'quizaccess_presencial_invite', 'quizaccess_presencial_req', 'tool_log'],
             array_keys($items),
         );
         $this->assertEqualsCanonicalizing([
@@ -53,5 +53,7 @@ final class metadata_test extends \basic_testcase {
             'quizid', 'userid', 'attemptnumber', 'state', 'rejectionreason', 'timecreated', 'expiresat', 'timemodified',
             'qrtokenhash', 'qrexpiresat', 'active',
         ], array_keys($items['quizaccess_presencial_req']->get_privacy_fields()));
+        $this->assertInstanceOf(\core_privacy\local\metadata\types\subsystem_link::class, $items['tool_log']);
+        $this->assertSame('privacy:metadata:log', $items['tool_log']->get_summary());
     }
 }
