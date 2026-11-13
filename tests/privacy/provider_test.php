@@ -23,6 +23,7 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
 use quizaccess_presencial\local\invitation;
+use quizaccess_presencial\local\delegation_manager;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -43,6 +44,38 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @covers     \quizaccess_presencial\privacy\provider
  */
 final class provider_test extends provider_testcase {
+    /**
+     * Erasing a revoking teacher anonymizes their participation without removing another user's delegation.
+     */
+    public function test_teacher_erasure_preserves_another_users_delegation(): void {
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(1800000000);
+        $teacher = self::getDataGenerator()->create_user();
+        $applicator = self::getDataGenerator()->create_user();
+        $quiz = $this->configured_quiz([$teacher]);
+        $context = \context_module::instance($quiz->cmid);
+        $this->setUser($teacher);
+        $delegations = delegation_manager::include_users($quiz->id, [$applicator->id], $teacher->id);
+        delegation_manager::revoke($quiz->id, $delegations[$applicator->id]->id, $teacher->id);
+        $this->assertEquals([$context->id], provider::get_contexts_for_userid($teacher->id)->get_contextids());
+
+        provider::export_user_data(new approved_contextlist($teacher, 'quizaccess_presencial', [$context->id]));
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial'), 1];
+        $this->assertEquals($teacher->id, writer::with_context($context)->get_data($path)->revokedby);
+
+        provider::delete_data_for_users(new approved_userlist($context, 'quizaccess_presencial', [$teacher->id]));
+        provider::delete_data_for_users(new approved_userlist($context, 'quizaccess_presencial', [$teacher->id]));
+        $this->assertEmpty(provider::get_contexts_for_userid($teacher->id)->get_contextids());
+        $this->assertEquals([$context->id], provider::get_contexts_for_userid($applicator->id)->get_contextids());
+        writer::reset();
+        provider::export_user_data(new approved_contextlist($applicator, 'quizaccess_presencial', [$context->id]));
+        $data = writer::with_context($context)->get_data($path);
+        $this->assertEquals($applicator->id, $data->userid);
+        $this->assertEquals(0, $data->revokedby);
+        $this->assertNotNull($data->timerevoked);
+    }
+
     /**
      * Only the current invitation creator is discoverable in the quiz module.
      */

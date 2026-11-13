@@ -154,5 +154,25 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026110500, 'quizaccess', 'presencial');
     }
+    if ($oldversion < 2026111100) {
+        $indexes = [
+            'quizaccess_presencial_delegation' => [
+                'useridquiz' => ['userid', 'quizid'],
+                'revokedbyquiz' => ['revokedby', 'quizid'],
+            ],
+            'quizaccess_presencial_invite' => ['createdbyquiz' => ['createdby', 'quizid']],
+            'quizaccess_presencial_req' => ['useridquiz' => ['userid', 'quizid']],
+        ];
+        foreach ($indexes as $tablename => $tableindexes) {
+            $table = new xmldb_table($tablename);
+            foreach ($tableindexes as $name => $fields) {
+                $index = new xmldb_index($name, XMLDB_INDEX_NOTUNIQUE, $fields);
+                if (!$dbman->index_exists($table, $index)) {
+                    $dbman->add_index($table, $index);
+                }
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026111100, 'quizaccess', 'presencial');
+    }
     return true;
 }

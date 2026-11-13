@@ -32,6 +32,7 @@ use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use quizaccess_presencial\local\invitation;
+use quizaccess_presencial\local\quiz_lock;
 
 /**
  * Describe, export, and remove persisted personal data stored by the plugin.
@@ -70,14 +71,17 @@ class provider implements
             'privacy:metadata:delegation',
         );
         $collection->add_database_table('quizaccess_presencial_invite', [
+            'quizid' => 'privacy:metadata:invite:quizid',
             'createdby' => 'privacy:metadata:invite:createdby',
             'generation' => 'privacy:metadata:invite:generation',
             'state' => 'privacy:metadata:invite:state',
+            'tokenhash' => 'privacy:metadata:invite:tokenhash',
             'timecreated' => 'privacy:metadata:invite:timecreated',
             'timemodified' => 'privacy:metadata:invite:timemodified',
             'timeexpires' => 'privacy:metadata:invite:timeexpires',
         ], 'privacy:metadata:invite');
         $collection->add_database_table('quizaccess_presencial_req', [
+            'active' => 'privacy:metadata:request:active',
             'userid' => 'privacy:metadata:request:userid',
             'quizid' => 'privacy:metadata:request:quizid',
             'attemptnumber' => 'privacy:metadata:request:attemptnumber',
@@ -89,6 +93,7 @@ class provider implements
             'expiresat' => 'privacy:metadata:request:expiresat',
             'timemodified' => 'privacy:metadata:request:timemodified',
         ], 'privacy:metadata:request');
+        $collection->add_subsystem_link('tool_log', [], 'privacy:metadata:log');
         return $collection;
     }
 
@@ -190,30 +195,38 @@ class provider implements
             if (!$quizid) {
                 continue;
             }
-            $records = $DB->get_records_select(
+            $records = $DB->get_recordset_select(
                 'quizaccess_presencial_delegation',
                 'quizid = :quizid AND (userid = :userid OR revokedby = :userid2)',
                 ['quizid' => $quizid, 'userid' => $userid, 'userid2' => $userid],
                 'id ASC',
             );
             $index = 0;
-            foreach ($records as $record) {
-                $index++;
-                writer::with_context($context)->export_data(
-                    ['delegations', $index],
-                    (object) [
-                        'quizid' => $record->quizid,
-                        'userid' => $record->userid,
-                        'timeopen' => transform::datetime($record->timeopen),
-                        'timeclose' => transform::datetime($record->timeclose),
-                        'origin' => $record->origin,
-                        'timecreated' => transform::datetime($record->timecreated),
-                        'timemodified' => transform::datetime($record->timemodified),
-                        'timerevoked' => $record->timerevoked ? transform::datetime($record->timerevoked) : null,
-                        'timeexpired' => $record->timeexpired ? transform::datetime($record->timeexpired) : null,
-                        'revokedby' => $record->revokedby,
-                    ],
-                );
+            try {
+                foreach ($records as $record) {
+                    $index++;
+                    writer::with_context($context)->export_data(
+                        [
+                            get_string('pluginname', 'quizaccess_presencial'),
+                            get_string('privacy:exportpath:delegation', 'quizaccess_presencial'),
+                            $index,
+                        ],
+                        (object) [
+                            'quizid' => $record->quizid,
+                            'userid' => $record->userid,
+                            'timeopen' => transform::datetime($record->timeopen),
+                            'timeclose' => transform::datetime($record->timeclose),
+                            'origin' => $record->origin,
+                            'timecreated' => transform::datetime($record->timecreated),
+                            'timemodified' => transform::datetime($record->timemodified),
+                            'timerevoked' => $record->timerevoked ? transform::datetime($record->timerevoked) : null,
+                            'timeexpired' => $record->timeexpired ? transform::datetime($record->timeexpired) : null,
+                            'revokedby' => $record->revokedby,
+                        ],
+                    );
+                }
+            } finally {
+                $records->close();
             }
 
             $record = $DB->get_record('quizaccess_presencial_invite', [
@@ -232,30 +245,35 @@ class provider implements
                     $data,
                 );
             }
-            $requests = $DB->get_records('quizaccess_presencial_req', [
+            $requests = $DB->get_recordset('quizaccess_presencial_req', [
                 'quizid' => $quizid,
                 'userid' => $userid,
             ], 'timecreated ASC');
             $index = 0;
-            foreach ($requests as $request) {
-                $index++;
-                writer::with_context($context)->export_data(
-                    [
-                        get_string('pluginname', 'quizaccess_presencial'),
-                        get_string('privacy:exportpath:request', 'quizaccess_presencial'),
-                        $index,
-                    ],
-                    (object) [
-                        'quizid' => (int) $request->quizid,
-                        'attemptnumber' => (int) $request->attemptnumber,
-                        'state' => $request->state,
-                        'rejectionreason' => (string) ($request->rejectionreason ?? ''),
-                        'timecreated' => transform::datetime($request->timecreated),
-                        'expiresat' => transform::datetime($request->expiresat),
-                        'qrexpiresat' => empty($request->qrexpiresat) ? null : transform::datetime($request->qrexpiresat),
-                        'timemodified' => transform::datetime($request->timemodified),
-                    ],
-                );
+            try {
+                foreach ($requests as $request) {
+                    $index++;
+                    writer::with_context($context)->export_data(
+                        [
+                            get_string('pluginname', 'quizaccess_presencial'),
+                            get_string('privacy:exportpath:request', 'quizaccess_presencial'),
+                            $index,
+                        ],
+                        (object) [
+                            'quizid' => (int) $request->quizid,
+                            'attemptnumber' => (int) $request->attemptnumber,
+                            'active' => transform::yesno(!empty($request->active)),
+                            'state' => $request->state,
+                            'rejectionreason' => (string) ($request->rejectionreason ?? ''),
+                            'timecreated' => transform::datetime($request->timecreated),
+                            'expiresat' => transform::datetime($request->expiresat),
+                            'qrexpiresat' => empty($request->qrexpiresat) ? null : transform::datetime($request->qrexpiresat),
+                            'timemodified' => transform::datetime($request->timemodified),
+                        ],
+                    );
+                }
+            } finally {
+                $requests->close();
             }
         }
     }
@@ -272,9 +290,11 @@ class provider implements
         if (!$quizid) {
             return;
         }
-        $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid]);
-        $DB->delete_records('quizaccess_presencial_req', ['quizid' => $quizid]);
-        invitation::erase_user_data($context->instanceid);
+        quiz_lock::execute($quizid, function () use ($DB, $quizid, $context): void {
+            $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid]);
+            $DB->delete_records('quizaccess_presencial_req', ['quizid' => $quizid]);
+            invitation::erase_user_data($context->instanceid);
+        });
     }
 
     /**
@@ -294,16 +314,18 @@ class provider implements
             if (!$quizid) {
                 continue;
             }
-            $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid, 'userid' => $userid]);
-            $DB->set_field_select(
-                'quizaccess_presencial_delegation',
-                'revokedby',
-                0,
-                'quizid = :quizid AND revokedby = :userid',
-                ['quizid' => $quizid, 'userid' => $userid],
-            );
-            $DB->delete_records('quizaccess_presencial_req', ['quizid' => $quizid, 'userid' => $userid]);
-            invitation::erase_user_data($context->instanceid, [$userid]);
+            quiz_lock::execute($quizid, function () use ($DB, $quizid, $userid, $context): void {
+                $DB->delete_records('quizaccess_presencial_delegation', ['quizid' => $quizid, 'userid' => $userid]);
+                $DB->set_field_select(
+                    'quizaccess_presencial_delegation',
+                    'revokedby',
+                    0,
+                    'quizid = :quizid AND revokedby = :userid',
+                    ['quizid' => $quizid, 'userid' => $userid],
+                );
+                $DB->delete_records('quizaccess_presencial_req', ['quizid' => $quizid, 'userid' => $userid]);
+                invitation::erase_user_data($context->instanceid, [$userid]);
+            });
         }
     }
 
@@ -323,26 +345,28 @@ class provider implements
         if (!$userids || !$quizid) {
             return;
         }
-        [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'userid');
-        $params['quizid'] = $quizid;
-        $DB->delete_records_select(
-            'quizaccess_presencial_delegation',
-            "quizid = :quizid AND userid {$insql}",
-            $params,
-        );
-        $DB->set_field_select(
-            'quizaccess_presencial_delegation',
-            'revokedby',
-            0,
-            "quizid = :quizid AND revokedby {$insql}",
-            $params,
-        );
-        $DB->delete_records_select(
-            'quizaccess_presencial_req',
-            "quizid = :quizid AND userid {$insql}",
-            $params,
-        );
-        invitation::erase_user_data($context->instanceid, $userids);
+        quiz_lock::execute($quizid, function () use ($DB, $quizid, $userids, $context): void {
+            [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'userid');
+            $params['quizid'] = $quizid;
+            $DB->delete_records_select(
+                'quizaccess_presencial_delegation',
+                "quizid = :quizid AND userid {$insql}",
+                $params,
+            );
+            $DB->set_field_select(
+                'quizaccess_presencial_delegation',
+                'revokedby',
+                0,
+                "quizid = :quizid AND revokedby {$insql}",
+                $params,
+            );
+            $DB->delete_records_select(
+                'quizaccess_presencial_req',
+                "quizid = :quizid AND userid {$insql}",
+                $params,
+            );
+            invitation::erase_user_data($context->instanceid, $userids);
+        });
     }
 
     /**

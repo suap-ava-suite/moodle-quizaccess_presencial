@@ -40,6 +40,10 @@ echo json_encode(['connectionid' => (int) $DB->get_field_sql('SELECT pg_backend_
 fflush(STDOUT);
 if ($params['operation'] === 'status') {
     (new \quizaccess_presencial\local\release_request_service())->read_status($params['requestid'], $params['actorid']);
+} else if ($params['operation'] === 'privacy') {
+    $user = \core_user::get_user($params['userid']);
+    $contexts = new \core_privacy\local\request\approved_contextlist($user, 'quizaccess_presencial', [$params['contextid']]);
+    \quizaccess_presencial\privacy\provider::delete_data_for_user($contexts);
 } else {
     $quiz = (object) $params['quiz'];
     $quiz->presencial_enabled = 0;
@@ -48,5 +52,5 @@ if ($params['operation'] === 'status') {
     \quizaccess_presencial::save_settings($quiz);
 }
 $events = array_filter($sink->get_events(), static fn($event): bool =>
-    $event instanceof \quizaccess_presencial\event\request_expired && $event->objectid == $params['requestid']);
+    $event instanceof \quizaccess_presencial\event\request_expired && $event->objectid == ($params['requestid'] ?? 0));
 echo json_encode(['expired' => count($events)], JSON_THROW_ON_ERROR) . "\n";

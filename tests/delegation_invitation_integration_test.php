@@ -23,6 +23,7 @@ use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
 use quizaccess_presencial\local\delegation_manager;
 use quizaccess_presencial\local\invitation;
+use quizaccess_presencial\local\release_request_service;
 use quizaccess_presencial\privacy\provider;
 
 defined('MOODLE_INTERNAL') || die();
@@ -44,6 +45,90 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  * @covers     \quizaccess_presencial\privacy\provider
  */
 final class delegation_invitation_integration_test extends provider_testcase {
+    /**
+     * A failure in the enclosing Moodle transaction restores every kind of erased personal data.
+     *
+     * @dataProvider erasure_scopes
+     * @param string $scope Approved erasure scope.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('erasure_scopes')]
+    public function test_erasure_rollback_restores_personal_data_and_invitation(string $scope): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->preventResetByRollback();
+        [$quiz, $teacher, $revoked] = $this->create_quiz_with_team_and_invitation($issued);
+        $context = \context_module::instance($quiz->cmid);
+        delegation_manager::include_users($quiz->id, [$teacher->id], $teacher->id);
+        $service = new release_request_service();
+        $request = $service->ensure_pending($quiz->id, $teacher->id, 1);
+        $team = delegation_manager::list_current($quiz->id);
+        $invitation = invitation::get_status($quiz->cmid);
+        set_config('enabled_stores', 'logstore_standard', 'tool_log');
+        set_config('buffersize', 0, 'logstore_standard');
+        $manager = get_log_manager(true);
+        $store = $manager->get_readers()['logstore_standard'];
+        $eventfilter = 'component = :component AND contextid = :contextid';
+        $eventparams = ['component' => 'quizaccess_presencial', 'contextid' => $context->id];
+        $events = $store->get_events_select($eventfilter, $eventparams, 'id ASC', 0, 0);
+        $transaction = null;
+        try {
+            $transaction = $DB->start_delegated_transaction();
+            if ($scope === 'context') {
+                provider::delete_data_for_all_users_in_context($context);
+            } else if ($scope === 'batch') {
+                provider::delete_data_for_users(new approved_userlist($context, 'quizaccess_presencial', [$teacher->id]));
+            } else {
+                provider::delete_data_for_user(new approved_contextlist($teacher, 'quizaccess_presencial', [$context->id]));
+            }
+            $this->assertEmpty(provider::get_contexts_for_userid($teacher->id)->get_contextids());
+            $this->assertSame('disabled', invitation::get_status($quiz->cmid)['state']);
+            $failure = new \moodle_exception('invalidrequest');
+            try {
+                $transaction->rollback($failure);
+            } catch (\moodle_exception $exception) {
+                $this->assertSame($failure, $exception);
+            }
+            $transaction = null;
+
+            $this->assertEquals($team, delegation_manager::list_current($quiz->id));
+            $this->assertSame($invitation, invitation::get_status($quiz->cmid));
+            $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+            $this->assertEquals($request, $service->get($request->id));
+            $this->assertEquals([$context->id], provider::get_contexts_for_userid($teacher->id)->get_contextids());
+            writer::reset();
+            provider::export_user_data(new approved_contextlist($revoked, 'quizaccess_presencial', [$context->id]));
+            $path = [get_string('pluginname', 'quizaccess_presencial'),
+                get_string('privacy:exportpath:delegation', 'quizaccess_presencial'), 1];
+            $this->assertEquals($teacher->id, writer::with_context($context)->get_data($path)->revokedby);
+            $this->assertEquals(
+                $events,
+                $store->get_events_select($eventfilter, $eventparams, 'id ASC', 0, 0),
+                'Rolled-back erasure must not publish an invitation invalidation.',
+            );
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \moodle_exception('invalidrequest'));
+                } catch (\moodle_exception $ignored) {
+                    // Release the enclosing transaction without masking an earlier assertion failure.
+                    $transaction = null;
+                }
+            }
+            $manager->dispose();
+            get_log_manager(true);
+        }
+    }
+
+    /**
+     * Supply the supported Privacy API erasure scopes.
+     *
+     * @return array Erasure scopes.
+     */
+    public static function erasure_scopes(): array {
+        return ['individual' => ['individual'], 'batch' => ['batch'], 'context' => ['context']];
+    }
+
     /**
      * Disabling or regenerating the invitation never revokes or changes a delegation.
      */
@@ -134,10 +219,12 @@ final class delegation_invitation_integration_test extends provider_testcase {
         $invitationdata = $writer->get_data([get_string('pluginname', 'quizaccess_presencial')]);
         $this->assertSame('active', $invitationdata->state);
         $this->assertSame(1, $invitationdata->generation);
-        $delegationdata = $writer->get_data(['delegations', 1]);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial')];
+        $delegationdata = $writer->get_data([...$path, 1]);
         $this->assertSame((int) $revoked->id, (int) $delegationdata->userid);
         $this->assertSame((int) $teacher->id, (int) $delegationdata->revokedby);
-        $this->assertSame([], (array) $writer->get_data(['delegations', 2]));
+        $this->assertSame([], (array) $writer->get_data([...$path, 2]));
         $this->assertStringNotContainsString($issued['token'], json_encode([$invitationdata, $delegationdata]));
     }
 
@@ -158,7 +245,9 @@ final class delegation_invitation_integration_test extends provider_testcase {
         $this->assertTrue(delegation_manager::is_active_applicator($quiz->id, $current->id));
         $this->assertEmpty(provider::get_contexts_for_userid($teacher->id)->get_contextids());
         provider::export_user_data(new approved_contextlist($revoked, 'quizaccess_presencial', [$context->id]));
-        $this->assertSame(0, (int) writer::with_context($context)->get_data(['delegations', 1])->revokedby);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial'), 1];
+        $this->assertSame(0, (int) writer::with_context($context)->get_data($path)->revokedby);
 
         $replacement = invitation::generate($quiz->cmid, 1);
         $this->assertSame(2, $replacement['generation']);

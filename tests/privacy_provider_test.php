@@ -177,8 +177,18 @@ final class privacy_provider_test extends \advanced_testcase {
         $this->assertSame((int) $quiz->id, $export->quizid);
         $this->assertSame(1, $export->attemptnumber);
         $this->assertSame('rejected', $export->state);
+        $this->assertSame(get_string('yes'), $export->active);
         $this->assertSame('Complete rejection explanation.', $export->rejectionreason);
         $this->assertSame(userdate($request->timecreated), $export->timecreated);
+
+        $clock->bump(1);
+        (new release_request_service($clock))->ensure_pending($quiz->id, $student->id, 1);
+        writer::reset();
+        provider::export_user_data($approvedcontexts);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:request', 'quizaccess_presencial')];
+        $this->assertSame(get_string('no'), writer::with_context($context)->get_data([...$path, 1])->active);
+        $this->assertSame(get_string('yes'), writer::with_context($context)->get_data([...$path, 2])->active);
 
         provider::delete_data_for_user($approvedcontexts);
         $this->assertFalse($DB->record_exists('quizaccess_presencial_req', ['id' => $request->id]));

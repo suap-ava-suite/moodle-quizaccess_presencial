@@ -127,8 +127,10 @@ final class delegation_manager_test extends \advanced_testcase {
         );
         \quizaccess_presencial\privacy\provider::export_user_data($approvedcontextlist);
         $writer = \core_privacy\local\request\writer::with_context($context);
-        $revoked = $writer->get_data(['delegations', 1]);
-        $active = $writer->get_data(['delegations', 2]);
+        $path = [get_string('pluginname', 'quizaccess_presencial'),
+            get_string('privacy:exportpath:delegation', 'quizaccess_presencial')];
+        $revoked = $writer->get_data([...$path, 1]);
+        $active = $writer->get_data([...$path, 2]);
         $this->assertNotEmpty($revoked->timerevoked);
         $this->assertSame((int)$user->id, (int)$active->userid);
         $this->assertNull($active->timerevoked);
