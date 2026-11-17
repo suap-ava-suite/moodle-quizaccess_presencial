@@ -36,7 +36,9 @@ echo json_encode(['connectionid' => (int) $DB->get_field_sql('SELECT pg_backend_
 flush();
 try {
     $result = \quizaccess_presencial\local\delegation_manager::include_users(
-        $request['quizid'], [$request['userid']], $request['actorid'],
+        $request['quizid'],
+        [$request['userid']],
+        $request['actorid'],
     );
     echo json_encode(['delegationid' => (int) $result[$request['userid']]->id]) . "\n";
 } catch (\Throwable $exception) {

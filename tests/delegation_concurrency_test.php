@@ -224,7 +224,8 @@ final class delegation_concurrency_test extends \advanced_testcase {
             stream_set_timeout($pipes[1], 30);
             stream_set_timeout($pipes[2], 30);
             $transaction = $DB->start_delegated_transaction();
-            \quizaccess_presencial\local\quiz_lock::execute($quiz->id, static function (): void {});
+            \quizaccess_presencial\local\quiz_lock::execute($quiz->id, static function (): void {
+            });
             $actorid = $switched && !$switchteacher ? (int) get_admin()->id : (int) $teacher->id;
             fwrite($pipes[0], json_encode([
                 'quizid' => (int) $quiz->id,
@@ -293,6 +294,8 @@ final class delegation_concurrency_test extends \advanced_testcase {
     }
 
     /**
+     * Provide authority and session scenarios for delayed direct inclusion.
+     *
      * @return array Named authority and session scenarios.
      */
     public static function delayed_inclusion_provider(): array {
