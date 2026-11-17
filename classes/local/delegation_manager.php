@@ -58,7 +58,10 @@ final class delegation_manager {
         $context = self::quiz_context($quizid);
         require_capability('mod/quiz:manage', $context, $actorid);
 
-        $result = quiz_lock::execute($quizid, function () use ($quizid, $userids, $actorid, $origin, $now, $DB) {
+        $result = quiz_lock::execute($quizid, function () use ($quizid, $userids, $actorid, $origin, $now, $DB, $context) {
+            if (!self::can_manage_after_wait($context, $actorid)) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
             $now ??= \core\di::get(\core\clock::class)->time();
             self::synchronize_configuration($quizid, null, $now);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $quizid], '*', MUST_EXIST);
@@ -85,6 +88,56 @@ final class delegation_manager {
             throw $result;
         }
         return $result;
+    }
+
+    /**
+     * Recheck management authority without trusting role data cached before a lock wait.
+     *
+     * @param \context_module $context Quiz context.
+     * @param int $actorid User performing the inclusion.
+     * @return bool Whether the actor has current management authority.
+     */
+    private static function can_manage_after_wait(\context_module $context, int $actorid): bool {
+        global $CFG, $DB, $USER;
+
+        if (!has_capability('mod/quiz:manage', $context, $actorid)) {
+            return false;
+        }
+        // A switched role replaces the actor's actual assignments in Moodle's capability check.
+        $paths = [];
+        for ($path = $context->path; $path !== ''; $path = substr($path, 0, strrpos($path, '/'))) {
+            $paths[] = $path;
+        }
+        if ((int) $USER->id === $actorid && !empty($USER->access['rsw'])) {
+            foreach ($paths as $path) {
+                if (isset($USER->access['rsw'][$path])) {
+                    $roles = array_unique([(int) $USER->access['rsw'][$path], (int) $CFG->defaultuserroleid]);
+                    $definitions = get_role_definitions_uncached($roles);
+                    $allowed = false;
+                    foreach ($roles as $roleid) {
+                        $permission = null;
+                        foreach ($paths as $rolepath) {
+                            $value = $definitions[$roleid][$rolepath]['mod/quiz:manage'] ?? null;
+                            if ($value === CAP_PROHIBIT) {
+                                return false;
+                            }
+                            $permission ??= $value;
+                        }
+                        $allowed = $allowed || $permission === CAP_ALLOW;
+                    }
+                    return $allowed;
+                }
+            }
+        }
+        if (is_siteadmin($actorid)) {
+            return true;
+        }
+        $authority = get_with_capability_join($context, 'mod/quiz:manage', 'u.id');
+        return !$authority->cannotmatchanyrows && $DB->record_exists_sql(
+            "SELECT 1 FROM {user} u {$authority->joins}
+              WHERE u.id = :inclusionactor AND ({$authority->wheres})",
+            array_merge($authority->params, ['inclusionactor' => $actorid]),
+        );
     }
 
     /**

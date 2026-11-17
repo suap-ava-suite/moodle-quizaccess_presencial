@@ -161,6 +161,153 @@ final class delegation_concurrency_test extends \advanced_testcase {
     }
 
     /**
+     * A direct inclusion must use the actor's authority after waiting for the quiz lock.
+     *
+     * @dataProvider delayed_inclusion_provider
+     * @param bool $revoke Whether to revoke the teacher's role during the wait.
+     * @param bool $othersession Whether the actor differs from the session user.
+     * @param bool $switched Whether an administrator has switched to the temporary role.
+     * @param bool $switchteacher Whether a non-administrator uses the switched role.
+     */
+    public function test_inclusion_rechecks_authority_after_lock_wait(
+        bool $revoke,
+        bool $othersession,
+        bool $switched = false,
+        bool $switchteacher = false,
+    ): void {
+        global $CFG, $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test monitors PostgreSQL locks across independent connections.');
+        }
+        $this->preventResetByRollback();
+        $this->setAdminUser();
+        $course = self::getDataGenerator()->create_course();
+        $quiz = self::getDataGenerator()->create_module('quiz', ['course' => $course->id]);
+        $quiz->coursemodule = $quiz->cmid;
+        $quiz->presencial_enabled = 1;
+        $quiz->presencial_timeopen = time() - 100;
+        $quiz->presencial_timeclose = time() + 3600;
+        \quizaccess_presencial::save_settings($quiz);
+        $context = \context_module::instance($quiz->cmid);
+        $teacher = self::getDataGenerator()->create_user();
+        $applicator = self::getDataGenerator()->create_user();
+        $role = create_role('Temporary manager', 'temporarymanager', '');
+        assign_capability('mod/quiz:manage', CAP_ALLOW, $role, $context->id);
+        role_assign($role, $teacher->id, $context->id);
+        $this->assertTrue(has_capability('mod/quiz:manage', $context, $teacher->id));
+        if ($switchteacher) {
+            role_unassign($role, $teacher->id, $context->id);
+            $switcher = create_role('Role switcher', 'roleswitcher', '');
+            assign_capability('moodle/role:switchroles', CAP_ALLOW, $switcher, $context->id);
+            role_assign($switcher, $teacher->id, $context->id);
+        }
+        $bootstrap = <<<'PHP'
+        $autoload = $argv[1] . '/vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            $autoload = dirname($argv[1]) . '/vendor/autoload.php';
+        }
+        require($autoload);
+        define('PHPUNIT_UTIL', true);
+        require($argv[1] . '/lib/phpunit/bootstrap.php');
+        require($argv[1] . '/mod/quiz/accessrule/presencial/tests/fixtures/delegation_authority_worker.php');
+        PHP;
+        $process = proc_open(
+            [PHP_BINARY, '-r', $bootstrap, $CFG->dirroot],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        $this->assertIsResource($process);
+        $transaction = null;
+        try {
+            stream_set_timeout($pipes[1], 30);
+            stream_set_timeout($pipes[2], 30);
+            $transaction = $DB->start_delegated_transaction();
+            \quizaccess_presencial\local\quiz_lock::execute($quiz->id, static function (): void {});
+            $actorid = $switched && !$switchteacher ? (int) get_admin()->id : (int) $teacher->id;
+            fwrite($pipes[0], json_encode([
+                'quizid' => (int) $quiz->id,
+                'cmid' => (int) $quiz->cmid,
+                'userid' => (int) $applicator->id,
+                'actorid' => $actorid,
+                'sessionid' => $othersession ? (int) get_admin()->id : $actorid,
+                'switchrole' => $switched ? $role : 0,
+            ], JSON_THROW_ON_ERROR) . "\n");
+            fflush($pipes[0]);
+            $connection = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $deadline = microtime(true) + 10;
+            do {
+                $waiting = $DB->get_field_sql(
+                    'SELECT 1 WHERE pg_backend_pid() = ANY(pg_blocking_pids(:connectionid))',
+                    ['connectionid' => $connection['connectionid']],
+                );
+                if ($waiting) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            $this->assertNotFalse($waiting, 'The inclusion must actually wait for the quiz lock.');
+            if ($revoke) {
+                if ($switched) {
+                    assign_capability('mod/quiz:manage', CAP_PREVENT, $role, $context->id, true);
+                } else {
+                    role_unassign($role, $teacher->id, $context->id);
+                }
+            }
+            $transaction->allow_commit();
+            $transaction = null;
+            $result = json_decode(fgets($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame('', stream_get_contents($pipes[2]));
+            $this->setAdminUser();
+            $current = delegation_manager::list_current($quiz->id);
+            if ($revoke) {
+                $this->assertSame(['permissiondenied' => true], $result);
+                $this->assertEmpty($current);
+            } else {
+                $this->assertCount(1, $current);
+                $this->assertSame((int) reset($current)->id, $result['delegationid']);
+                if ($switchteacher) {
+                    $this->setUser($teacher);
+                    role_switch($role, $context);
+                }
+                $again = delegation_manager::include_users($quiz->id, [$applicator->id], $actorid);
+                $this->assertSame($result['delegationid'], (int) $again[$applicator->id]->id);
+            }
+        } finally {
+            if ($transaction) {
+                try {
+                    $transaction->rollback(new \Exception('Concurrent inclusion test cleanup.'));
+                } catch (\Exception $ignored) {
+                    $transaction = null;
+                }
+            }
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+            if (proc_get_status($process)['running']) {
+                proc_terminate($process);
+            }
+            proc_close($process);
+        }
+    }
+
+    /**
+     * @return array Named authority and session scenarios.
+     */
+    public static function delayed_inclusion_provider(): array {
+        return [
+            'actor loses authority' => [true, false],
+            'other actor loses authority' => [true, true],
+            'actor retains authority' => [false, false],
+            'other actor retains authority' => [false, true],
+            'switched administrator loses authority' => [true, false, true],
+            'switched administrator retains authority' => [false, false, true],
+            'switched teacher retains authority' => [false, false, true, true],
+        ];
+    }
+
+    /**
      * Exercise either grant path as the owner of the outer transaction.
      *
      * @return array Named operation scenarios.
