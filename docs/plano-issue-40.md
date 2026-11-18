@@ -1,123 +1,103 @@
-# Plano de correção da issue #40
+# Plano e validação da correção da issue #40
 
 ## Objetivo e estado
 
-Impedir que uma Inclusão direta conceda uma Delegação de aplicação quando o Professor perdeu `mod/quiz:manage` enquanto a operação aguardava o bloqueio do Questionário e essa retirada já foi confirmada.
+Impedir que uma Inclusão direta conceda uma Delegação de aplicação depois que o Professor perdeu a autoridade durante a espera pelo bloqueio do Questionário, preservando as inclusões ainda autorizadas e a idempotência.
 
-- Issue: [#40 — Inclusão de Aplicador é concluída após o Professor perder a permissão](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/issues/40).
-- Branch de trabalho: `fixissue40`, criada a partir da `main` local no commit `16d84e9027096348b24638e52a6ffd17b373c93a`.
-- Planejamento realizado em 17/11/2026. A issue está aberta, marcada como `ready-for-agent` e não possui comentários na consulta desta data.
-- A implementação foi iniciada nesta branch; os resultados das verificações devem ser registrados na entrega.
+- Issue: [#40](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/issues/40).
+- Pull request: [#43](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/43), branch `fixissue40`, destino `main`.
+- Base original: `16d84e9027096348b24638e52a6ffd17b373c93a`.
+- Implementação inicial: `c6c584c`; ajustes de padrões: `37daf91`.
+- Revisão e tratamento dos cinco comentários do PR: 18/11/2026.
 
-## Evidências e limites
+O [ADR 0006](adr/0006-reutilizar-a-capability-de-gestao-do-questionario.md) permanece válido: a autoridade depende de `mod/quiz:manage` no contexto do Questionário, independentemente do nome do papel.
 
-A issue relata uma reprodução com duas conexões PostgreSQL independentes: a Inclusão direta passa pela verificação inicial, espera pelo bloqueio do Questionário e conclui a concessão depois da retirada confirmada da permissão do Professor. O relato inclui o teste e o processo auxiliar necessários para reproduzir a falha no Moodle 4.5.
+## Diagnóstico e reprodução
 
-A leitura de [`delegation_manager::include_users`](../classes/local/delegation_manager.php) confirma que `require_capability` é chamado antes de `quiz_lock::execute`; não existe nova validação de autoridade dentro da operação protegida. Isso é compatível com a reprodução relatada, mas não substitui executá-la.
+Na base original, `delegation_manager::include_users` verificava a capability somente antes de adquirir o bloqueio. A reprodução controlada confirmou que uma atribuição de papel retirada e confirmada durante a espera não impedia a concessão.
 
-[`quiz_lock::execute`](../classes/local/quiz_lock.php) mantém o bloqueio da linha do Questionário até o fim da transação externa. A correção deve validar a autoridade depois dessa espera e antes de sincronizar configurações, criar Delegações ou emitir eventos de concessão.
+A revisão do PR confirmou também dois limites da primeira implementação:
 
-Há um precedente em [`release_request_service::can_manage_quiz`](../classes/local/release_request_service.php): o fluxo de decisões combina as restrições de `has_capability` com uma consulta de autoridade construída pela API Moodle `get_with_capability_join`, tratando administradores explicitamente. Esse precedente será avaliado para a Inclusão direta; ele depende do usuário da sessão, enquanto `include_users` recebe um `$actorid` explícito.
+- Uma permissão temporária reconhecida pelo Moodle era recusada porque a consulta considerava apenas atribuições persistidas.
+- A retirada do status de administrador durante a espera não era percebida porque `is_siteadmin` usava a configuração carregada no início da requisição.
 
-O [ADR 0006](adr/0006-reutilizar-a-capability-de-gestao-do-questionario.md) continua válido: a autoridade depende da capability contextual, independentemente do nome do papel. Não há mudança de domínio ou decisão arquitetural que exija novo ADR.
+Os novos testes reproduziram essas falhas antes dos ajustes. Foram acrescentados controles para evitar que a preservação de permissões temporárias reaceitasse uma atribuição persistida revogada em cache.
 
-## Estratégia de trabalho
+## Implementação entregue
 
-Aplicar o fluxo recomendado por `ask-matt` para bugs: primeiro obter uma reprodução automatizada que falhe pelo sintoma exato, depois corrigir em ciclos de teste e implementação e finalizar com revisão contra os padrões do repositório e os critérios da issue.
+[`delegation_manager::include_users`](../classes/local/delegation_manager.php) mantém a verificação inicial e revalida a autoridade imediatamente após adquirir o bloqueio, antes de sincronizar configurações ou conceder Delegações.
 
-Como a solicitação atual é de planejamento, a reprodução, a investigação dinâmica e a implementação ficam para a execução deste plano. A issue já contém uma especificação pronta; não é necessário criar outra issue, decompor o trabalho em tickets ou publicar um novo plano no rastreador.
+A revalidação:
 
-## Sequência de implementação
+1. Mantém as restrições de `has_capability` e verifica a existência atual de uma conta não excluída.
+2. Consulta a lista vigente de administradores diretamente na configuração persistida, respeitando `siteadmins` quando forçado por `config.php` e a mesma comparação de IDs usada pelo Moodle.
+3. Obtém as atribuições atuais e os papéis implícitos por `get_user_roles_with_special`.
+4. Usa `get_roles_with_cap_in_context` para delegar ao Moodle a precedência de permissões do papel assumido, do papel padrão e das atribuições persistidas. Não carrega as definições de todas as capabilities do site nem mantém uma cópia desse algoritmo.
+5. Quando a autoridade depende de acesso temporário, pede nova concessão aos plugins de matrícula ativos por `try_guestaccess`, usando uma cópia dos dados da sessão construída apenas com atribuições atuais. As configurações relevantes de matrícula são lidas novamente, e os objetos globais originais são restaurados em `finally`.
+6. Retorna a exceção de permissão pela operação protegida e a lança depois de `quiz_lock::execute`, seguindo o padrão existente de erros esperados e preservando a transação externa.
 
-### 1. Fixar a reprodução no limite público
+### Contrato de permissões temporárias
 
-Adaptar a reprodução fornecida na issue para [`tests/delegation_concurrency_test.php`](../tests/delegation_concurrency_test.php), reutilizando o padrão de processos independentes existente. Avaliar uma extensão compatível de [`tests/fixtures/delegation_worker.php`](../tests/fixtures/delegation_worker.php); se o protocolo ficar confuso, usar uma fixture específica para a corrida de autoridade.
+A Inclusão direta preserva papéis temporários cuja concessão possa ser renovada por uma instância ativa de matrícula por meio de `try_guestaccess`. Papéis presentes apenas no cache da sessão, sem uma origem que reconceda o acesso, não são mantidos como prova de autoridade.
 
-O teste deve:
+Essa distinção é necessária porque `load_temp_course_role` e o cache de atribuições persistidas usam a mesma estrutura, sem uma marca de origem. Preservar indiscriminadamente a diferença entre sessão e banco poderia reaceitar um papel revogado antes da chamada.
 
-1. Usar `advanced_testcase`, chamar `resetAfterTest()` antes das alterações e `preventResetByRollback()` para permitir dados confirmados visíveis pelas duas conexões.
-2. Criar Questionário, Professor e Conta elegível pelos geradores/APIs Moodle, com Liberação Presencial habilitada, Período de Autorização vigente e um papel temporário que conceda `mod/quiz:manage` no contexto correto.
-3. Manter o bloqueio do Questionário na conexão A e iniciar `delegation_manager::include_users` no processo B com a permissão inicialmente válida e os dados de acesso já carregados.
-4. Confirmar a espera real de B pelo bloqueio de A antes de revogar a atribuição de papel em A e confirmar a transação. Usar a observação PostgreSQL de `pg_blocking_pids`, já empregada em outros testes do projeto; uma mensagem de início ou um atraso fixo não comprova a espera.
-5. Receber de B uma exceção de permissão identificável, preferencialmente `required_capability_exception`/`nopermissions`, e verificar como administrador, por `delegation_manager::list_current`, que nenhuma Delegação foi concedida.
-6. Encerrar processos, pipes e transações em `finally`, com prazos limitados e diagnóstico para falha de sincronização.
+A revalidação respeita proibições das atribuições atuais e as regras contextuais do Moodle. Ela não cria matrículas nem atribuições persistidas para conceder acesso temporário.
 
-As consultas PostgreSQL servem apenas para coordenar as conexões. O resultado do produto deve ser verificado pelas operações públicas, sem chamar métodos privados nem afirmar detalhes da estrutura SQL do plugin. Restringir a instrumentação específica ao PostgreSQL e sinalizar o teste como não aplicável nos demais bancos, seguindo os precedentes da suíte.
+## Testes e diagnóstico
 
-**Conclusão desta etapa:** executar o teste na base e registrar uma falha causada pela concessão indevida após a retirada confirmada da permissão. Erros de ambiente, de processo ou de sincronização não satisfazem esse critério.
+A cobertura está nos limites públicos de [`tests/delegation_manager_test.php`](../tests/delegation_manager_test.php) e [`tests/delegation_concurrency_test.php`](../tests/delegation_concurrency_test.php).
 
-### 2. Validar a autoridade vigente sob o bloqueio
-
-Alterar somente o caminho de Inclusão direta em [`classes/local/delegation_manager.php`](../classes/local/delegation_manager.php), mantendo a verificação inicial para recusar imediatamente um ator já sem permissão e acrescentando uma validação decisiva no início da operação protegida pelo bloqueio.
-
-Essa validação deve:
-
-- Considerar o `$actorid` informado, tanto quando é o usuário da sessão quanto quando difere dele.
-- Consultar a autoridade confirmada depois da espera, sem depender apenas de repetir `require_capability` sobre dados de acesso carregados anteriormente.
-- Preservar a semântica Moodle de contexto, herança de permissões, restrições da sessão e troca para papel menos privilegiado, além dos privilégios implícitos de administradores.
-- Recusar a operação antes de qualquer concessão parcial, atualização de Delegação ou evento de concessão, usando o contrato de erro de permissão já existente.
-- Preservar as transações aninhadas e a ordem atual dos bloqueios.
-
-Preferir a abordagem já presente no fluxo de decisões, adaptada ao ator explícito e confinada à Inclusão direta. Validar as APIs no Moodle suportado antes de escolher o mecanismo definitivo. Uma alternativa de atualização de cache só é aceitável se demonstrar, pelo teste concorrente, a renovação dos dados do ator correto e a preservação das restrições da sessão. Evitar manipular diretamente as estruturas privadas de cache do Moodle ou reproduzir manualmente suas regras de permissão.
-
-**Decisão durante a implementação:** a consulta `get_with_capability_join` verifica as atribuições vigentes para usuários sem papel assumido. Para um papel assumido na sessão, ela não representa a autorização do Moodle; nesse caso, a verificação usa `get_role_definitions_uncached` e reproduz a precedência de permissões dos papéis assumido e padrão do Moodle. O teste concorrente também cobre a retirada da capability do papel assumido. Uma tentativa de recarregar todos os caches de acesso provocou falha na suíte de integração de privacidade e foi descartada.
-
-**Conclusão desta etapa:** o mesmo teste passa por recusa de permissão e ausência de Delegação, sem atualização artificial do cache no processo B pelo próprio teste.
-
-### 3. Confirmar os comportamentos preservados
-
-Ampliar a cobertura uma situação por vez, reutilizando [`tests/delegation_manager_test.php`](../tests/delegation_manager_test.php) e o teste concorrente:
-
-| Situação | Resultado esperado |
+| Cenário | Resultado esperado |
 | --- | --- |
-| Permissão retirada e confirmada durante a espera | Recusa de permissão e nenhuma nova Delegação |
-| Mesma espera, sem retirada de permissão | Inclusão concluída normalmente |
-| Repetição da Inclusão direta com permissão válida | Mesma Delegação, sem duplicação |
-| Ator já sem permissão ao iniciar | Recusa imediata pelo contrato existente |
-| Ator explícito diferente do usuário da sessão | Decisão baseada na autoridade do ator informado |
-| Professor com permissão herdada do curso | Inclusão permitida no contexto do Questionário |
-| Administrador e usuário com papel temporariamente reduzido | Preservação da semântica Moodle de autoridade |
+| Atribuição retirada durante a espera, para ator da sessão ou explícito | Recusa sem nova Delegação |
+| Permissão mantida durante a espera | Inclusão válida e repetição idempotente |
+| Atribuição revogada antes da chamada, mas ainda no cache | Recusa; não é tratada como concessão temporária |
+| Administrador removido sem outro privilégio | Recusa |
+| Administrador removido com papel de Professor ainda válido | Inclusão permitida pelo papel |
+| Lista de administradores forçada em `config.php`, inclusive com espaços | Prevalência da configuração forçada |
+| Concessão temporária renovada por plugin ativo | Inclusão permitida e idempotente |
+| Instância de matrícula desabilitada ou permissão temporária retirada | Recusa |
+| Proibição persistida concomitante à concessão temporária | Recusa |
+| Conta excluída durante a espera | Recusa, mesmo com permissão no papel padrão |
+| Combinações de permissões no curso, Questionário e papel padrão | Precedência aplicada pelo Moodle |
 
-Manter os testes existentes de idempotência, elegibilidade e concessão concorrente por convite. Acrescentar casos somente onde a alteração introduzir risco ainda não coberto. Não usar administrador como Professor no teste de revogação, pois seus privilégios implícitos invalidariam esse cenário.
+Os testes concorrentes usam processos e conexões independentes. `pg_blocking_pids` confirma a espera real pelo bloqueio antes da alteração de autoridade. A ausência ou existência de Delegações é observada pela operação pública `list_current`.
 
-**Conclusão desta etapa:** a corrida de retirada e o controle positivo da espera passam, a idempotência permanece e as variantes relevantes do ator não contornam nem perdem a autorização correta.
+As tabelas modificadas pelo subprocesso são informadas ao rastreador público do PHPUnit no processo principal, garantindo a limpeza entre cenários. Em caso de falha antes dessa resposta, a limpeza considera todas as tabelas.
 
-### 4. Executar as verificações e revisar
+A inicialização dos subprocessos foi centralizada, preservando o fallback de autoload para Moodle 5.1 e `max_input_vars=5000`. As respostas são verificadas antes da decodificação, identificando se faltou a conexão ou o resultado da inclusão. A fixture captura somente `required_capability_exception` como recusa esperada; outras exceções permanecem visíveis no diagnóstico.
 
-Preparar um ambiente Moodle com PHPUnit inicializado, processos independentes e banco/diretório de dados exclusivos de teste. Começar por Moodle 4.5, PHP 8.3 e PostgreSQL 15, coerente com a evidência da issue. O ambiente Docker de uso manual descrito no README não inicializa PHPUnit/Behat; não presumir que ele está pronto para essa execução. Nesta sessão, `php` não foi encontrado no ambiente de execução do agente.
+## Validação
 
-Comandos previstos, executados a partir da raiz do Moodle 4.5 e com o plugin instalado no caminho padrão:
+Ambiente local: Moodle 4.5.12, PHP 8.3.36, PostgreSQL 15.19 e PHPUnit 9.6.34, com banco e diretórios exclusivos de teste.
+
+A partir da raiz de um Moodle com PHPUnit preparado e o plugin instalado no caminho padrão:
 
 ```bash
-# Nome proposto para o teste de regressão a criar.
-vendor/bin/phpunit --filter test_capability_revoked_during_lock_wait mod/quiz/accessrule/presencial/tests/delegation_concurrency_test.php
-
 vendor/bin/phpunit mod/quiz/accessrule/presencial/tests/delegation_manager_test.php
 vendor/bin/phpunit mod/quiz/accessrule/presencial/tests/delegation_concurrency_test.php
 vendor/bin/phpunit --testsuite quizaccess_presencial_testsuite
 ```
 
-Executar lint, Moodle Code Checker e PHPDoc nos arquivos alterados, usando a configuração existente do projeto. Confirmar a cobertura funcional em MariaDB e as versões suportadas pela matriz de CI; a observação de espera específica de PostgreSQL permanece explicitamente limitada a esse banco. Não afirmar reprodução concorrente em MariaDB sem uma verificação equivalente.
+O teste original também pode ser executado isoladamente:
 
-Usar as jornadas Behat existentes de gestão/Delegações como verificação de integração quando o ambiente estiver disponível. Não criar um cenário de navegador para substituir a sincronização determinística entre conexões.
+```bash
+vendor/bin/phpunit --filter test_inclusion_rechecks_authority_after_lock_wait mod/quiz/accessrule/presencial/tests/delegation_concurrency_test.php
+```
 
-Revisar o diff contra os critérios da issue e as instruções do repositório, com atenção à autoridade do ator explícito, caches, ausência de efeitos em caso de recusa e comportamento transacional. Registrar na entrega quais verificações foram executadas e suas limitações.
+Resultados finais: **256 testes e 1.628 verificações aprovados** na suíte completa; Moodle Code Checker 3.9.0 aprovado em todo o plugin; sintaxe PHP e `git diff --check` aprovados.
 
-## Limites do fix
+A revisão independente dos padrões e da conformidade com a issue foi repetida após os ajustes. Os resultados locais não substituem a matriz de versões e bancos do CI; a sincronização por monitoramento de bloqueios é específica de PostgreSQL e é explicitamente ignorada nos demais bancos. Behat não foi executado localmente nesta rodada.
 
-- Sem alterações de banco, capabilities novas, mudanças de interface ou nova regra de domínio.
-- Não estender automaticamente a correção a revogação, geração de convite ou outras operações. Padrões semelhantes são candidatos a investigação própria, não evidência de falha coberta pela #40.
-- Não extrair um serviço geral de autorização nem refatorar o fluxo de decisões apenas para compartilhar código nesta correção.
-- O compromisso é considerar a retirada já confirmada durante a espera do bloqueio; o plano não promete atomicidade global contra qualquer mudança de permissão posterior à validação.
-- A consulta de atribuições persistidas pode recusar uma capability concedida exclusivamente por papel temporário mantido na sessão por um plugin de matrícula. A mudança concorrente do próprio status de administrador também depende da configuração carregada pelo Moodle; esses casos não foram cobertos pela reprodução da issue.
-- Preservar as alterações locais preexistentes em `README.md`, `docs/guia-de-uso.md`, `docs/imagens/` e `docs/validacao-local-2026-11-13.md`.
-- Commit, push, abertura de PR e atualizações no GitHub ficam fora desta etapa de planejamento.
+## Escopo e aceite
 
-## Aceite final da implementação
+A mudança fica restrita à Inclusão direta e aos testes associados. Não altera o esquema de dados, não cria capabilities nem modifica a interface. Revogação de Delegações e gestão de convites permanecem fora desta correção.
 
-- [ ] A reprodução falha antes da correção pelo sintoma da #40 e passa depois dela.
-- [ ] A autoridade é verificada após o bloqueio, com dados vigentes, antes de conceder Delegações.
-- [ ] Retirada confirmada durante a espera produz recusa de permissão e nenhuma nova Delegação.
-- [ ] Inclusão com permissão válida e repetição idempotente continuam funcionando.
-- [ ] A cobertura usa conexões independentes e não depende de invalidar o cache pelo teste para passar.
-- [ ] As verificações pertinentes e a revisão foram concluídas, com limitações de ambiente/banco documentadas.
+- [x] A retirada confirmada durante a espera é percebida antes da concessão.
+- [x] Permissão válida e repetição idempotente são preservadas.
+- [x] Administradores são avaliados pela configuração vigente, respeitando `config.php`.
+- [x] Temporários são revalidados por uma origem ativa, sem confiar em atribuições revogadas em cache.
+- [x] A precedência de permissões é calculada pelas APIs do Moodle.
+- [x] O bootstrap e os diagnósticos dos subprocessos foram ajustados conforme a revisão.
+- [x] Os limites de compatibilidade e de validação estão documentados.
