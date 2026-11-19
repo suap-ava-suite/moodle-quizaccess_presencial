@@ -173,6 +173,7 @@ $string['rejectionreasonrequired'] = 'Enter a reason for rejecting this request.
 $string['requestattemptalreadyexists'] = 'An attempt has already been created for this request. ' .
     'Return to the quiz to resume it.';
 $string['requestauthorized'] = 'Your request was authorized. Continue to start your attempt.';
+$string['requestconnectionerror'] = 'Unable to update your release request. The connection to the server is unavailable. This page will keep trying to reconnect automatically.';
 $string['requestconsumed'] = 'This authorization has already been used. Return to the quiz to continue your attempt.';
 $string['requestdescription'] = 'Starting a new attempt requires in-person release. Your request will appear on a ' .
     'waiting page and update automatically.';

@@ -59,8 +59,10 @@
          role="status" aria-live="polite" data-region="request-status">
         {{message}}
     </div>
+    <div role="status" aria-live="polite" aria-atomic="true" class="alert-warning"
+         data-region="request-connection" data-message="{{#str}}requestconnectionerror, quizaccess_presencial{{/str}}"></div>
     {{#pending}}
-        <p>{{#str}}requestpolling, quizaccess_presencial{{/str}}</p>
+        <p data-region="request-polling">{{#str}}requestpolling, quizaccess_presencial{{/str}}</p>
         <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
     {{/pending}}
     {{#authorized}}

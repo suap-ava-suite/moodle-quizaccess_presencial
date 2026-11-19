@@ -21,6 +21,22 @@ export const init = (requestId) => {
     if (!container) {
         return;
     }
+    const connectionRegion = container.querySelector('[data-region="request-connection"]');
+    const pollingMessage = container.querySelector('[data-region="request-polling"]');
+    let connectionUnavailable = false;
+    const updateConnection = (unavailable) => {
+        if (unavailable === connectionUnavailable) {
+            return;
+        }
+        connectionUnavailable = unavailable;
+        if (connectionRegion) {
+            connectionRegion.textContent = unavailable ? connectionRegion.dataset.message : '';
+            connectionRegion.classList.toggle('alert', unavailable);
+        }
+        if (pollingMessage) {
+            pollingMessage.hidden = unavailable;
+        }
+    };
     const renderedState = container.getAttribute('data-state');
     // HTML normalizes textarea CRLF line endings; compare without changing the stored explanation.
     const normalizeReason = (reason) => reason.replace(/\r\n?/g, '\n');
@@ -31,6 +47,7 @@ export const init = (requestId) => {
             methodname: 'quizaccess_presencial_read_request',
             args: {requestid: requestId},
         }])[0].then((result) => {
+            updateConnection(false);
             if (result.state !== renderedState || normalizeReason(result.rejectionreason) !== renderedReason) {
                 window.location.reload();
                 return result;
@@ -42,6 +59,7 @@ export const init = (requestId) => {
             window.location.reload();
             return result;
         }).catch(() => {
+            updateConnection(true);
             window.setTimeout(poll, 5000);
         });
     };
