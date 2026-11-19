@@ -197,6 +197,39 @@ final class delegation_manager_test extends \advanced_testcase {
     }
 
     /**
+     * An active enrolment plugin can renew a temporary management role without a role assignment.
+     */
+    public function test_temporary_enrolment_role_can_include_users(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->create_configured_quiz();
+        $teacher = self::getDataGenerator()->create_user();
+        $applicator = self::getDataGenerator()->create_user();
+        $coursecontext = \context_course::instance($quiz->course);
+        $context = \context_module::instance($quiz->cmid);
+        $role = create_role('Temporary manager', 'temporarymanager', '');
+        assign_capability('mod/quiz:manage', CAP_ALLOW, $role, $coursecontext->id);
+        set_config('guestroleid', $role);
+        set_config('enrol_plugins_enabled', 'manual,guest');
+        $guest = enrol_get_plugin('guest');
+        $instanceid = $guest->add_instance(get_course($quiz->course), [
+            'status' => ENROL_INSTANCE_ENABLED,
+            'password' => '',
+        ]);
+        $instance = $GLOBALS['DB']->get_record('enrol', ['id' => $instanceid], '*', MUST_EXIST);
+        $this->setUser($teacher);
+        $this->assertNotFalse($guest->try_guestaccess($instance));
+        $this->assertTrue(has_capability('mod/quiz:manage', $context));
+
+        $included = delegation_manager::include_users($quiz->id, [$applicator->id], $teacher->id);
+        $again = delegation_manager::include_users($quiz->id, [$applicator->id], $teacher->id);
+
+        $this->assertSame((int) $included[$applicator->id]->id, (int) $again[$applicator->id]->id);
+        $this->assertCount(1, delegation_manager::list_current($quiz->id));
+        $this->assertTrue(has_capability('mod/quiz:manage', $context));
+    }
+
+    /**
      * Ineligible accounts cannot receive a delegation.
      */
     public function test_deleted_suspended_unconfirmed_and_non_login_accounts_are_rejected(): void {
