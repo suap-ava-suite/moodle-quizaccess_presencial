@@ -15,6 +15,8 @@ $CFG->prefix = 'mdl_';
 $CFG->dboptions = ['dbpersist' => false, 'dbport' => 5432];
 
 $CFG->wwwroot = getenv('MOODLE_WWWROOT');
+$CFG->sslproxy = getenv('MOODLE_SSLPROXY') === '1';
+$CFG->reverseproxy = getenv('MOODLE_REVERSEPROXY') === '1';
 $CFG->dataroot = '/var/www/moodledata';
 $CFG->admin = 'admin';
 $CFG->directorypermissions = 02770;

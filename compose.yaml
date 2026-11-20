@@ -25,7 +25,9 @@ services:
       MOODLE_DB_NAME: moodle
       MOODLE_DB_USER: moodle
       MOODLE_DB_PASSWORD: moodle-local
-      MOODLE_WWWROOT: "http://localhost:${MOODLE_PORT:-8085}"
+      MOODLE_WWWROOT: "${MOODLE_WWWROOT:-http://localhost:${MOODLE_PORT:-8085}}"
+      MOODLE_SSLPROXY: "${MOODLE_SSLPROXY:-0}"
+      MOODLE_REVERSEPROXY: "${MOODLE_REVERSEPROXY:-0}"
       MOODLE_ADMIN_USER: admin
       MOODLE_ADMIN_PASSWORD: "${MOODLE_ADMIN_PASSWORD:-PresencialLocal_2026!}"
     volumes:
