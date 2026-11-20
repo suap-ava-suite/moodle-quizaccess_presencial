@@ -78,6 +78,12 @@ usando PHP 8.3 e PostgreSQL 15. Quando a instalação terminar, acesse
 <http://localhost:8085> com o usuário `admin` e a senha `PresencialLocal_2026!`.
 O serviço fica disponível somente na máquina local e não envia e-mails.
 
+A imagem bloqueia o acesso HTTP a arquivos e diretórios ocultos, incluindo `.env`
+e `.git`, pois a raiz do repositório é montada no diretório público do plugin.
+O bloqueio também se aplica ao acesso por túneis e retorna **403 Forbidden**.
+Ao atualizar um ambiente existente, execute `docker compose up -d --build moodle`
+para incorporar essa proteção à imagem.
+
 O código deste repositório é montado diretamente no Moodle. Alterações no plugin ficam
 disponíveis sem reconstruir a imagem; depois de uma mudança que exija atualização ou
 limpeza de cache, execute:
@@ -112,6 +118,100 @@ docker compose down
 
 Os dados ficam nos volumes Docker `database` e `moodledata` deste projeto Compose.
 Este ambiente serve para testes manuais; ele não configura PHPUnit ou Behat.
+
+### QR Code pelo celular com encaminhamento de porta do VS Code
+
+O fluxo de QR Code exige HTTPS no celular. A exceção HTTP para `localhost` não
+abrange um endereço como `http://192.168.1.10:8085`. Para testar sem configurar
+certificados na rede local, use o encaminhamento de porta do VS Code:
+
+1. Com o Docker em execução, abra **Ports** no VS Code e encaminhe a porta **8085**
+   (ou a porta definida em `MOODLE_PORT`). O serviço local usa **HTTP**; o endereço
+   externo fornecido pelo túnel deve usar **HTTPS**.
+2. Copie o endereço externo. A visibilidade **Private** exige autenticação no
+   túnel com a mesma conta do VS Code, inclusive no celular. **Public** dispensa
+   esse login adicional, mantendo o login do Moodle. Consulte a
+   [documentação de encaminhamento de portas do VS Code](https://code.visualstudio.com/docs/debugtest/port-forwarding).
+3. Na raiz deste repositório, crie ou edite `.env`, preservando outras variáveis
+   existentes, e configure o endereço externo sem barra final:
+
+   ```dotenv
+   MOODLE_WWWROOT=https://ENDERECO-DO-TUNEL.devtunnels.ms
+   MOODLE_SSLPROXY=1
+   MOODLE_REVERSEPROXY=1
+   ```
+
+4. Aplique a configuração; os volumes e os dados existentes são preservados:
+
+   ```bash
+   docker compose up -d --build moodle
+   ```
+
+O Moodle passa a gerar links, imagens e QR Codes com esse endereço. A configuração
+`MOODLE_SSLPROXY=1` informa que o túnel termina o HTTPS e encaminha HTTP ao
+container. `MOODLE_REVERSEPROXY=1` permite que o VS Code encaminhe o pedido com o
+nome interno do servidor, conforme a [configuração de proxy do Moodle](https://github.com/moodle/moodle/blob/v4.5.12/config-dist.php).
+Enquanto estiver nesse modo, abra a mesma URL HTTPS no computador e no celular.
+Se o endereço do túnel mudar, atualize `.env` e repita o comando.
+
+No computador, entre como estudante e inicie um Questionário com Liberação
+Presencial e Período de Autorização vigente. A página de espera exibirá o QR Code.
+No celular, abra primeiro o endereço HTTPS no navegador, conclua o acesso ao túnel
+se necessário e entre como Professor ou Aplicador daquele Questionário. Leia um
+QR Code atual com a câmera e abra o endereço no mesmo navegador em que fez login.
+A leitura autoriza a Solicitação; o estudante ainda precisa clicar em **Iniciar
+tentativa** no computador. Se o leitor não enviar Fetch Metadata, use outro
+navegador ou leitor compatível. O código muda a cada 60 segundos.
+
+Para voltar ao acesso local, remova `MOODLE_WWWROOT`, `MOODLE_SSLPROXY` e
+`MOODLE_REVERSEPROXY` de `.env`,
+execute `docker compose up -d moodle` e encerre o encaminhamento no VS Code. O
+arquivo `.env` é ignorado pelo Git.
+
+### QR Code pelo celular com ngrok e autorização pelo Professor
+
+Com o Moodle local ativo, instale e autentique o ngrok conforme o
+[guia oficial](https://ngrok.com/docs/start). No macOS:
+
+```bash
+brew install --cask ngrok
+ngrok config add-authtoken SEU_TOKEN
+ngrok http http://localhost:8085 --inspect=false
+```
+
+Informe o token somente no seu terminal. Mantenha o ngrok em execução e copie a
+URL HTTPS que ele apresentar. Na raiz do repositório, crie ou atualize `.env`,
+preservando outras variáveis existentes:
+
+```dotenv
+MOODLE_WWWROOT=https://SEU-DOMINIO.ngrok-free.app
+MOODLE_SSLPROXY=1
+MOODLE_REVERSEPROXY=0
+```
+
+Use o domínio realmente fornecido pelo ngrok, sem barra final. Essa configuração
+considera o encaminhamento padrão, que preserva o Host externo. Aplique com
+`docker compose up -d --build moodle`. Se estiver migrando do túnel do VS Code,
+substitua o endereço anterior e altere também `MOODLE_REVERSEPROXY` para `0`.
+
+No celular, abra primeiro a URL HTTPS no navegador e avance em **Visit Site** se
+o ngrok apresentar sua página de entrada. Entre com uma conta de Professor que
+tenha `mod/quiz:manage` no contexto do Questionário, por exemplo, matriculada como
+Professor editor na disciplina. Essa conta pode autorizar sem receber Delegação
+de Aplicador. Consulte os detalhes da
+[página de entrada do plano gratuito](https://ngrok.com/docs/pricing-limits/free-plan-limits).
+
+No computador, use a mesma URL HTTPS, entre como estudante e inicie um
+Questionário com Liberação Presencial e Período de Autorização vigente. Apresente
+o QR Code da página de espera ao Professor. No celular, leia o código com a câmera
+e abra o endereço no mesmo navegador em que entrou como Professor. A leitura
+autoriza a Solicitação imediatamente; o estudante ainda confirma em **Iniciar
+tentativa**. Use um código atual, pois ele muda a cada 60 segundos.
+
+Ao encerrar o teste, pare o ngrok. Para recuperar o acesso em `localhost`, remova
+`MOODLE_WWWROOT`, `MOODLE_SSLPROXY` e `MOODLE_REVERSEPROXY` de `.env` e execute
+`docker compose up -d moodle`. Se o domínio mudar na próxima execução do ngrok,
+atualize `.env` antes de tentar ler outro QR Code.
 
 ### Testes automatizados
 
