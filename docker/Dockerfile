@@ -11,7 +11,9 @@ COPY config.php.template /var/www/html/config.php
 COPY is-installed.php.template /usr/local/bin/moodle-is-installed.php
 COPY init.sh /docker-entrypoint.d/50-presencial-init.sh
 COPY php.ini /usr/local/etc/php/conf.d/zz-presencial-local.ini
+COPY apache-security.conf /etc/apache2/conf-available/presencial-security.conf
 
-RUN chmod +x /docker-entrypoint.d/50-presencial-init.sh
+RUN a2enconf presencial-security \
+    && chmod +x /docker-entrypoint.d/50-presencial-init.sh
 
 WORKDIR /var/www/html

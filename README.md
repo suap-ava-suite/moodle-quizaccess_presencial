@@ -78,6 +78,12 @@ usando PHP 8.3 e PostgreSQL 15. Quando a instalação terminar, acesse
 <http://localhost:8085> com o usuário `admin` e a senha `PresencialLocal_2026!`.
 O serviço fica disponível somente na máquina local e não envia e-mails.
 
+A imagem bloqueia o acesso HTTP a arquivos e diretórios ocultos, incluindo `.env`
+e `.git`, pois a raiz do repositório é montada no diretório público do plugin.
+O bloqueio também se aplica ao acesso por túneis e retorna **403 Forbidden**.
+Ao atualizar um ambiente existente, execute `docker compose up -d --build moodle`
+para incorporar essa proteção à imagem.
+
 O código deste repositório é montado diretamente no Moodle. Alterações no plugin ficam
 disponíveis sem reconstruir a imagem; depois de uma mudança que exija atualização ou
 limpeza de cache, execute:
