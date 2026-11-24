@@ -108,7 +108,7 @@ Em Moodle 4.5.12, PHP 8.3.24 e PostgreSQL 15.19, a suíte PHPUnit passou com 261
 
 Um teste de atualização em banco isolado instalou a versão anterior, gerou convite ativo e aplicou o upgrade. O link anterior permaneceu válido e não recuperável; após regeneração explícita, deixou de ser válido e o novo link tornou-se recuperável. Esses resultados não substituem a matriz de versões, bancos e demais verificações do CI.
 
-O PHPDoc Checker, a validação do plugin e a verificação de savepoints também passaram. O lint Mustache não pôde concluir porque o validador HTML estava indisponível; a verificação em navegador passou. A matriz do CI e a conferência da mensagem no navegador em Português do Brasil permanecem pendentes.
+O PHPDoc Checker, a validação do plugin e a verificação de savepoints também passaram. O lint Mustache passou nos três templates usando o validador HTML local após a indisponibilidade do serviço remoto. Em um ambiente isolado configurado em Português do Brasil, dois cenários Behat no Chrome passaram com 29 passos: o Professor copiou o mesmo link após retornar à gestão e o convite expirado exibiu uma única mensagem com data e hora, sem as frases anteriores nem o botão de cópia. A matriz de versões e bancos do CI permanece pendente.
 
 ## Critérios de conclusão e limites
 
