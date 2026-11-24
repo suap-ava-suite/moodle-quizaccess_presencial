@@ -46,10 +46,12 @@ final class invitation_acceptance_test extends \advanced_testcase {
 
         $this->setUser($teacher);
         $issued = invitation::generate($quiz->cmid, 0);
+        $recovered = invitation::get_current_token($quiz->cmid);
+        $this->assertSame($issued['token'], $recovered);
         $this->setUser($applicator);
 
         $sink = $this->redirectEvents();
-        $accepted = invitation::accept($quiz->cmid, $issued['token']);
+        $accepted = invitation::accept($quiz->cmid, $recovered);
 
         $this->assertTrue($accepted['created']);
         $this->assertFalse(delegation_manager::is_active_applicator($quiz->id, $applicator->id));

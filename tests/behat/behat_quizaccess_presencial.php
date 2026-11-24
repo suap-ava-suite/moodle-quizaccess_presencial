@@ -365,6 +365,17 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Check that the current link is the previously observed invitation.
+     *
+     * @Then the invitation link should match the remembered link
+     */
+    public function the_invitation_link_should_match_the_remembered_link(): void {
+        if (!$this->previouslink || $this->find_field('Invitation link')->getAttribute('value') !== $this->previouslink) {
+            throw new ExpectationException('The invitation link changed.', $this->getSession());
+        }
+    }
+
+    /**
      * Open the invitation previously observed in the generated-link response.
      *
      * @When /^I open the remembered invitation link$/
@@ -546,6 +557,27 @@ class behat_quizaccess_presencial extends behat_base {
             (new \quizaccess_presencial\task\expire_invitations())->execute();
         } finally {
             \core\di::set(\core\clock::class, $clock);
+        }
+    }
+
+    /**
+     * Check the complete localized expiration message using the quiz authorization deadline.
+     *
+     * @Then /^the invitation for "([^"]+)" should display its expiration date and time$/
+     * @param string $quizname Quiz name.
+     */
+    public function the_invitation_displays_its_expiration_date_and_time(string $quizname): void {
+        global $DB;
+
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        $expected = get_string('invitationexpiredat', 'quizaccess_presencial', userdate((int) $quiz->presencial_timeclose));
+        $page = $this->getSession()->getPage()->getText();
+        if (substr_count($page, $expected) !== 1) {
+            throw new ExpectationException(
+                'Expected the invitation expiration message exactly once: ' . $expected,
+                $this->getSession()
+            );
         }
     }
 

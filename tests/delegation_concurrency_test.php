@@ -221,6 +221,60 @@ final class delegation_concurrency_test extends \advanced_testcase {
     }
 
     /**
+     * Invitation management rechecks authority after waiting for the quiz lock.
+     *
+     * @dataProvider delayed_invitation_authority_provider
+     * @param bool $revoke Whether the manager's role is revoked while waiting.
+     */
+    public function test_invitation_details_recheck_authority_after_lock_wait(bool $revoke): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test monitors PostgreSQL locks across independent connections.');
+        }
+        $this->preventResetByRollback();
+        $this->setAdminUser();
+        $quiz = $this->create_authority_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $context = \context_module::instance($quiz->cmid);
+        $teacher = self::getDataGenerator()->create_user();
+        $role = create_role('Invitation manager', 'invitationmanager', '');
+        assign_capability('mod/quiz:manage', CAP_ALLOW, $role, $context->id);
+        role_assign($role, $teacher->id, $context->id);
+        $this->assertTrue(has_capability('mod/quiz:manage', $context, $teacher->id));
+
+        $result = $this->run_delayed_inclusion($quiz, [
+            'operation' => 'invitation_details',
+            'actorid' => (int) $teacher->id,
+            'sessionid' => (int) $teacher->id,
+        ], static function () use ($revoke, $role, $teacher, $context): void {
+            if ($revoke) {
+                role_unassign($role, $teacher->id, $context->id);
+            }
+        });
+        if ($revoke) {
+            $this->assertSame(['permissiondenied' => true], $result);
+        } else {
+            $this->assertSame(['token' => $issued['token'], 'generation' => 1], $result);
+        }
+        $this->setAdminUser();
+        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
+     * Provide both authority outcomes after a lock wait.
+     *
+     * @return array Named authority scenarios.
+     */
+    public static function delayed_invitation_authority_provider(): array {
+        return [
+            'manager loses authority' => [true],
+            'manager retains authority' => [false],
+        ];
+    }
+
+    /**
      * Provide authority and session scenarios for delayed direct inclusion.
      *
      * @return array Named authority and session scenarios.
@@ -613,7 +667,7 @@ final class delegation_concurrency_test extends \advanced_testcase {
                     }
                     usleep(10000);
                 } while (microtime(true) < $deadline);
-                $this->assertNotFalse($waiting, 'The inclusion must actually wait for the quiz lock.');
+                $this->assertNotFalse($waiting, 'The operation must actually wait for the quiz lock.');
             }
             $change();
             $transaction->allow_commit();

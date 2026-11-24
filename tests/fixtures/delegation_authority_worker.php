@@ -49,12 +49,17 @@ if (!empty($request['waitforstart'])) {
     }
 }
 try {
-    $included = \quizaccess_presencial\local\delegation_manager::include_users(
-        $request['quizid'],
-        [$request['userid']],
-        $request['actorid'],
-    );
-    $result = ['delegationid' => (int) $included[$request['userid']]->id];
+    if (($request['operation'] ?? '') === 'invitation_details') {
+        $details = \quizaccess_presencial\local\invitation::get_management_details($request['cmid']);
+        $result = ['token' => $details['token'], 'generation' => $details['generation']];
+    } else {
+        $included = \quizaccess_presencial\local\delegation_manager::include_users(
+            $request['quizid'],
+            [$request['userid']],
+            $request['actorid'],
+        );
+        $result = ['delegationid' => (int) $included[$request['userid']]->id];
+    }
 } catch (\required_capability_exception $exception) {
     $result = ['permissiondenied' => true];
 }

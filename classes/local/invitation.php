@@ -119,6 +119,7 @@ final class invitation {
             $new = (object) [
                 'quizid' => $cm->instance,
                 'tokenhash' => self::derive($token),
+                'tokenencrypted' => \core\encryption::encrypt($token),
                 'createdby' => $USER->id,
                 'generation' => (int) ($record->generation ?? 0) + 1,
                 'state' => 'active',
@@ -162,6 +163,64 @@ final class invitation {
                 'canissue' => self::can_issue($cm, $configuration ?: null),
             ];
         });
+    }
+
+    /**
+     * Return the active invitation token to a quiz manager when it is recoverable.
+     *
+     * @param int $cmid Quiz course module.
+     * @return string|null Token, or null when unavailable.
+     */
+    public static function get_current_token(int $cmid): ?string {
+        return self::get_management_details($cmid)['token'];
+    }
+
+    /**
+     * Read the management state and recoverable token together under the quiz lock.
+     *
+     * @param int $cmid Quiz course module.
+     * @return array State and token from the same invitation generation.
+     */
+    public static function get_management_details(int $cmid): array {
+        global $DB, $USER;
+
+        $cm = self::managed_quiz($cmid);
+        $context = \context_module::instance($cm->id);
+        $result = quiz_lock::execute($cm->instance, function () use ($cm, $DB, $USER, $context) {
+            if (!delegation_manager::can_manage_after_wait($context, (int) $USER->id)) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
+            $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
+            $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
+            self::reconcile($cm, $record ?: null, $configuration ?: null);
+            $token = null;
+            if (
+                $record && $record->state === 'active' && !empty($record->tokenencrypted)
+                    && \core\encryption::key_exists()
+            ) {
+                try {
+                    $candidate = \core\encryption::decrypt($record->tokenencrypted);
+                    if (self::is_valid($cm, $record, $configuration ?: null, $candidate)) {
+                        $token = $candidate;
+                    }
+                } catch (\moodle_exception $exception) {
+                    // Keep management available if the server key or ciphertext is unavailable.
+                    $token = null;
+                }
+            }
+            return [
+                'state' => $record->state ?? 'none',
+                'generation' => (int) ($record->generation ?? 0),
+                'timeexpires' => (int) ($record->timeexpires ?? 0),
+                'canissue' => self::can_issue($cm, $configuration ?: null),
+                'token' => $token,
+                'copylegacy' => $record && $record->state === 'active' && empty($record->tokenencrypted),
+            ];
+        });
+        if ($result instanceof \moodle_exception) {
+            throw $result;
+        }
+        return $result;
     }
 
     /**
@@ -264,6 +323,7 @@ final class invitation {
             // Keep the marker even for context-wide erasure so an old form cannot target a later invitation.
             $record->createdby = 0;
             $record->tokenhash = '';
+            $record->tokenencrypted = null;
             if ($record->state === 'active') {
                 $record->state = 'disabled';
             }
@@ -351,6 +411,7 @@ final class invitation {
 
         $record->state = $state;
         $record->tokenhash = '';
+        $record->tokenencrypted = null;
         $record->timemodified = \core\di::get(\core\clock::class)->time();
         $DB->update_record('quizaccess_presencial_invite', $record);
         self::transition_event($cm, $record, $state);

@@ -97,7 +97,7 @@ final class delegation_manager {
      * @param int $actorid User performing the inclusion.
      * @return bool Whether the actor has current management authority.
      */
-    private static function can_manage_after_wait(\context_module $context, int $actorid): bool {
+    public static function can_manage_after_wait(\context_module $context, int $actorid): bool {
         global $CFG, $DB, $USER;
 
         if (!has_capability('mod/quiz:manage', $context, $actorid)) {

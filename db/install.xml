@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/quiz/accessrule/presencial/db" VERSION="2026111100" COMMENT="XMLDB file for quizaccess_presencial"
+<XMLDB PATH="mod/quiz/accessrule/presencial/db" VERSION="2026112400" COMMENT="XMLDB file for quizaccess_presencial"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../../lib/xmldb/xmldb.xsd"
 >
@@ -44,11 +44,12 @@
         <INDEX NAME="revokedbyquiz" UNIQUE="false" FIELDS="revokedby, quizid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="quizaccess_presencial_invite" COMMENT="Current open invitation for a quiz; only a token derivative is stored.">
+    <TABLE NAME="quizaccess_presencial_invite" COMMENT="Current open invitation for a quiz.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="quizid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="tokenhash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="tokenencrypted" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="createdby" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="generation" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="state" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="active" SEQUENCE="false"/>

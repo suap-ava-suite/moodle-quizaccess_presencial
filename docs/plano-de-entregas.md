@@ -63,14 +63,14 @@ O Professor consegue preparar a equipe de aplicação por seleção direta ou pe
 - Tratar nova inclusão de um Aplicador ativo de forma idempotente. Se uma Delegação anterior foi revogada, criar uma nova em vez de reativar a antiga.
 - Permitir revogação individual imediata, preservando os registros já produzidos.
 - Manter um único Convite por link ativo por Questionário, válido por padrão até o fim do Período de Autorização.
-- Armazenar somente uma derivação segura do token e mostrar o link completo apenas durante sua geração. Regenerar invalida o link anterior; desativar impede novos aceites sem revogar Delegações existentes.
+- Armazenar uma derivação segura para validação e o token criptografado para permitir nova cópia pelo Professor. Regenerar invalida o link anterior; desativar impede novos aceites sem revogar Delegações existentes.
 
 ### Demonstração e aceite
 
 - O Professor inclui usuários sem matrícula na disciplina, inclusive vários de uma vez, e vê suas Delegações e origens.
 - Contas inelegíveis não podem ser incluídas e uma inclusão duplicada não cria outro registro.
 - A revogação impede imediatamente novas ações do Aplicador.
-- O Professor gera e copia o link uma única vez. Depois disso, a interface informa sua existência sem revelar o segredo.
+- O Professor pode copiar novamente o mesmo link enquanto o convite estiver ativo.
 - O link antigo falha depois de regeneração; a desativação não remove Aplicadores que já ingressaram.
 
 ## Marco 3 — Usuário aceita o Convite por link
