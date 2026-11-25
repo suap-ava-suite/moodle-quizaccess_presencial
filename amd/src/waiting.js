@@ -23,18 +23,16 @@ export const init = (requestId) => {
     }
     const connectionRegion = container.querySelector('[data-region="request-connection"]');
     const pollingMessage = container.querySelector('[data-region="request-polling"]');
-    let connectionUnavailable = false;
-    const updateConnection = (unavailable) => {
-        if (unavailable === connectionUnavailable) {
+    let currentWarning = '';
+    const showWarning = (message = '') => {
+        if (!connectionRegion || message === currentWarning) {
             return;
         }
-        connectionUnavailable = unavailable;
-        if (connectionRegion) {
-            connectionRegion.textContent = unavailable ? connectionRegion.dataset.message : '';
-            connectionRegion.classList.toggle('alert', unavailable);
-        }
+        currentWarning = message;
+        connectionRegion.textContent = message;
+        connectionRegion.classList.toggle('alert', message !== '');
         if (pollingMessage) {
-            pollingMessage.hidden = unavailable;
+            pollingMessage.hidden = message !== '';
         }
     };
     const renderedState = container.getAttribute('data-state');
@@ -47,7 +45,7 @@ export const init = (requestId) => {
             methodname: 'quizaccess_presencial_read_request',
             args: {requestid: requestId},
         }], true, true, false, 10000)[0].then((result) => {
-            updateConnection(false);
+            showWarning();
             if (result.state !== renderedState || normalizeReason(result.rejectionreason) !== renderedReason) {
                 window.location.reload();
                 return result;
@@ -58,8 +56,9 @@ export const init = (requestId) => {
             }
             window.location.reload();
             return result;
-        }).catch(() => {
-            updateConnection(true);
+        }).catch((error) => {
+            const {message, updateError} = connectionRegion?.dataset ?? {};
+            showWarning(error?.errorcode ? updateError : message);
             window.setTimeout(poll, 5000);
         });
     };

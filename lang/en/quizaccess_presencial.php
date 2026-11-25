@@ -186,6 +186,7 @@ $string['requestpending'] = 'Your release request is pending. Keep this page ope
 $string['requestpolling'] = 'This page checks for an update automatically every five seconds.';
 $string['requestrejected'] = 'Rejected. You can return to the quiz and request release again.';
 $string['requeststartattempt'] = 'Start attempt';
+$string['requestupdateerror'] = 'Unable to update your release request. Return to the quiz to check its status.';
 $string['requestvalidity'] = 'Release request validity';
 $string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';
 $string['requestwaittitle'] = 'Waiting for in-person release';
