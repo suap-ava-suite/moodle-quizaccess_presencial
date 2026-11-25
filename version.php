@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'quizaccess_presencial';
-$plugin->release = '0.6.0';
-$plugin->version = 2026111100;
+$plugin->release = '0.6.1';
+$plugin->version = 2026112300;
 $plugin->requires = 2024100700;
 $plugin->maturity = MATURITY_ALPHA;
