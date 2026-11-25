@@ -60,6 +60,7 @@ $string['eventdelegationcreated'] = 'Delegação de aplicação criada';
 $string['eventdelegationidempotent'] = 'Delegação de aplicação incluída novamente';
 $string['eventdelegationupdated'] = 'Delegação de aplicação atualizada';
 $string['eventinvitationinvalid'] = 'Uso inválido de convite';
+$string['eventinvitationlinkretrieved'] = 'Link do convite recuperado';
 $string['eventinvitationupdated'] = 'Convite atualizado';
 $string['eventqrauthorized'] = 'Autorização por QR Code utilizada';
 $string['eventqrauthorizeddesc'] = 'O usuário {$a->actorid} autorizou a solicitação {$a->requestid} do usuário {$a->studentid} usando um QR Code.';
@@ -202,5 +203,3 @@ $string['ruleisdisabled'] = 'A Liberação Presencial não está habilitada nest
 $string['taskexpiredelegations'] = 'Expirar Delegações de aplicação';
 $string['taskexpireinvitations'] = 'Expirar convites';
 $string['taskexpirerequests'] = 'Expirar solicitações vencidas e autorizações não utilizadas';
-
-$string['eventinvitationlinkretrieved'] = 'Link do convite recuperado';

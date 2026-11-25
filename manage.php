@@ -81,7 +81,7 @@ if ($revokeid) {
     );
 }
 
-$status = invitation::get_management_details($cm->id);
+$status = $submitteddata ? invitation::get_status($cm->id) : invitation::get_management_details($cm->id);
 $form = new invitation_form($url, ['cmid' => $cm->id, 'status' => $status]);
 $issued = null;
 if ($data = $form->get_data()) {
@@ -97,6 +97,11 @@ if ($data = $form->get_data()) {
             \core\output\notification::NOTIFY_SUCCESS
         );
     }
+}
+
+if ($submitteddata && $issued === null) {
+    $status = invitation::get_management_details($cm->id);
+    $form = new invitation_form($url, ['cmid' => $cm->id, 'status' => $status]);
 }
 
 $header = $OUTPUT->header();

@@ -59,6 +59,7 @@ $string['eventdelegationcreated'] = 'Application delegation created';
 $string['eventdelegationidempotent'] = 'Application delegation included again';
 $string['eventdelegationupdated'] = 'Application delegation updated';
 $string['eventinvitationinvalid'] = 'Invalid invitation use';
+$string['eventinvitationlinkretrieved'] = 'Invitation link retrieved';
 $string['eventinvitationupdated'] = 'Invitation updated';
 $string['eventqrauthorized'] = 'QR authorization used';
 $string['eventqrauthorizeddesc'] = 'User {$a->actorid} authorized request {$a->requestid} for user {$a->studentid} using a QR code.';
@@ -199,5 +200,3 @@ $string['ruleisdisabled'] = 'In-person release is not enabled for this quiz.';
 $string['taskexpiredelegations'] = 'Expire application delegations';
 $string['taskexpireinvitations'] = 'Expire invitations';
 $string['taskexpirerequests'] = 'Expire due release requests and unused authorizations';
-
-$string['eventinvitationlinkretrieved'] = 'Invitation link retrieved';

@@ -105,6 +105,10 @@ final class invitation {
 
         $cm = self::managed_quiz($cmid);
         $result = quiz_lock::execute($cm->instance, function () use ($cm, $expectedgeneration, $DB, $USER) {
+            $context = \context_module::instance($cm->id);
+            if (!management_authority::recheck($context, (int) $USER->id)) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             if ($expectedgeneration !== (int) ($record->generation ?? 0)) {
@@ -177,9 +181,10 @@ final class invitation {
             }
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
-            self::reconcile($cm, $record ?: null, $configuration ?: null);
+            $now = \core\di::get(\core\clock::class)->time();
+            self::reconcile($cm, $record ?: null, $configuration ?: null, 0, $now);
             $token = null;
-            $canissue = self::can_issue($cm, $configuration ?: null);
+            $canissue = self::can_issue($cm, $configuration ?: null, $now);
             $copyreason = !$record || $record->state !== 'active' ? 'inactive' :
                 (!$canissue ? 'configuration' : (empty($record->tokenencrypted) ? 'legacy' : 'recoveryfailed'));
             if (
@@ -188,7 +193,7 @@ final class invitation {
             ) {
                 try {
                     $candidate = \core\encryption::decrypt($record->tokenencrypted);
-                    if (self::is_valid($cm, $record, $configuration ?: null, $candidate)) {
+                    if (self::is_valid($cm, $record, $configuration ?: null, $candidate, $now)) {
                         $token = $candidate;
                         $copyreason = null;
                     }
@@ -204,7 +209,7 @@ final class invitation {
                     'other' => ['generation' => (int) $record->generation],
                 ])->trigger();
             }
-            return self::summary($cm, $record ?: null, $configuration ?: null) + [
+            return self::summary($cm, $record ?: null, $configuration ?: null, $now) + [
                 'token' => $token,
                 'copylegacy' => $copyreason === 'legacy',
                 'copyreason' => $copyreason,
@@ -222,14 +227,15 @@ final class invitation {
      * @param \stdClass $cm Course module.
      * @param \stdClass|null $record Invitation.
      * @param \stdClass|null $configuration Quiz configuration.
+     * @param int|null $now Time used for the summary, or null for the current time.
      * @return array Management summary.
      */
-    private static function summary(\stdClass $cm, ?\stdClass $record, ?\stdClass $configuration): array {
+    private static function summary(\stdClass $cm, ?\stdClass $record, ?\stdClass $configuration, ?int $now = null): array {
         return [
             'state' => $record->state ?? 'none',
             'generation' => (int) ($record->generation ?? 0),
             'timeexpires' => (int) ($record->timeexpires ?? 0),
-            'canissue' => self::can_issue($cm, $configuration),
+            'canissue' => self::can_issue($cm, $configuration, $now),
         ];
     }
 
@@ -266,10 +272,14 @@ final class invitation {
      * @return void
      */
     public static function disable(int $cmid, int $expectedgeneration): void {
-        global $DB;
+        global $DB, $USER;
 
         $cm = self::managed_quiz($cmid);
-        $result = quiz_lock::execute($cm->instance, function () use ($cm, $expectedgeneration, $DB) {
+        $result = quiz_lock::execute($cm->instance, function () use ($cm, $expectedgeneration, $DB, $USER) {
+            $context = \context_module::instance($cm->id);
+            if (!management_authority::recheck($context, (int) $USER->id)) {
+                return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
+            }
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             if ($expectedgeneration !== (int) ($record->generation ?? 0)) {
                 return new \moodle_exception('invitationstale', 'quizaccess_presencial');
@@ -377,6 +387,7 @@ final class invitation {
      * @param \stdClass|null $record Invitation, updated in place.
      * @param \stdClass|null $configuration Current configuration.
      * @param int $previousend Previous period end.
+     * @param int|null $now Time used for reconciliation.
      * @return void
      */
     private static function reconcile(
@@ -384,8 +395,11 @@ final class invitation {
         ?\stdClass $record,
         ?\stdClass $configuration,
         int $previousend = 0,
+        ?int $now = null,
     ): void {
         global $DB;
+
+        $now ??= \core\di::get(\core\clock::class)->time();
 
         if (!$record || $record->state !== 'active') {
             return;
@@ -400,7 +414,7 @@ final class invitation {
         }
         $changed = $expiry !== (int) $record->timeexpires;
         $record->timeexpires = $expiry;
-        if ($expiry <= \core\di::get(\core\clock::class)->time()) {
+        if ($expiry <= $now) {
             self::end_invitation($cm, $record, 'expired');
         } else if ($changed) {
             $record->timemodified = \core\di::get(\core\clock::class)->time();
@@ -442,14 +456,17 @@ final class invitation {
      * Determine whether a finite valid configuration can issue a new invitation.
      * @param \stdClass $cm Course module.
      * @param \stdClass|null $configuration Configuration.
+     * @param int|null $now Time used for validation.
      * @return bool Whether issuing is allowed, including before the start.
      */
-    private static function can_issue(\stdClass $cm, ?\stdClass $configuration): bool {
+    private static function can_issue(\stdClass $cm, ?\stdClass $configuration, ?int $now = null): bool {
         global $DB;
+
+        $now ??= \core\di::get(\core\clock::class)->time();
 
         if (
             !$configuration || !$configuration->enabled
-                || $configuration->timeclose <= \core\di::get(\core\clock::class)->time()
+                || $configuration->timeclose <= $now
         ) {
             return false;
         }
@@ -460,7 +477,7 @@ final class invitation {
             (int) $configuration->timeclose,
             (int) $quiz->timeopen,
             (int) $quiz->timeclose,
-            \core\di::get(\core\clock::class)->time(),
+            $now,
             false
         );
     }
@@ -472,6 +489,7 @@ final class invitation {
      * @param \stdClass|null $record Invitation record.
      * @param \stdClass|null $configuration Quiz configuration.
      * @param string $token Untrusted secret.
+     * @param int|null $now Time used for validation.
      * @return bool Whether the token can be accepted.
      */
     private static function is_valid(
@@ -479,9 +497,11 @@ final class invitation {
         ?\stdClass $record,
         ?\stdClass $configuration,
         string $token,
+        ?int $now = null,
     ): bool {
-        return $record && $record->state === 'active' && self::can_issue($cm, $configuration)
-            && $record->timeexpires > \core\di::get(\core\clock::class)->time()
+        $now ??= \core\di::get(\core\clock::class)->time();
+        return $record && $record->state === 'active' && self::can_issue($cm, $configuration, $now)
+            && $record->timeexpires > $now
             && preg_match('/\Ai1_[0-9a-f]{64}\z/', $token)
             && hash_equals($record->tokenhash, self::derive($token));
     }

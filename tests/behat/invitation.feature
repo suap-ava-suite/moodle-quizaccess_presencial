@@ -57,6 +57,7 @@ Feature: Manage the in-person release invitation
     And I follow "Return to invitation management"
     When I press "Disable invitation"
     Then I should see "The invitation is disabled."
+    And I should not see "Invitation expires:"
     And "Invitation link" "field" should not exist
     When I press "Regenerate invitation"
     Then the generated invitation link should differ from the previous link
@@ -86,6 +87,17 @@ Feature: Manage the in-person release invitation
     When I follow "Return to invitation management"
     Then I should see "The invitation is active."
     And "Invitation link" "field" should exist
+
+  Scenario: An expired invitation after privacy erasure has no fabricated expiration date
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Manage application team" in current page administration
+    And I press "Generate invitation"
+    And the generated invitation for "Quiz 1" has expired
+    And the invitation data for "Quiz 1" has been erased
+    When I follow "Return to invitation management"
+    Then I should see "The invitation has expired."
+    And I should not see "The invitation expired on"
+    And "Invitation link" "field" should not exist
 
   Scenario: An expired authorization period does not allow issuing invitations
     Given the following "activities" exist:

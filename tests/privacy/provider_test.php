@@ -286,6 +286,41 @@ final class provider_test extends provider_testcase {
     }
 
     /**
+     * Erasing an expired invitation retains its state without a fabricated date.
+     *
+     * @dataProvider expired_erasure_scope_provider
+     * @param string $scope Erasure scope.
+     */
+    public function test_erasing_expired_invitation_clears_its_deadline(string $scope): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(strtotime('2030-01-01 09:00:00 UTC'));
+        $creator = self::getDataGenerator()->create_user();
+        $quiz = $this->configured_quiz([$creator]);
+        $context = \context_module::instance($quiz->cmid);
+        $this->setUser($creator);
+        $issued = invitation::generate($quiz->cmid, 0);
+        $clock->set_to($issued['timeexpires']);
+        (new \quizaccess_presencial\task\expire_invitations())->execute();
+        if ($scope === 'context') {
+            provider::delete_data_for_all_users_in_context($context);
+        } else {
+            provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
+        }
+        $status = invitation::get_status($quiz->cmid);
+        $this->assertSame('expired', $status['state']);
+        $this->assertSame(0, $status['timeexpires']);
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+    }
+
+    /**
+     * Provide approved erasure scopes.
+     * @return array
+     */
+    public static function expired_erasure_scope_provider(): array {
+        return ['user' => ['user'], 'context' => ['context']];
+    }
+
+    /**
      * Context erasure cannot make a pre-erasure form target the replacement invitation.
      */
     public function test_context_erasure_rejects_old_disable_and_regenerate_forms(): void {

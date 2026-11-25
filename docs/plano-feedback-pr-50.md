@@ -4,7 +4,7 @@
 
 Análise de 25/11/2026 do [PR #50](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50), referente à issue #48, no commit `b558e9b51868cf3a02db8d15125d96ed05f90044`. Foram consultados os oito comentários de revisão de `jalerson`, as revisões e os comentários gerais; não havia comentários gerais nem respostas aos oito apontamentos. As revisões estão como `COMMENTED`, sem aprovação ou pedido formal de mudanças. A prioridade indicada neste plano é nossa avaliação técnica, não um estado de bloqueio definido pelo revisor.
 
-O objetivo desta etapa é analisar e planejar. As conclusões abaixo resultam da leitura do código, sem nova reprodução em testes. Nenhuma correção de produção foi aplicada, nenhuma resposta foi publicada e nenhuma conversa foi marcada como resolvida.
+O tratamento está em andamento na branch local. A integração com `main` foi concluída e as correções de apresentação, recuperação, autorização e auditoria foram implementadas. Nenhuma resposta foi publicada e nenhuma conversa foi marcada como resolvida.
 
 As referências oficiais das APIs envolvidas estão na [documentação auxiliar para desenvolvimento](desenvolvimento.md).
 
@@ -18,14 +18,14 @@ As referências oficiais das APIs envolvidas estão na [documentação auxiliar 
 | [Testes acoplados ao armazenamento](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684518247) | Concordância parcial. As mutações para simular falha/legado podem ser substituídas. Já a ausência de segredo em persistência é uma garantia de segurança, não apenas um detalhe SQL incidental. | Substituir a falha simulada por chave diferente via API pública do Moodle; tornar reproduzível o teste real de upgrade. Preservar verificações públicas de exportação e eventos sem segredo, reduzindo leituras da coluna. Exceções estritamente necessárias de integridade do armazenamento ficam concentradas e justificadas. |
 | [Atalho público usado somente pelos testes](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684518426) | Procedente: `get_current_token()` apenas delega e suas chamadas estão nos testes. | Remover o atalho introduzido neste PR e usar `get_management_details()` nos testes, como faz a página real. |
 | [Autorização compartilhada em gerenciador de Delegações](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684518661) | Procedente como melhoria de estrutura. Há dois consumidores reais e o PHPDoc continua restrito à inclusão. | Extrair a revalidação e seus auxiliares para `management_authority`, sem alterar o algoritmo. Testar pelo comportamento público de inclusão e gestão de convite. |
-| [Auditoria de recuperação do segredo](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684518957) | É uma lacuna de decisão, não violação comprovada do contrato atual: o README promete transições e uso inválido, não toda leitura. A exposição adicional justifica explicitar a política. | Recomenda-se auditar a recuperação bem-sucedida por evento Moodle sem credenciais. A proposta está detalhada abaixo e ainda não constitui decisão de domínio aceita. |
+| [Auditoria de recuperação do segredo](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684518957) | A exposição adicional justifica explicitar a política de auditoria. | A recuperação bem-sucedida é auditada por evento Moodle sem credenciais, conforme decisão registrada no ADR 0012. |
 | [Resumo de estado duplicado](https://github.com/suap-ava-suite/moodle-quizaccess_presencial/pull/50#discussion_r4684519201) | Procedente como manutenção; os quatro campos do resumo são construídos duas vezes. | Extrair helper privado comum para o resumo e acrescentar os dados de recuperação somente na operação de gestão. Preservar leitura única sob bloqueio. |
 
 ## Integração com a base atual
 
-O GitHub informou `mergeable = false` e `mergeable_state = dirty`. A referência remota `main` está em `93d27f040f740aaf948876e3379665cc08d0ce5a`, com os commits `5fddd10` (nova decisão de disponibilidade) e `93d27f0` (mensagem de perda de conexão), posteriores à base original `9be9d95`. A atualização da referência local foi somente uma consulta; a branch do PR não foi integrada nem reescrita.
+Na análise inicial, o GitHub informou `mergeable = false` e `mergeable_state = dirty`. A referência `main` em `93d27f040f740aaf948876e3379665cc08d0ce5a` foi integrada à branch pelo merge `8d366ca`, com a conciliação dos conflitos de documentação e versão.
 
-Antes das correções, conciliar as mudanças em uma integração revisável:
+Critérios usados na integração:
 
 - Preservar o vocabulário novo de `main`: Período de disponibilidade do Questionário e Disponibilidade efetiva do estudante. A decisão de `main` sobre ausência de período próprio deve permanecer; a resolução do feedback não implementará por conta própria toda essa mudança de modelo ainda não refletida no código.
 - No conceito de Convite por link, combinar o ciclo de vida aceito em `main` com a possibilidade de copiar novamente o mesmo link ativo aceita na issue #48. Conservar os demais conceitos novos de `main`.
@@ -75,7 +75,7 @@ Proposta recomendada: emitir `invitation_link_retrieved` somente quando `get_man
 
 O evento registra usuário/contexto Moodle, Questionário e geração; não contém token, URL, hash nem ciphertext. Consultar apenas `get_status()`, falhar na permissão ou não recuperar um segredo não emite esse evento. As transições de geração/regeneração já têm seu evento; não duplicá-las só para apresentar o link recém-gerado. Retornar à gestão e recuperar o convite é uma nova leitura auditável.
 
-Essa proposta acrescenta comportamento observável e exige confirmar a política antes de implementá-la. Caso se opte por não auditar cada recuperação, registrar explicitamente o alcance da auditoria no ADR da cópia posterior e justificar a escolha. O ADR 0010 continua válido nas duas opções: os eventos usam o log do Moodle e não uma interface de auditoria do plugin.
+A política de auditar recuperações foi autorizada pelo usuário e implementada. O ADR 0010 continua válido: os eventos usam o log do Moodle e não uma interface de auditoria do plugin.
 
 ## Validação e conclusão
 
@@ -88,3 +88,10 @@ Implementar um comportamento por vez com teste que falha antes da correção. Us
 - Revisão dos padrões e do atendimento aos oito comentários. Na futura etapa autorizada de publicação, associar cada resposta ao commit/teste correspondente e só resolver conversas depois de comprovar o resultado. Este planejamento não publica respostas nem resolve conversas.
 
 O critério de conclusão é corrigir os três problemas de apresentação, preservar as garantias de autorização/concorrência/privacidade, reduzir a duplicação e o acoplamento dos testes e deixar a decisão de auditoria explícita. As prioridades são: integração da base, data após privacidade, causas de indisponibilidade, prazo em desativado, estrutura/testes e política de auditoria.
+
+### Resultado local e pendências
+
+- A branch foi integrada à `main`, e os ajustes de apresentação, resumo, autorização e evento de auditoria foram implementados. A alteração preexistente em `qr_landing.php` permanece fora da entrega.
+- No Moodle 4.5.12, PHP 8.3 e PostgreSQL 15, a suíte PHPUnit passou com 271 testes e 1.747 asserções, assim como os 12 cenários Behat de convite. Uma execução anterior teve falha de comunicação com processo auxiliar de concorrência; a repetição isolada passou. Passaram também a verificação de sintaxe PHP, Moodle Code Checker, PHPDoc, validação do plugin, savepoints e lint Mustache com validador local.
+- Uma instalação descartável da versão anterior gerou um convite, foi atualizada e confirmou a validade do link anterior e sua substituição após regeneração. O [procedimento reproduzível](../tests/upgrade/README.md) e a fixture estão versionados; a suíte PHPUnit também conserva uma preparação direta do registro para o caso legado.
+- Cinco jornadas de navegador em Português do Brasil passaram, incluindo a mensagem de expiração formatada para o fuso `America/Bahia`. A matriz completa de versões e bancos do CI ainda precisa ser executada; os resultados locais não a substituem.

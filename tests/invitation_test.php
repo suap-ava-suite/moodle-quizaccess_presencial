@@ -51,6 +51,32 @@ final class invitation_test extends \advanced_testcase {
     }
 
     /**
+     * Recovering a valid link records its generation without leaking the secret.
+     */
+    public function test_recovery_emits_a_secret_free_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $sink = $this->redirectEvents();
+        invitation::get_status($quiz->cmid);
+        $this->assertCount(0, $sink->get_events());
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame($issued['token'], $details['token']);
+        $events = $sink->get_events();
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(\quizaccess_presencial\event\invitation_link_retrieved::class, $events[0]);
+        $data = $events[0]->get_data();
+        $this->assertSame(1, $data['other']['generation']);
+        $this->assertSame(['generation'], array_keys($data['other']));
+        $this->assertEquals($quiz->id, $data['objectid']);
+        $this->assertEquals(\context_module::instance($quiz->cmid)->id, $data['contextid']);
+        $this->assertEquals(2, $data['userid']);
+        $this->assertStringNotContainsString($issued['token'], json_encode($data));
+        $sink->close();
+    }
+
+    /**
      * Management receives state, generation, expiry and token for the same invitation.
      */
     public function test_management_details_follow_regeneration_and_disabling(): void {
@@ -107,21 +133,35 @@ final class invitation_test extends \advanced_testcase {
      * Invalid encrypted data cannot disclose or silently replace a valid invitation.
      */
     public function test_unreadable_encrypted_token_does_not_invalidate_invitation(): void {
-        global $DB;
+        global $CFG;
 
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
-        // Simulate a damaged ciphertext or a key that cannot decrypt it.
-        $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', 'invalid', ['quizid' => $quiz->id]);
-
-        $details = invitation::get_management_details($quiz->cmid);
-        $this->assertNull($details['token']);
-        $this->assertFalse($details['copylegacy']);
-        $this->assertSame('active', $details['state']);
-        $this->assertSame(1, invitation::get_status($quiz->cmid)['generation']);
-        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        $hadsecretroot = isset($CFG->secretdataroot);
+        $originalsecretroot = $CFG->secretdataroot ?? null;
+        $newroot = make_temp_directory('quizaccess_presencial_wrongkey_' . bin2hex(random_bytes(8)));
+        try {
+            $CFG->secretdataroot = $newroot;
+            \core\encryption::create_key();
+            $sink = $this->redirectEvents();
+            $details = invitation::get_management_details($quiz->cmid);
+            $this->assertNull($details['token']);
+            $this->assertSame('recoveryfailed', $details['copyreason']);
+            $this->assertSame('active', $details['state']);
+            $this->assertCount(0, $sink->get_events());
+            $sink->close();
+            $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        } finally {
+            if ($hadsecretroot) {
+                $CFG->secretdataroot = $originalsecretroot;
+            } else {
+                unset($CFG->secretdataroot);
+            }
+            remove_dir($newroot);
+        }
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
     }
 
     /**
@@ -250,7 +290,11 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $second['token']));
         $this->assertSame($second['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertSame(2, invitation::get_status($quiz->cmid)['generation']);
-        $this->assertSame('regenerated', $sink->get_events()[1]->get_data()['other']['action']);
+        $transitions = array_values(array_filter(
+            $sink->get_events(),
+            static fn($event) => $event instanceof \quizaccess_presencial\event\invitation_updated
+        ));
+        $this->assertSame('regenerated', $transitions[1]->get_data()['other']['action']);
         try {
             invitation::generate($quiz->cmid, 1);
             $this->fail('A stale form must not replace the invitation.');
