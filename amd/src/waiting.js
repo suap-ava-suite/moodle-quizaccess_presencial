@@ -46,7 +46,7 @@ export const init = (requestId) => {
         Ajax.call([{
             methodname: 'quizaccess_presencial_read_request',
             args: {requestid: requestId},
-        }])[0].then((result) => {
+        }], true, true, false, 10000)[0].then((result) => {
             updateConnection(false);
             if (result.state !== renderedState || normalizeReason(result.rejectionreason) !== renderedReason) {
                 window.location.reload();
