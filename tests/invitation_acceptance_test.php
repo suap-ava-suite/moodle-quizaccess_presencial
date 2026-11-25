@@ -46,7 +46,7 @@ final class invitation_acceptance_test extends \advanced_testcase {
 
         $this->setUser($teacher);
         $issued = invitation::generate($quiz->cmid, 0);
-        $recovered = invitation::get_current_token($quiz->cmid);
+        $recovered = invitation::get_management_details($quiz->cmid)['token'];
         $this->assertSame($issued['token'], $recovered);
         $this->setUser($applicator);
 

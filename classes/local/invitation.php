@@ -156,23 +156,8 @@ final class invitation {
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
             self::reconcile($cm, $record ?: null, $configuration ?: null);
-            return [
-                'state' => $record->state ?? 'none',
-                'generation' => (int) ($record->generation ?? 0),
-                'timeexpires' => (int) ($record->timeexpires ?? 0),
-                'canissue' => self::can_issue($cm, $configuration ?: null),
-            ];
+            return self::summary($cm, $record ?: null, $configuration ?: null);
         });
-    }
-
-    /**
-     * Return the active invitation token to a quiz manager when it is recoverable.
-     *
-     * @param int $cmid Quiz course module.
-     * @return string|null Token, or null when unavailable.
-     */
-    public static function get_current_token(int $cmid): ?string {
-        return self::get_management_details($cmid)['token'];
     }
 
     /**
@@ -187,40 +172,65 @@ final class invitation {
         $cm = self::managed_quiz($cmid);
         $context = \context_module::instance($cm->id);
         $result = quiz_lock::execute($cm->instance, function () use ($cm, $DB, $USER, $context) {
-            if (!delegation_manager::can_manage_after_wait($context, (int) $USER->id)) {
+            if (!management_authority::recheck($context, (int) $USER->id)) {
                 return new \required_capability_exception($context, 'mod/quiz:manage', 'nopermissions', '');
             }
             $record = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $cm->instance]);
             $configuration = $DB->get_record('quizaccess_presencial', ['quizid' => $cm->instance]);
             self::reconcile($cm, $record ?: null, $configuration ?: null);
             $token = null;
+            $canissue = self::can_issue($cm, $configuration ?: null);
+            $copyreason = !$record || $record->state !== 'active' ? 'inactive' :
+                (!$canissue ? 'configuration' : (empty($record->tokenencrypted) ? 'legacy' : 'recoveryfailed'));
             if (
-                $record && $record->state === 'active' && !empty($record->tokenencrypted)
+                $canissue && $record && $record->state === 'active' && !empty($record->tokenencrypted)
                     && \core\encryption::key_exists()
             ) {
                 try {
                     $candidate = \core\encryption::decrypt($record->tokenencrypted);
                     if (self::is_valid($cm, $record, $configuration ?: null, $candidate)) {
                         $token = $candidate;
+                        $copyreason = null;
                     }
                 } catch (\moodle_exception $exception) {
                     // Keep management available if the server key or ciphertext is unavailable.
                     $token = null;
                 }
             }
-            return [
-                'state' => $record->state ?? 'none',
-                'generation' => (int) ($record->generation ?? 0),
-                'timeexpires' => (int) ($record->timeexpires ?? 0),
-                'canissue' => self::can_issue($cm, $configuration ?: null),
+            if ($token !== null) {
+                \quizaccess_presencial\event\invitation_link_retrieved::create([
+                    'context' => $context,
+                    'objectid' => $cm->instance,
+                    'other' => ['generation' => (int) $record->generation],
+                ])->trigger();
+            }
+            return self::summary($cm, $record ?: null, $configuration ?: null) + [
                 'token' => $token,
-                'copylegacy' => $record && $record->state === 'active' && empty($record->tokenencrypted),
+                'copylegacy' => $copyreason === 'legacy',
+                'copyreason' => $copyreason,
             ];
         });
         if ($result instanceof \moodle_exception) {
             throw $result;
         }
         return $result;
+    }
+
+    /**
+     * Return the common management summary for reconciled records.
+     *
+     * @param \stdClass $cm Course module.
+     * @param \stdClass|null $record Invitation.
+     * @param \stdClass|null $configuration Quiz configuration.
+     * @return array Management summary.
+     */
+    private static function summary(\stdClass $cm, ?\stdClass $record, ?\stdClass $configuration): array {
+        return [
+            'state' => $record->state ?? 'none',
+            'generation' => (int) ($record->generation ?? 0),
+            'timeexpires' => (int) ($record->timeexpires ?? 0),
+            'canissue' => self::can_issue($cm, $configuration),
+        ];
     }
 
     /**

@@ -162,11 +162,11 @@ final class provider_test extends provider_testcase {
         $issued = invitation::generate($quiz->cmid, 0);
         $otherissued = invitation::generate($other->cmid, 0);
 
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
 
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
-        $this->assertSame($otherissued['token'], invitation::get_current_token($other->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertSame($otherissued['token'], invitation::get_management_details($other->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertTrue(invitation::validate($other->cmid, $otherissued['token']));
         $status = invitation::get_status($quiz->cmid);

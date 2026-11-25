@@ -1,5 +1,7 @@
 # Plano de implementação da issue #48
 
+O tratamento dos comentários recebidos está no [plano de resolução do feedback do PR #50](plano-feedback-pr-50.md).
+
 ## Objetivo e estado
 
 Permitir ao Professor copiar novamente o mesmo Convite por link ativo na gestão da equipe de aplicação e apresentar uma única mensagem de expiração: **“O convite expirou em {data_hora}”**.

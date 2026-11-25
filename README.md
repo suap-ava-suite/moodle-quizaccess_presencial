@@ -8,6 +8,8 @@ O `quizaccess_presencial` é uma regra de acesso para Questionários do Moodle q
 - PHP 8.1 a 8.4, conforme a versão do Moodle
 - PostgreSQL e MariaDB
 
+As referências das APIs do Moodle e suas indicações de uso estão na [documentação auxiliar para desenvolvimento](docs/desenvolvimento.md).
+
 ## Instalação
 
 Instale o plugin pelo instalador de plugins do Moodle ou coloque este código no diretório `mod/quiz/accessrule/presencial`. No Moodle 5.1, o diretório correspondente fica sob a nova raiz pública: `public/mod/quiz/accessrule/presencial`.

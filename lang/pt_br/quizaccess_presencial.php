@@ -90,7 +90,7 @@ $string['invitationalreadyaccepted'] = 'Você já possui uma Delegação de apli
 $string['invitationcopied'] = 'Link do convite copiado.';
 $string['invitationcopy'] = 'Copiar link do convite';
 $string['invitationcopylegacy'] = 'Este convite foi criado antes da cópia posterior estar disponível. Regenere-o para habilitar a cópia; o link anterior deixará de funcionar.';
-$string['invitationcopyunavailable'] = 'Não é possível copiar o convite. Restaure a chave de criptografia do servidor ou regenere o convite para substituir o link anterior.';
+$string['invitationcopyunavailable'] = 'Não é possível copiar o convite. Peça ajuda ao administrador do site ou regenere o convite para substituir o link anterior.';
 $string['invitationcourse'] = 'Disciplina';
 $string['invitationdisable'] = 'Desativar convite';
 $string['invitationdisabled'] = 'Convite desativado.';
@@ -200,3 +200,5 @@ $string['ruleisdisabled'] = 'A Liberação Presencial não está habilitada nest
 $string['taskexpiredelegations'] = 'Expirar Delegações de aplicação';
 $string['taskexpireinvitations'] = 'Expirar convites';
 $string['taskexpirerequests'] = 'Expirar solicitações vencidas e autorizações não utilizadas';
+
+$string['eventinvitationlinkretrieved'] = 'Link do convite recuperado';

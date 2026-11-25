@@ -174,13 +174,13 @@ if ($issued !== null) {
         'token' => $token,
     ]) : null;
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
-        'state' => $status['state'] === 'expired'
+        'state' => $status['state'] === 'expired' && $status['timeexpires'] > 0
             ? get_string('invitationexpiredat', 'quizaccess_presencial', userdate($status['timeexpires']))
             : get_string('invitationstate_' . $status['state'], 'quizaccess_presencial'),
         'link' => $link ? $link->out(false) : null,
         'copylegacy' => $status['copylegacy'],
-        'copyunavailable' => $status['state'] === 'active' && !$link && !$status['copylegacy'],
-        'expires' => $status['timeexpires'] && $status['state'] !== 'expired' ? get_string(
+        'copyunavailable' => $status['copyreason'] === 'recoveryfailed',
+        'expires' => $status['timeexpires'] && $status['state'] === 'active' ? get_string(
             'invitationexpires',
             'quizaccess_presencial',
             userdate($status['timeexpires'])

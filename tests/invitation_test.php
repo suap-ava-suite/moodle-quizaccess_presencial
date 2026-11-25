@@ -41,13 +41,13 @@ final class invitation_test extends \advanced_testcase {
         $this->setAdminUser();
         $quiz = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $status = invitation::get_status($quiz->cmid);
         $this->assertSame(1, $status['generation']);
         $this->assertSame($issued['timeexpires'], $status['timeexpires']);
         invitation::disable($quiz->cmid, 1);
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
     }
 
     /**
@@ -98,7 +98,7 @@ final class invitation_test extends \advanced_testcase {
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertSame(1, invitation::get_status($quiz->cmid)['generation']);
         $replacement = invitation::generate($quiz->cmid, 1);
-        $this->assertSame($replacement['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($replacement['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
     }
@@ -153,7 +153,7 @@ final class invitation_test extends \advanced_testcase {
             }
             remove_dir($emptyroot);
         }
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
     }
 
@@ -172,7 +172,7 @@ final class invitation_test extends \advanced_testcase {
         $ciphertext = $DB->get_field('quizaccess_presencial_invite', 'tokenencrypted', ['quizid' => $other->id], MUST_EXIST);
         $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', $ciphertext, ['quizid' => $quiz->id]);
 
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
     }
 
@@ -248,7 +248,7 @@ final class invitation_test extends \advanced_testcase {
         $this->assertNotSame($first['token'], $second['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
         $this->assertTrue(invitation::validate($quiz->cmid, $second['token']));
-        $this->assertSame($second['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($second['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertSame(2, invitation::get_status($quiz->cmid)['generation']);
         $this->assertSame('regenerated', $sink->get_events()[1]->get_data()['other']['action']);
         try {
@@ -318,10 +318,10 @@ final class invitation_test extends \advanced_testcase {
         $quiz = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
         $sink = $this->redirectEvents();
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $clock->set_to($issued['timeexpires']);
 
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertSame('expired', invitation::get_status($quiz->cmid)['state']);
         $task = new \quizaccess_presencial\task\expire_invitations();
@@ -370,9 +370,9 @@ final class invitation_test extends \advanced_testcase {
         \quizaccess_presencial::save_settings($quiz);
 
         $this->assertSame(strtotime('2030-01-01 15:00:00 UTC'), invitation::get_status($quiz->cmid)['timeexpires']);
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $clock->set_to(strtotime('2030-01-01 15:00:00 UTC'));
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $replacement = invitation::generate($quiz->cmid, 1);
         $this->assertSame($quiz->presencial_timeclose, $replacement['timeexpires']);
@@ -406,7 +406,7 @@ final class invitation_test extends \advanced_testcase {
         $issued = invitation::generate($quiz->cmid, 0);
         $quiz->presencial_enabled = 0;
         \quizaccess_presencial::save_settings($quiz);
-        $this->assertNull(invitation::get_current_token($quiz->cmid));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertFalse(invitation::get_status($quiz->cmid)['canissue']);
         $quiz->presencial_enabled = 1;
@@ -456,12 +456,12 @@ final class invitation_test extends \advanced_testcase {
         role_assign($role, $teacher->id, \context_module::instance($quiz->cmid));
         $this->setUser($teacher);
         $this->assertSame('active', invitation::get_status($quiz->cmid)['state']);
-        $this->assertSame($issued['token'], invitation::get_current_token($quiz->cmid));
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
 
         foreach (
             [
             fn() => invitation::get_status($other->cmid),
-            fn() => invitation::get_current_token($other->cmid),
+            fn() => invitation::get_management_details($other->cmid)['token'],
             fn() => invitation::generate($other->cmid, 0),
             fn() => invitation::disable($other->cmid, 0),
             ] as $operation

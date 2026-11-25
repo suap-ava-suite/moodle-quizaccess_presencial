@@ -88,7 +88,7 @@ $string['invitationalreadyaccepted'] = 'You already have a current application d
 $string['invitationcopied'] = 'Invitation link copied.';
 $string['invitationcopy'] = 'Copy invitation link';
 $string['invitationcopylegacy'] = 'This invitation was created before link recovery was available. Regenerate it to enable copying; the previous link will stop working.';
-$string['invitationcopyunavailable'] = 'The invitation link cannot be copied. Restore the server encryption key or regenerate the invitation to replace the old link.';
+$string['invitationcopyunavailable'] = 'The invitation link cannot be copied. Ask the site administrator for help, or regenerate the invitation to replace the old link.';
 $string['invitationcourse'] = 'Course';
 $string['invitationdisable'] = 'Disable invitation';
 $string['invitationdisabled'] = 'Invitation disabled.';
@@ -197,3 +197,5 @@ $string['ruleisdisabled'] = 'In-person release is not enabled for this quiz.';
 $string['taskexpiredelegations'] = 'Expire application delegations';
 $string['taskexpireinvitations'] = 'Expire invitations';
 $string['taskexpirerequests'] = 'Expire due release requests and unused authorizations';
+
+$string['eventinvitationlinkretrieved'] = 'Invitation link retrieved';
