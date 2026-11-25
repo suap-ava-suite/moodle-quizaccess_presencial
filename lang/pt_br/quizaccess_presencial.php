@@ -175,6 +175,7 @@ $string['rejectionreasonrequired'] = 'Informe uma justificativa para rejeitar es
 $string['requestattemptalreadyexists'] = 'Uma tentativa já foi criada para esta solicitação. ' .
     'Volte ao Questionário para retomá-la.';
 $string['requestauthorized'] = 'Sua solicitação foi autorizada. Continue para iniciar sua tentativa.';
+$string['requestconnectionerror'] = 'Não foi possível atualizar sua Solicitação de liberação. A conexão com o servidor está indisponível. Esta página continuará tentando se reconectar automaticamente.';
 $string['requestconsumed'] = 'Esta autorização já foi utilizada. Volte ao Questionário para continuar sua tentativa.';
 $string['requestdescription'] = 'Para iniciar uma nova tentativa, é necessária a liberação presencial. A solicitação ' .
     'aparecerá em uma página de espera com atualização automática.';
@@ -187,6 +188,7 @@ $string['requestpending'] = 'Sua solicitação de liberação está pendente. Ma
 $string['requestpolling'] = 'Esta página verifica automaticamente se houve atualização a cada cinco segundos.';
 $string['requestrejected'] = 'Rejeitado. Você pode voltar ao Questionário e solicitar a liberação novamente.';
 $string['requeststartattempt'] = 'Iniciar tentativa';
+$string['requestupdateerror'] = 'Não foi possível atualizar sua Solicitação de liberação. Volte ao Questionário para verificar a situação.';
 $string['requestvalidity'] = 'Validade da solicitação de liberação';
 $string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
     'permanece válida.';

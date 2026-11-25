@@ -853,4 +853,93 @@ class behat_quizaccess_presencial extends behat_base {
             \core\session\manager::set_user($previoususer);
         }
     }
+
+    /**
+     * Exercise a real student-only outage while another authenticated browser makes the decision.
+     *
+     * @When the student loses connection while :operator authorizes :quizname in another browser
+     * @param string $operator Applicator username.
+     * @param string $quizname Quiz name.
+     */
+    public function student_recovers_connection(string $operator, string $quizname): void {
+        $student = $this->getSession();
+        $applicator = new \Behat\Mink\Session(new \Behat\Mink\Driver\BrowserKitDriver(
+            new \Symfony\Component\BrowserKit\HttpBrowser()
+        ));
+        $requestid = $student->getPage()->find('css', '[data-request-id]')->getAttribute('data-request-id');
+        $waitingurl = $student->getCurrentUrl();
+        $cm = $this->get_cm_by_activity_name('quiz', $quizname);
+        $applicationurl = new moodle_url('/mod/quiz/accessrule/presencial/application.php', ['cmid' => $cm->id]);
+        $loginurl = new moodle_url('/auth/tests/behat/login.php', [
+            'username' => $operator,
+            'wantsurl' => $applicationurl->out_as_local_url(false),
+        ]);
+        try {
+            $applicator->visit($this->locate_path($loginurl->out_as_local_url(false)));
+            $this->set_student_network(true);
+            $warning = "document.querySelector('[data-region=\"request-connection\"]')";
+            if (!$student->wait(15000, $warning . "?.textContent.includes('Unable to update your release request')")) {
+                throw new ExpectationException('The student received no connection warning.', $student);
+            }
+            // A successful poll must also clear the warning when the decision is unchanged.
+            $this->set_student_network(false);
+            if (!$student->wait(15000, $warning . "?.textContent === ''")) {
+                throw new ExpectationException('The connection warning did not clear after recovery.', $student);
+            }
+            if (!$student->getPage()->find('css', '[data-region="request-polling"]')->isVisible()) {
+                throw new ExpectationException('The automatic update message did not return.', $student);
+            }
+            $this->set_student_network(true);
+            if (!$student->wait(15000, $warning . "?.textContent.includes('Unable to update your release request')")) {
+                throw new ExpectationException('A subsequent outage did not show the connection warning.', $student);
+            }
+            $student->executeScript("window.presencialWarningChanges = 0;" .
+                "new MutationObserver(() => window.presencialWarningChanges++).observe(" . $warning .
+                ", {subtree: true, childList: true, characterData: true, attributes: true});");
+            // Cover several retries, without repeated live-region announcements or a page reload.
+            $student->executeScript('window.setTimeout(() => { window.presencialRetriesElapsed = true; }, 31000);');
+            $student->wait(33000, 'window.presencialRetriesElapsed === true');
+            if ($student->evaluateScript('window.presencialWarningChanges') !== 0) {
+                throw new ExpectationException('Repeated retries changed the connection announcement.', $student);
+            }
+            $alert = $student->getPage()->find('css', '[data-region="request-connection"]');
+            if ($alert->getAttribute('role') !== 'status' || $alert->getAttribute('aria-live') !== 'polite') {
+                throw new ExpectationException('The connection warning is not an accessible live region.', $student);
+            }
+            $applicator->getPage()->find('css', 'button[value="authorize"]')->press();
+            if (!str_contains($applicator->getPage()->getText(), 'Authorized')) {
+                throw new ExpectationException('The connected applicator could not authorize the request.', $applicator);
+            }
+            if (
+                $student->getCurrentUrl() !== $waitingurl ||
+                    $student->getPage()->find('css', '.quizaccess-presencial-waiting')->getAttribute('data-state') !== 'pending'
+            ) {
+                throw new ExpectationException('The offline waiting page unexpectedly changed.', $student);
+            }
+            $this->set_student_network(false);
+            $this->wait_for_request_poll('authorized');
+            if ($student->getPage()->find('css', '[data-request-id]')->getAttribute('data-request-id') !== $requestid) {
+                throw new ExpectationException('Recovery created a different release request.', $student);
+            }
+        } finally {
+            $this->set_student_network(false);
+            $applicator->stop();
+        }
+    }
+
+    /**
+     * Change only the student's Chrome network through its WebDriver session.
+     *
+     * @param bool $offline Whether to interrupt the network.
+     */
+    private function set_student_network(bool $offline): void {
+        $devtools = new \Facebook\WebDriver\Chrome\ChromeDevToolsDriver($this->getSession()->getDriver()->getWebDriver());
+        $devtools->execute('Network.enable');
+        $devtools->execute('Network.emulateNetworkConditions', [
+            'offline' => $offline,
+            'latency' => 0,
+            'downloadThroughput' => -1,
+            'uploadThroughput' => -1,
+        ]);
+    }
 }

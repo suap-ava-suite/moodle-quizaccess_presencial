@@ -173,6 +173,7 @@ $string['rejectionreasonrequired'] = 'Enter a reason for rejecting this request.
 $string['requestattemptalreadyexists'] = 'An attempt has already been created for this request. ' .
     'Return to the quiz to resume it.';
 $string['requestauthorized'] = 'Your request was authorized. Continue to start your attempt.';
+$string['requestconnectionerror'] = 'Unable to update your release request. The connection to the server is unavailable. This page will keep trying to reconnect automatically.';
 $string['requestconsumed'] = 'This authorization has already been used. Return to the quiz to continue your attempt.';
 $string['requestdescription'] = 'Starting a new attempt requires in-person release. Your request will appear on a ' .
     'waiting page and update automatically.';
@@ -185,6 +186,7 @@ $string['requestpending'] = 'Your release request is pending. Keep this page ope
 $string['requestpolling'] = 'This page checks for an update automatically every five seconds.';
 $string['requestrejected'] = 'Rejected. You can return to the quiz and request release again.';
 $string['requeststartattempt'] = 'Start attempt';
+$string['requestupdateerror'] = 'Unable to update your release request. Return to the quiz to check its status.';
 $string['requestvalidity'] = 'Release request validity';
 $string['requestvalidity_desc'] = 'Number of whole minutes a pending release request remains valid.';
 $string['requestwaittitle'] = 'Waiting for in-person release';

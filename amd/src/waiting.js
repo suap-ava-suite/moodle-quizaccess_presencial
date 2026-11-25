@@ -21,6 +21,20 @@ export const init = (requestId) => {
     if (!container) {
         return;
     }
+    const connectionRegion = container.querySelector('[data-region="request-connection"]');
+    const pollingMessage = container.querySelector('[data-region="request-polling"]');
+    let currentWarning = '';
+    const showWarning = (message = '') => {
+        if (!connectionRegion || message === currentWarning) {
+            return;
+        }
+        currentWarning = message;
+        connectionRegion.textContent = message;
+        connectionRegion.classList.toggle('alert', message !== '');
+        if (pollingMessage) {
+            pollingMessage.hidden = message !== '';
+        }
+    };
     const renderedState = container.getAttribute('data-state');
     // HTML normalizes textarea CRLF line endings; compare without changing the stored explanation.
     const normalizeReason = (reason) => reason.replace(/\r\n?/g, '\n');
@@ -30,7 +44,8 @@ export const init = (requestId) => {
         Ajax.call([{
             methodname: 'quizaccess_presencial_read_request',
             args: {requestid: requestId},
-        }])[0].then((result) => {
+        }], true, true, false, 10000)[0].then((result) => {
+            showWarning();
             if (result.state !== renderedState || normalizeReason(result.rejectionreason) !== renderedReason) {
                 window.location.reload();
                 return result;
@@ -41,7 +56,9 @@ export const init = (requestId) => {
             }
             window.location.reload();
             return result;
-        }).catch(() => {
+        }).catch((error) => {
+            const {message, updateError} = connectionRegion?.dataset ?? {};
+            showWarning(error?.errorcode ? updateError : message);
             window.setTimeout(poll, 5000);
         });
     };

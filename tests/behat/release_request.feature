@@ -145,3 +145,17 @@ Feature: Gate new quiz attempts with an in-person release request
     And I press "Start attempt"
     Then I should see "Question 1"
     And the release request for attempt 1 of "Password quiz" for "student1" should be consumed
+
+  @javascript
+  Scenario: A student sees connection failures and recovers without starting an attempt
+    Given application account "applicator1" is delegated to the quizzes in course "C1"
+    And I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
+    When I press "Attempt quiz"
+    Then I should see "Your release request is pending"
+    When the student loses connection while "applicator1" authorizes "Quiz 1" in another browser
+    Then I should see "Your request was authorized"
+    And I should not see "Unable to update your release request"
+    And there should be no attempt for "Quiz 1" as "student1"
+    When I press "Start attempt"
+    Then I should see "Question 1"
+    And the release request for attempt 1 of "Quiz 1" for "student1" should be consumed
