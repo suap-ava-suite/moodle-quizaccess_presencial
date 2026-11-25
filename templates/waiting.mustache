@@ -56,30 +56,23 @@
 </div>
 <div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}" data-rejection-reason="{{rejectionreason}}">
     <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}{{#rejected}}alert-warning{{/rejected}}"
-         role="status" aria-live="polite" data-region="request-status">
-        {{message}}
+         role="group" tabindex="-1" data-region="request-status"
+         aria-labelledby="request-message-{{requestid}}" aria-describedby="request-reason-{{requestid}}">
+        <div id="request-message-{{requestid}}" data-region="request-message">{{message}}</div>
+        <div id="request-reason-{{requestid}}" data-region="request-reason"
+             class="text-break presencial-rejection-reason" {{^rejected}}hidden{{/rejected}}>{{rejectionreason}}</div>
     </div>
     <div role="status" aria-live="polite" aria-atomic="true" class="alert-warning"
          data-region="request-connection" data-message="{{#str}}requestconnectionerror, quizaccess_presencial{{/str}}"
          data-update-error="{{#str}}requestupdateerror, quizaccess_presencial{{/str}}"></div>
-    {{#pending}}
-        <p data-region="request-polling">{{#str}}requestpolling, quizaccess_presencial{{/str}}</p>
-        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
-    {{/pending}}
-    {{#authorized}}
-        <form action="{{starturl}}" method="post">
-            <input type="hidden" name="sesskey" value="{{sesskey}}">
-            <button type="submit" class="btn btn-primary">{{startlabel}}</button>
-        </form>
-    {{/authorized}}
-    {{#rejected}}
-        <div class="text-break presencial-rejection-reason">{{rejectionreason}}</div>
-        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
-    {{/rejected}}
-    {{#expired}}
-        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
-    {{/expired}}
-    {{#consumed}}
-        <p><a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a></p>
-    {{/consumed}}
+    <div class="accesshide" role="status" aria-live="polite" aria-atomic="true"
+         data-region="request-announcement"></div>
+    <p data-region="request-polling" {{^pending}}hidden{{/pending}}>{{#str}}requestpolling, quizaccess_presencial{{/str}}</p>
+    <form data-region="request-start" action="{{starturl}}" method="post" {{^authorized}}hidden{{/authorized}}>
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <button type="submit" class="btn btn-primary">{{startlabel}}</button>
+    </form>
+    <p data-region="request-return" {{#authorized}}hidden{{/authorized}}>
+        <a href="{{quizurl}}">{{#str}}backtoquiz, quizaccess_presencial{{/str}}</a>
+    </p>
 </div>

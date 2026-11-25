@@ -66,6 +66,17 @@ $PAGE->set_cacheable(false);
 
 $state = $request->state;
 $pending = in_array($state, [release_request::STATE_PENDING, release_request::STATE_STARTING], true);
+$messages = [];
+foreach ([
+    release_request::STATE_PENDING,
+    release_request::STATE_AUTHORIZED,
+    release_request::STATE_REJECTED,
+    release_request::STATE_EXPIRED,
+    release_request::STATE_CONSUMED,
+] as $messagestate) {
+    $messages[$messagestate] = get_string('request' . $messagestate, 'quizaccess_presencial');
+}
+$messages[release_request::STATE_STARTING] = $messages[release_request::STATE_PENDING];
 $data = [
     'requestid' => $request->id,
     'state' => $state,
@@ -75,10 +86,7 @@ $data = [
     'rejectionreason' => $request->rejectionreason,
     'expired' => $state === release_request::STATE_EXPIRED,
     'consumed' => $state === release_request::STATE_CONSUMED,
-    'message' => get_string(
-        $state === release_request::STATE_STARTING ? 'requestpending' : 'request' . $state,
-        'quizaccess_presencial',
-    ),
+    'message' => $messages[$state],
     'expiresat' => $request->expiresat,
     'quizurl' => $quizobj->view_url()->out(false),
     'starturl' => (new moodle_url('/mod/quiz/accessrule/presencial/start.php', ['requestid' => $requestid]))->out(false),
@@ -90,6 +98,6 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('requestwaittitle', 'quizaccess_presencial'));
 echo $OUTPUT->render_from_template('quizaccess_presencial/waiting', $data);
 if ($data['pending'] || $data['authorized'] || $data['rejected']) {
-    $PAGE->requires->js_call_amd('quizaccess_presencial/waiting', 'init', [$requestid]);
+    $PAGE->requires->js_call_amd('quizaccess_presencial/waiting', 'init', [$requestid, $messages]);
 }
 echo $OUTPUT->footer();

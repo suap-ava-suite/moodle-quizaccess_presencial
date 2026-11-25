@@ -599,8 +599,10 @@ class behat_quizaccess_presencial extends behat_base {
      */
     public function assert_no_manual_check_button(): void {
         $buttons = $this->getSession()->getPage()->findAll('css', '.quizaccess-presencial-waiting button');
-        if ($buttons) {
-            throw new ExpectationException('The pending page contains a manual check button.', $this->getSession());
+        foreach ($buttons as $button) {
+            if ($button->isVisible()) {
+                throw new ExpectationException('The pending page contains a manual check button.', $this->getSession());
+            }
         }
     }
 
@@ -652,7 +654,7 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
-     * Wait for the scheduled browser poll to reload after a state change.
+     * Wait for the scheduled browser poll to present a state change.
      *
      * @When /^I wait for the release request poll "([^"]*)"$/
      * @param string $state Expected state rendered after the poll.
@@ -789,6 +791,97 @@ class behat_quizaccess_presencial extends behat_base {
             }
         } finally {
             \core\session\manager::set_user($previoususer);
+        }
+    }
+
+    /**
+     * Submit a decision through the panel in an independent authenticated HTTP session.
+     *
+     * @When applicator :operator authorizes :quizname in another session
+     * @When applicator :operator rejects :quizname with :reason in another session
+     * @param string $operator Applicator username.
+     * @param string $quizname Quiz name.
+     * @param string|null $reason Rejection explanation, or null to authorize.
+     */
+    public function applicator_decides_in_another_session(string $operator, string $quizname, ?string $reason = null): void {
+        $student = $this->getSession();
+        $requestid = $student->getPage()->find('css', '[data-request-id]')->getAttribute('data-request-id');
+        $cm = $this->get_cm_by_activity_name('quiz', $quizname);
+        $panelurl = new moodle_url('/mod/quiz/accessrule/presencial/application.php', ['cmid' => $cm->id]);
+        $loginurl = new moodle_url('/auth/tests/behat/login.php', [
+            'username' => $operator,
+            'wantsurl' => $panelurl->out_as_local_url(false),
+        ]);
+        $client = new \Symfony\Component\BrowserKit\HttpBrowser();
+        $client->followRedirects(true);
+        $client->request('GET', $this->locate_path($loginurl->out_as_local_url(false)));
+        $form = $client->getCrawler()->filter('form.presencial-queue-actions')->reduce(
+            fn($node) => $node->filter('input[name="requestid"]')->attr('value') === $requestid,
+        );
+        if ($form->count() !== 1) {
+            throw new ExpectationException('The request was not available in the applicator session.', $student);
+        }
+        $decision = $reason === null ? 'authorize' : 'reject';
+        $button = $form->filter('button[value="' . $decision . '"]');
+        $client->submit($button->form($reason === null ? [] : ['reason' => $reason]));
+        $expected = get_string('queuestate' . ($reason === null ? 'authorized' : 'rejected'), 'quizaccess_presencial');
+        $row = $client->getCrawler()->filter('input[name="requestid"]')->reduce(
+            fn($node) => $node->attr('value') === $requestid,
+        )->closest('tr');
+        if ($row->count() !== 1 || !str_contains($row->text(), $expected)) {
+            throw new ExpectationException('The applicator session did not confirm the decision.', $student);
+        }
+    }
+
+    /**
+     * Wait for a revised explanation without changing the student's focus.
+     *
+     * @When I wait for the release request explanation :reason
+     * @param string $reason Expected plain-text explanation.
+     */
+    public function wait_for_request_explanation(string $reason): void {
+        $expected = json_encode($reason, JSON_THROW_ON_ERROR);
+        $script = "document.querySelector('[data-region=\"request-reason\"]')?.textContent === {$expected}";
+        if (!$this->getSession()->wait(10000, $script)) {
+            throw new ExpectationException('The revised rejection explanation was not presented.', $this->getSession());
+        }
+    }
+
+    /**
+     * Inspect the live announcement without moving focus or reading hidden layout text.
+     *
+     * @Then the release announcement should be :message
+     * @param string $message Expected announcement, or an empty string when focus announces the change.
+     */
+    public function assert_release_announcement(string $message): void {
+        $actual = $this->evaluate_script('document.querySelector(\'[data-region="request-announcement"]\').textContent');
+        if ($actual !== $message) {
+            throw new ExpectationException('The release announcement did not match the decision.', $this->getSession());
+        }
+    }
+
+    /**
+     * Check that an unchanged poll does not repeat a live announcement.
+     *
+     * @Then the release announcement should remain unchanged across the next poll
+     */
+    public function release_announcement_remains_unchanged(): void {
+        $this->execute_script(<<<'JS'
+            window.presencialAnnouncementChanges = 0;
+            window.presencialAnnouncementPollFinished = false;
+            window.presencialAnnouncementObserver = new MutationObserver(() => window.presencialAnnouncementChanges++);
+            window.presencialAnnouncementObserver.observe(document.querySelector('[data-region="request-announcement"]'), {
+                childList: true, characterData: true, subtree: true
+            });
+            window.setTimeout(() => { window.presencialAnnouncementPollFinished = true; }, 6000);
+            JS);
+        $finished = $this->getSession()->wait(8000, 'window.presencialAnnouncementPollFinished === true');
+        if (!$finished) {
+            throw new ExpectationException('The waiting page reloaded during the next poll.', $this->getSession());
+        }
+        $this->execute_script('window.presencialAnnouncementObserver.disconnect();');
+        if ($this->evaluate_script('window.presencialAnnouncementChanges') !== 0) {
+            throw new ExpectationException('An unchanged poll repeated the live announcement.', $this->getSession());
         }
     }
 

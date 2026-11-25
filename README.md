@@ -223,6 +223,10 @@ Behat cobre as jornadas de gestão da equipe de aplicação, geração, cópia, 
 
 As jornadas do painel cobrem navegação sem matrícula, recusa de acesso acadêmico, revogação e suspensão na sessão existente, usuário sem autoridade e Professor sem Delegação. Os cenários de teclado usam um navegador real e percorrem menu, abertura, atualização, retorno e paginação com Tab, setas e Enter, verificando o foco sem forçá-lo por JavaScript.
 
+A espera atualiza a decisão e a justificativa sem recarregar a página. Ela preserva o foco nos controles que continuam disponíveis e, quando o controle focado desaparece, leva o foco à mensagem da Decisão vigente; o próximo Tab alcança a ação correspondente. Mudanças fora desse caso são anunciadas por uma região acessível, sem repetir o anúncio nas consultas sem alteração. Os cenários `@waiting_accessibility` usam Tab e Enter no navegador do estudante e outra sessão autenticada para decidir pelo Painel do Aplicador.
+
+A verificação com leitor de tela complementa esses cenários: registre o leitor, o navegador e suas versões; alcance **Voltar ao Questionário** com Tab após uma rejeição; autorize a mesma Solicitação em outra sessão e confira a leitura da nova situação e o próximo Tab até **Iniciar tentativa**. Repita com o foco fora dos controles da Solicitação, com alteração apenas da justificativa e com rejeição ou expiração enquanto o botão de início está focado. Aguarde mais uma consulta sem mudança para confirmar que não há anúncio repetido e que a tentativa só começa após ativação explícita. A automação de DOM e teclado não substitui esse ensaio.
+
 Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash

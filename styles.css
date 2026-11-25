@@ -2,6 +2,11 @@
     white-space: pre-wrap;
 }
 
+.quizaccess-presencial-waiting [data-region="request-status"]:focus {
+    outline: 0.2rem solid currentColor;
+    outline-offset: 0.2rem;
+}
+
 .presencial-queue-actions,
 .presencial-panel-navigation {
     display: flex;
