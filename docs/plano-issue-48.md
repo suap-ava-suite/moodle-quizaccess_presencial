@@ -17,7 +17,7 @@ O Professor poderá recuperar o mesmo link em visitas futuras. Copiar não regen
 
 O usuário confirmou armazenar o segredo de forma criptografada para permitir essa recuperação. Convites criados antes da atualização permanecem válidos; para habilitar nova cópia, o Professor precisa regenerá-los manualmente uma vez. A interface deve explicar essa condição e que regenerar invalida o link anterior, sem realizar substituição automática.
 
-Essa decisão substitui a exibição única do [ADR 0005](adr/0005-exibir-o-link-de-convite-uma-unica-vez.md), conforme o [ADR 0011](adr/0011-permitir-nova-copia-do-convite-ativo.md).
+Essa decisão substitui a exibição única do [ADR 0005](adr/0005-exibir-o-link-de-convite-uma-unica-vez.md), conforme o [ADR 0012](adr/0012-permitir-nova-copia-do-convite-ativo.md).
 
 ## Situação anterior à implementação
 

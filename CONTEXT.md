@@ -25,19 +25,19 @@ Uma conta Moodle confirmada, não excluída, não suspensa, diferente da conta d
 _Avoid_: usuário da disciplina, servidor, docente
 
 **Delegação de aplicação**:
-A relação temporária que torna um usuário Aplicador de um Questionário durante um Período de Autorização, sem criar matrícula ou atribuição de papel no Moodle. A suspensão da conta interrompe temporariamente seu efeito; depois de expirar ou ser revogada, ela não é reativada, e uma nova concessão cria outra Delegação.
+A relação que torna um usuário Aplicador de um Questionário, sem criar matrícula ou atribuição de papel no Moodle. Ela não tem datas próprias: produz efeito sobre as Solicitações de liberação feitas dentro da Disponibilidade efetiva de cada estudante e acompanha as datas atuais do Questionário, inclusive quando ele é adiado, prorrogado ou reaberto. Pode ser concedida a qualquer momento, mesmo com o Questionário fechado ou a Liberação Presencial desabilitada. A suspensão da conta e a desabilitação da Liberação Presencial interrompem temporariamente seu efeito; somente a revogação a encerra definitivamente, e uma nova concessão cria outra Delegação.
 _Avoid_: permissão de curso, papel de aplicador, matrícula de aplicador
 
 **Período de disponibilidade do Questionário**:
-O intervalo já configurado no Questionário em que estudantes podem iniciar tentativas. A Liberação Presencial acrescenta uma condição de acesso, mas não cria nem substitui esse período.
-_Avoid_: período da aplicação, Sessão de Aplicação
+O intervalo geral de abertura e fechamento configurado no Questionário, sem considerar exceções individuais ou de grupo. A Liberação Presencial não tem período próprio: este período determina a validade do Convite por link e a presença do Questionário no Painel do Aplicador. Qualquer um dos limites pode estar ausente; sem fechamento, a autoridade dura até a revogação da Delegação ou a desabilitação da Liberação Presencial.
+_Avoid_: Período de Autorização, período da aplicação, Sessão de Aplicação
 
-**Período de Autorização**:
-O intervalo finito, contido no Período de disponibilidade do Questionário, em que professores autorizados e Aplicadores podem conceder Autorizações de tentativa.
-_Avoid_: período da aplicação, período do Questionário
+**Disponibilidade efetiva do estudante**:
+O intervalo em que o Moodle permite que um estudante específico inicie uma tentativa, resultante do Período de disponibilidade do Questionário e das exceções individuais ou de grupo desse estudante. Uma Solicitação de liberação só pode ser decidida, por um Professor ou pela equipe atual de Aplicadores, enquanto o estudante que a criou estiver nessa disponibilidade, mesmo antes da abertura ou depois do fechamento gerais.
+_Avoid_: período do estudante, período da exceção
 
 **Solicitação de liberação**:
-O pedido temporário criado automaticamente quando um estudante presente no laboratório tenta iniciar sua próxima tentativa de um Questionário sujeito à Liberação Presencial. Ele expira após 15 minutos se não for decidido, e cliques repetidos retornam à mesma solicitação pendente sem renovar esse prazo; desabilitar a Liberação Presencial encerra-o definitivamente.
+O pedido temporário criado automaticamente quando um estudante presente no laboratório tenta iniciar sua próxima tentativa de um Questionário sujeito à Liberação Presencial. Ele expira após 15 minutos se não for decidido, ou antes, no fim da Disponibilidade efetiva do estudante, e cliques repetidos retornam à mesma solicitação pendente sem renovar esse prazo; desabilitar a Liberação Presencial encerra-o definitivamente.
 _Avoid_: solicitação de prova, pedido de acesso ao curso
 
 **Autorização de tentativa**:
@@ -53,11 +53,11 @@ A forma de conceder uma Delegação de aplicação pela seleção de um usuário
 _Avoid_: convite direto, convite sem link
 
 **Convite por link**:
-A forma aberta de oferecer uma Delegação de aplicação. Qualquer usuário autenticado com uma conta Moodle ativa pode acessar o único link vigente do Questionário e aceitar tornar-se Aplicador antes ou durante o Período de Autorização; o Professor pode copiar novamente o mesmo link enquanto o convite estiver ativo.
+A forma aberta de oferecer uma Delegação de aplicação. Qualquer usuário autenticado com uma conta Moodle ativa pode acessar o único link vigente do Questionário e aceitar tornar-se Aplicador antes ou durante o Período de disponibilidade do Questionário; o Professor pode copiá-lo novamente enquanto estiver ativo. Diferentemente da Delegação, o convite expira definitivamente no fechamento do Questionário e não volta a valer se ele for reaberto; sem fechamento, vale até ser desativado ou regenerado.
 _Avoid_: convite individual, link público, Inclusão direta
 
 **Painel do Aplicador**:
-A página autônoma do Moodle em que um Aplicador encontra os Questionários com Delegação válida, inclusive os cujo Período de Autorização ainda não começou, e opera Solicitações de liberação sem precisar acessar a disciplina ou a página do Questionário. O item de navegação Minhas Aplicações fica oculto quando o usuário não possui Delegações atuais ou futuras.
+A página autônoma do Moodle em que um Aplicador encontra os Questionários com Delegação não revogada e opera Solicitações de liberação sem precisar acessar a disciplina ou a página do Questionário. Um Questionário aparece enquanto seu Período de disponibilidade for atual, futuro ou sem fechamento, ou enquanto sua Fila operacional tiver alguma Solicitação; fora disso, ele some e o acesso aos dados dos estudantes termina, mas a Delegação é preservada e o Questionário volta a aparecer se for reaberto. O item de navegação Minhas Aplicações fica oculto quando nenhum Questionário do usuário atende a essas condições.
 _Avoid_: painel da disciplina, painel de coordenação
 
 **Fila operacional**:
