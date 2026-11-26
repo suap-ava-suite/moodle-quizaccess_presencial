@@ -23,6 +23,8 @@
  */
 
 $string['addapplicators'] = 'Include selected accounts';
+$string['addapplicatorsheading'] = 'Add applicators';
+$string['addapplicatorsheading_help'] = 'Select eligible accounts to grant an application delegation immediately. No invitation, enrolment or role assignment is required.';
 $string['applicationaccessdenied'] = 'You do not currently have access to this application.';
 $string['applicationnotstarted'] = 'The authorization period has not started. Student data and operational actions are unavailable.';
 $string['applicationpanel'] = 'Application panel';
@@ -108,6 +110,8 @@ $string['invitationstate_expired'] = 'The invitation has expired.';
 $string['invitationstate_none'] = 'No invitation has been generated.';
 $string['invitationteacher'] = 'Invitation created by';
 $string['invitationunavailable'] = 'Enable in-person release and set a valid authorization period before generating an invitation.';
+$string['inviteapplicatorsheading'] = 'Invite applicators';
+$string['inviteapplicatorsheading_help'] = 'Generate a link for an eligible account to sign in and accept the invitation. The complete link is shown only once.';
 $string['manageapplicators'] = 'Manage application team';
 $string['myapplications'] = 'My applications';
 $string['noapplications'] = 'There are no current or future applications available to you.';

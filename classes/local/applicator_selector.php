@@ -42,6 +42,46 @@ final class applicator_selector extends \user_selector_base {
     }
 
     /**
+     * Render the native selector with search controls before the inclusion action and list.
+     *
+     * @param string $button Inclusion button HTML.
+     * @return string Selector markup.
+     */
+    public function display_for_inclusion(string $button): string {
+        $html = parent::display(true);
+        $document = new \DOMDocument('1.0', 'UTF-8');
+        $previous = libxml_use_internal_errors(true);
+        $document->loadHTML(
+            '<?xml encoding="UTF-8"><div id="selector-root">' . $html . '</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+        );
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $wrapper = $document->getElementById($this->get_name() . '_wrapper');
+        $select = $document->getElementById($this->get_name());
+        $search = $document->getElementById($this->get_name() . '_searchtext');
+        if (!$wrapper || !$select || !$search || $search->parentNode->parentNode !== $wrapper) {
+            throw new \coding_exception('Unexpected Moodle user selector markup');
+        }
+        $controls = $search->parentNode;
+        $wrapper->insertBefore($controls, $select);
+        $buttondocument = new \DOMDocument('1.0', 'UTF-8');
+        $buttondocument->loadHTML('<?xml encoding="UTF-8">' . $button, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $wrapper->insertBefore($document->importNode($buttondocument->documentElement, true), $select);
+        $label = $document->createElement('label');
+        $label->setAttribute('for', $this->get_name());
+        $label->setAttribute('class', 'd-block');
+        $label->appendChild($document->createTextNode(get_string('applicators', 'quizaccess_presencial')));
+        $wrapper->insertBefore($label, $select);
+        $root = $document->getElementById('selector-root');
+        $result = '';
+        foreach ($root->childNodes as $child) {
+            $result .= $document->saveHTML($child);
+        }
+        return $result;
+    }
+
+    /**
      * Find only confirmed, active, non-guest accounts with an enabled login method.
      *
      * @param string $search Search text.

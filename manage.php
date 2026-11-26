@@ -120,24 +120,12 @@ if ($issued !== null) {
     $delegations = delegation_manager::list_current((int) $quiz->id);
     $users = $delegations ? $DB->get_records_list('user', 'id', array_column($delegations, 'userid')) : [];
 
-    echo html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
-    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
-    echo html_writer::tag('label', get_string('applicators', 'quizaccess_presencial'), ['for' => 'applicators']);
-    echo $selector->display(true);
-    echo html_writer::empty_tag('input', [
-        'type' => 'submit',
-        'name' => 'addapplicators',
-        'value' => get_string('addapplicators', 'quizaccess_presencial'),
-        'class' => 'btn btn-primary mt-3 mb-3',
-    ]);
-    echo html_writer::end_tag('form');
-
     echo $OUTPUT->heading(get_string('currentapplicators', 'quizaccess_presencial'), 3);
     if (!$delegations) {
         echo html_writer::tag('p', get_string('none'));
     } else {
         $table = new html_table();
-        $table->attributes['class'] = 'presencial-current-applicators';
+        $table->attributes['class'] = 'generaltable table-bordered w-100 presencial-current-applicators';
         $table->head = [get_string('fullname'), get_string('delegationorigin', 'quizaccess_presencial'),
             get_string('authorizationperiodstart', 'quizaccess_presencial'),
             get_string('authorizationperiodend', 'quizaccess_presencial'), get_string('actions')];
@@ -164,10 +152,24 @@ if ($issued !== null) {
                 $revokeform,
             ];
         }
-        echo html_writer::table($table);
+        echo html_writer::div(html_writer::table($table), 'table-responsive');
     }
 
-    echo $OUTPUT->heading(get_string('invitationmanage', 'quizaccess_presencial'), 3);
+    echo $OUTPUT->heading(get_string('addapplicatorsheading', 'quizaccess_presencial') .
+        $OUTPUT->help_icon('addapplicatorsheading', 'quizaccess_presencial'), 3);
+    echo html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+    $addbutton = html_writer::empty_tag('input', [
+        'type' => 'submit',
+        'name' => 'addapplicators',
+        'value' => get_string('addapplicators', 'quizaccess_presencial'),
+        'class' => 'btn btn-primary mt-3 mb-3',
+    ]);
+    echo $selector->display_for_inclusion($addbutton);
+    echo html_writer::end_tag('form');
+
+    echo $OUTPUT->heading(get_string('inviteapplicatorsheading', 'quizaccess_presencial') .
+        $OUTPUT->help_icon('inviteapplicatorsheading', 'quizaccess_presencial'), 3);
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
         'state' => get_string('invitationstate_' . $status['state'], 'quizaccess_presencial'),
         'expires' => $status['timeexpires'] ? get_string(

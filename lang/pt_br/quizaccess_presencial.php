@@ -23,6 +23,8 @@
  */
 
 $string['addapplicators'] = 'Incluir contas selecionadas';
+$string['addapplicatorsheading'] = 'Adicionar aplicadores';
+$string['addapplicatorsheading_help'] = 'Selecione contas elegíveis para conceder imediatamente uma Delegação de aplicação, sem convite, matrícula ou atribuição de papel.';
 $string['applicationaccessdenied'] = 'Você não possui acesso a esta aplicação no momento.';
 $string['applicationnotstarted'] = 'O Período de Autorização ainda não começou. Dados de estudantes e ações operacionais estão indisponíveis.';
 $string['applicationpanel'] = 'Painel do Aplicador';
@@ -110,6 +112,8 @@ $string['invitationstate_expired'] = 'O convite expirou.';
 $string['invitationstate_none'] = 'Nenhum convite foi gerado.';
 $string['invitationteacher'] = 'Convite gerado por';
 $string['invitationunavailable'] = 'Habilite a Liberação Presencial e configure um período de autorização válido antes de gerar um convite.';
+$string['inviteapplicatorsheading'] = 'Convidar aplicadores';
+$string['inviteapplicatorsheading_help'] = 'Gere um link para que uma Conta elegível entre no Moodle e aceite o convite. O link completo é exibido somente uma vez.';
 $string['manageapplicators'] = 'Gerenciar equipe de aplicação';
 $string['myapplications'] = 'Minhas Aplicações';
 $string['noapplications'] = 'Não há aplicações atuais ou futuras disponíveis para você.';
