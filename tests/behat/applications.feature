@@ -81,7 +81,7 @@ Feature: Find and open standalone applications
     And I reach "My applications" "link" using only the keyboard
     Then the focused element is "My applications" "link"
     When I press the enter key
-    Then I should see "My applications" in the "h2" "css_element"
+    Then I should see "My applications" in the "h1" "css_element"
     When I reach "Open application" "link" using only the keyboard
     Then the focused element is "Open application" "link"
     When I press the enter key
@@ -95,7 +95,7 @@ Feature: Find and open standalone applications
     And I press the tab key
     Then the focused element is "My applications" "link" in the "#region-main" "css_element"
     When I press the enter key
-    Then I should see "My applications" in the "h2" "css_element"
+    Then I should see "My applications" in the "h1" "css_element"
 
   @javascript @presencial_keyboard
   Scenario: An applicator changes pages and opens an application using only the keyboard

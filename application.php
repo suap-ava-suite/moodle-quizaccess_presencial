@@ -70,7 +70,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 }
 $queue = operational_queue::get_page($cmid, $page);
 $PAGE->navbar->add(get_string('myapplications', 'quizaccess_presencial'), $listurl);
-$PAGE->navbar->add(get_string('applicationpanel', 'quizaccess_presencial'));
 
 echo $OUTPUT->header();
 echo html_writer::tag('p', format_string(
