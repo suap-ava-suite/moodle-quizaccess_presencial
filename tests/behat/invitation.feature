@@ -99,6 +99,17 @@ Feature: Manage the in-person release invitation
     And I should not see "The invitation expired on"
     And "Invitation link" "field" should not exist
 
+  Scenario: An incompatible quiz schedule does not report an encryption failure
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Manage application team" in current page administration
+    And I press "Generate invitation"
+    And the opening of "Quiz 1" conflicts with its in-person release period
+    When I follow "Return to invitation management"
+    Then I should see "The invitation is active."
+    And I should see "Enable in-person release and set a valid authorization period before generating an invitation."
+    And I should not see "The invitation link cannot be copied."
+    And "Invitation link" "field" should not exist
+
   Scenario: An expired authorization period does not allow issuing invitations
     Given the following "activities" exist:
       | activity | name         | course | idnumber    | presencial_enabled | presencial_timeopen       | presencial_timeclose      |

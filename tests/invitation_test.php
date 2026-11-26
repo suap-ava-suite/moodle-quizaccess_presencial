@@ -109,14 +109,11 @@ final class invitation_test extends \advanced_testcase {
      * An invitation created before the upgrade remains valid until explicitly replaced.
      */
     public function test_legacy_invitation_requires_regeneration_for_recovery(): void {
-        global $DB;
-
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
-        // Simulate the nullable column added to a pre-upgrade invitation record.
-        $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', null, ['quizid' => $quiz->id]);
+        $this->replace_encrypted_token($quiz->id);
 
         $details = invitation::get_management_details($quiz->cmid);
         $this->assertNull($details['token']);
@@ -127,6 +124,34 @@ final class invitation_test extends \advanced_testcase {
         $this->assertSame($replacement['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
+    }
+
+    /**
+     * An incompatible quiz schedule is not reported as an encryption failure.
+     */
+    public function test_incompatible_quiz_schedule_prevents_invitation_recovery(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(strtotime('2030-01-01 09:00:00 UTC'));
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        require_once($CFG->dirroot . '/mod/quiz/lib.php');
+        $quiz->instance = $quiz->id;
+        $quiz->quizpassword = $quiz->password;
+        $quiz->timeopen = strtotime('2030-01-01 11:00:00 UTC');
+        quiz_update_instance($quiz, null);
+
+        $sink = $this->redirectEvents();
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame('active', $details['state']);
+        $this->assertNull($details['token']);
+        $this->assertSame('configuration', $details['copyreason']);
+        $this->assertFalse($details['canissue']);
+        $this->assertCount(0, $sink->get_events());
+        $sink->close();
+        $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
     }
 
     /**
@@ -201,16 +226,13 @@ final class invitation_test extends \advanced_testcase {
      * A recoverable ciphertext must belong to the same invitation as the stored hash.
      */
     public function test_recovery_rejects_another_invitations_ciphertext(): void {
-        global $DB;
-
         $this->resetAfterTest();
         $this->setAdminUser();
         $quiz = $this->configured_quiz();
         $other = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
         invitation::generate($other->cmid, 0);
-        $ciphertext = $DB->get_field('quizaccess_presencial_invite', 'tokenencrypted', ['quizid' => $other->id], MUST_EXIST);
-        $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', $ciphertext, ['quizid' => $quiz->id]);
+        $this->replace_encrypted_token($quiz->id, $other->id);
 
         $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
@@ -709,6 +731,21 @@ final class invitation_test extends \advanced_testcase {
         PHP;
 
         return [PHP_BINARY, '-d', 'max_input_vars=5000', '-r', $bootstrap, $CFG->dirroot, $quiz->cmid, $USER->id, $mode];
+    }
+
+    /**
+     * Prepare legacy or mismatched encrypted data, states unavailable through the public interface.
+     *
+     * @param int $quizid Invitation to alter.
+     * @param int|null $sourcequizid Invitation supplying ciphertext, or null for a legacy invitation.
+     */
+    private function replace_encrypted_token(int $quizid, ?int $sourcequizid = null): void {
+        global $DB;
+
+        $ciphertext = $sourcequizid === null ? null : $DB->get_field(
+            'quizaccess_presencial_invite', 'tokenencrypted', ['quizid' => $sourcequizid], MUST_EXIST
+        );
+        $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', $ciphertext, ['quizid' => $quizid]);
     }
 
     /**

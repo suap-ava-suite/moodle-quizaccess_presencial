@@ -562,6 +562,25 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Change the quiz opening so it conflicts with the in-person release period.
+     *
+     * @Given the opening of :quizname conflicts with its in-person release period
+     * @param string $quizname Quiz name.
+     */
+    public function the_quiz_opening_conflicts_with_the_release_period(string $quizname): void {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/quiz/lib.php');
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        $quiz->instance = $quizid;
+        $quiz->coursemodule = get_coursemodule_from_instance('quiz', $quizid, 0, false, MUST_EXIST)->id;
+        $quiz->quizpassword = $quiz->password;
+        $quiz->timeopen = $quiz->presencial_timeopen + HOURSECS;
+        quiz_update_instance($quiz, null);
+    }
+
+    /**
      * Erase invitation creator data through the Moodle Privacy API.
      *
      * @Given the invitation data for :quizname has been erased

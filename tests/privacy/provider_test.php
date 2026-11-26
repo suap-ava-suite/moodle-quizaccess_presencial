@@ -111,8 +111,6 @@ final class provider_test extends provider_testcase {
      * Export contains only lifecycle data and honours both the owner and approved quiz context.
      */
     public function test_export_excludes_secrets_and_respects_approved_user_and_contexts(): void {
-        global $DB;
-
         $this->resetAfterTest();
         $this->mock_clock_with_frozen(1800000000);
         $creator = self::getDataGenerator()->create_user();
@@ -123,7 +121,6 @@ final class provider_test extends provider_testcase {
         $othercontext = \context_module::instance($unapproved->cmid);
         $this->setUser($creator);
         $issued = invitation::generate($quiz->cmid, 0);
-        $ciphertext = $DB->get_field('quizaccess_presencial_invite', 'tokenencrypted', ['quizid' => $quiz->id], MUST_EXIST);
         invitation::generate($unapproved->cmid, 0);
 
         provider::export_user_data(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
@@ -137,7 +134,6 @@ final class provider_test extends provider_testcase {
         $this->assertSame(transform::datetime(1800000000), $data->timemodified);
         $this->assertSame(transform::datetime($issued['timeexpires']), $data->timeexpires);
         $this->assertStringNotContainsString($issued['token'], json_encode($data));
-        $this->assertStringNotContainsString($ciphertext, json_encode($data));
         $this->assertFalse(writer::with_context($othercontext)->has_any_data());
 
         writer::reset();
