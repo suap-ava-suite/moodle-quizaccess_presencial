@@ -227,6 +227,8 @@ A espera atualiza a decisão e a justificativa sem recarregar a página. Ela pre
 
 A verificação com leitor de tela complementa esses cenários: registre o leitor, o navegador e suas versões; alcance **Voltar ao Questionário** com Tab após uma rejeição; autorize a mesma Solicitação em outra sessão e confira a leitura da nova situação e o próximo Tab até **Iniciar tentativa**. Repita com o foco fora dos controles da Solicitação, com alteração apenas da justificativa e com rejeição ou expiração enquanto o botão de início está focado. Aguarde mais uma consulta sem mudança para confirmar que não há anúncio repetido e que a tentativa só começa após ativação explícita. A automação de DOM e teclado não substitui esse ensaio.
 
+O ensaio com leitor de tela ainda está pendente. A issue #42 deve permanecer aberta até que o resultado desse ensaio seja registrado, incluindo leitor, navegador e versões.
+
 Em um ambiente preparado pelo `moodle-plugin-ci`, execute:
 
 ```bash

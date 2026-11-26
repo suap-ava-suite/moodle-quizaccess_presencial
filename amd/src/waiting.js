@@ -11,9 +11,8 @@ import Ajax from 'core/ajax';
  * Poll the release request without a manual refresh or check button.
  *
  * @param {number} requestId Request id.
- * @param {Object} messages Localized messages indexed by request state.
  */
-export const init = (requestId, messages) => {
+export const init = (requestId) => {
     const region = document.querySelector('[data-region="request-status"]');
     if (!region) {
         return;
@@ -23,6 +22,7 @@ export const init = (requestId, messages) => {
         return;
     }
     const messageRegion = container.querySelector('[data-region="request-message"]');
+    const messages = messageRegion.dataset;
     const reasonRegion = container.querySelector('[data-region="request-reason"]');
     const announcement = container.querySelector('[data-region="request-announcement"]');
     const pollingMessage = container.querySelector('[data-region="request-polling"]');

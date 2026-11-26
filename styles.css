@@ -2,7 +2,7 @@
     white-space: pre-wrap;
 }
 
-.quizaccess-presencial-waiting [data-region="request-status"]:focus {
+.quizaccess-presencial-waiting .presencial-request-status:focus {
     outline: 0.2rem solid currentColor;
     outline-offset: 0.2rem;
 }

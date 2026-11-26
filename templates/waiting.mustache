@@ -55,12 +55,18 @@
          data-region="request-qr-image" alt="{{#str}}qrwaiting, quizaccess_presencial{{/str}}">
 </div>
 <div class="quizaccess-presencial-waiting" data-request-id="{{requestid}}" data-state="{{state}}" data-rejection-reason="{{rejectionreason}}">
-    <div class="alert {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}{{#rejected}}alert-warning{{/rejected}}"
+    <div class="alert presencial-request-status {{#pending}}alert-info{{/pending}}{{#authorized}}alert-success{{/authorized}}{{#expired}}alert-warning{{/expired}}{{#rejected}}alert-warning{{/rejected}}"
          role="group" tabindex="-1" data-region="request-status"
-         aria-labelledby="request-message-{{requestid}}" aria-describedby="request-reason-{{requestid}}">
-        <div id="request-message-{{requestid}}" data-region="request-message">{{message}}</div>
-        <div id="request-reason-{{requestid}}" data-region="request-reason"
-             class="text-break presencial-rejection-reason" {{^rejected}}hidden{{/rejected}}>{{rejectionreason}}</div>
+         aria-labelledby="request-message-{{uniqid}}" aria-describedby="request-reason-{{uniqid}}">
+        <div id="request-message-{{uniqid}}" data-region="request-message"
+             data-pending="{{#str}}requestpending, quizaccess_presencial{{/str}}"
+             data-authorized="{{#str}}requestauthorized, quizaccess_presencial{{/str}}"
+             data-rejected="{{#str}}requestrejected, quizaccess_presencial{{/str}}"
+             data-expired="{{#str}}requestexpired, quizaccess_presencial{{/str}}"
+             data-consumed="{{#str}}requestconsumed, quizaccess_presencial{{/str}}"
+             data-starting="{{#str}}requeststarting, quizaccess_presencial{{/str}}">{{message}}</div>
+        <div id="request-reason-{{uniqid}}" data-region="request-reason"
+             class="text-break presencial-rejection-reason" {{^rejected}}hidden{{/rejected}}>{{#rejected}}{{rejectionreason}}{{/rejected}}</div>
     </div>
     <div role="status" aria-live="polite" aria-atomic="true" class="alert-warning"
          data-region="request-connection" data-message="{{#str}}requestconnectionerror, quizaccess_presencial{{/str}}"
