@@ -361,7 +361,19 @@ class behat_quizaccess_presencial extends behat_base {
      * @Given /^I remember the generated invitation link$/
      */
     public function i_remember_the_generated_invitation_link(): void {
-        $this->previouslink = $this->find_field('Invitation link')->getAttribute('value');
+        $this->previouslink = $this->find('css', '#presencial-invitation-link')->getAttribute('value');
+    }
+
+    /**
+     * Check that the current link is the previously observed invitation.
+     *
+     * @Then the invitation link should match the remembered link
+     */
+    public function the_invitation_link_should_match_the_remembered_link(): void {
+        $currentlink = $this->find('css', '#presencial-invitation-link')->getAttribute('value');
+        if (!$this->previouslink || $currentlink !== $this->previouslink) {
+            throw new ExpectationException('The invitation link changed.', $this->getSession());
+        }
     }
 
     /**
@@ -486,7 +498,7 @@ class behat_quizaccess_presencial extends behat_base {
      * @Then /^the generated invitation link should differ from the previous link$/
      */
     public function the_generated_invitation_link_should_differ(): void {
-        $currentlink = $this->find_field('Invitation link')->getAttribute('value');
+        $currentlink = $this->find('css', '#presencial-invitation-link')->getAttribute('value');
         if ($this->previouslink === null || !$currentlink || $currentlink === $this->previouslink) {
             throw new ExpectationException('The regenerated invitation must have a different link.', $this->getSession());
         }
@@ -546,6 +558,75 @@ class behat_quizaccess_presencial extends behat_base {
             (new \quizaccess_presencial\task\expire_invitations())->execute();
         } finally {
             \core\di::set(\core\clock::class, $clock);
+        }
+    }
+
+    /**
+     * Change the quiz opening so it conflicts with the in-person release period.
+     *
+     * @Given the opening of :quizname conflicts with its in-person release period
+     * @param string $quizname Quiz name.
+     */
+    public function the_quiz_opening_conflicts_with_the_release_period(string $quizname): void {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/quiz/lib.php');
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        $quiz->instance = $quizid;
+        $quiz->coursemodule = get_coursemodule_from_instance('quiz', $quizid, 0, false, MUST_EXIST)->id;
+        $quiz->quizpassword = $quiz->password;
+        $quiz->timeopen = $quiz->presencial_timeopen + HOURSECS;
+        quiz_update_instance($quiz, null);
+    }
+
+    /**
+     * Erase invitation creator data through the Moodle Privacy API.
+     *
+     * @Given the invitation data for :quizname has been erased
+     * @param string $quizname Quiz name.
+     */
+    public function the_invitation_data_has_been_erased(string $quizname): void {
+        global $DB;
+
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $cm = get_coursemodule_from_instance('quiz', $quizid, 0, false, MUST_EXIST);
+        \quizaccess_presencial\privacy\provider::delete_data_for_all_users_in_context(
+            \context_module::instance($cm->id)
+        );
+    }
+
+    /**
+     * Check the complete localized expiration message using the quiz authorization deadline.
+     *
+     * @Then /^the invitation for "([^"]+)" should display its expiration date and time(?: for "([^"]+)")?$/
+     * @param string $quizname Quiz name.
+     * @param string $username Optional user whose language and timezone are used.
+     */
+    public function the_invitation_displays_its_expiration_date_and_time(string $quizname, string $username = ''): void {
+        global $DB;
+
+        $quizid = $DB->get_field('quiz', 'id', ['name' => $quizname], MUST_EXIST);
+        $quiz = \mod_quiz\quiz_settings::create($quizid)->get_quiz();
+        $language = current_language();
+        $timezone = 99;
+        if ($username !== '') {
+            $user = $DB->get_record('user', ['username' => $username], '*', MUST_EXIST);
+            force_current_language($user->lang);
+            $timezone = $user->timezone;
+        }
+        try {
+            $date = userdate((int) $quiz->presencial_timeclose, '', $timezone);
+            $expected = get_string('invitationexpiredat', 'quizaccess_presencial', $date);
+        } finally {
+            force_current_language($language);
+        }
+        $page = $this->getSession()->getPage()->getText();
+        if (substr_count($page, $expected) !== 1) {
+            throw new ExpectationException(
+                'Expected the invitation expiration message exactly once: ' . $expected,
+                $this->getSession()
+            );
         }
     }
 

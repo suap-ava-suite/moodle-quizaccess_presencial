@@ -17,15 +17,17 @@
 {{!
     @template quizaccess_presencial/invitation
 
-    Invitation status or the link displayed immediately after generation.
+    Invitation status and a recoverable invitation link.
 
     Context variables required for this template:
     * generated - Whether this response contains a newly generated link.
-    * link - Complete invitation URL, only for the generation response.
+    * link - Complete invitation URL, when recoverable.
     * returnurl - URL of the clean invitation management page.
     * state - Localised current invitation status, for the management page.
     * expires - Localised expiry date, when an invitation exists.
     * unavailable - Whether an invitation cannot currently be issued.
+    * copyunavailable - Whether the active link cannot be recovered.
+    * copylegacy - Whether the active invitation predates recoverable links.
 
     Example context (json):
     {
@@ -35,6 +37,8 @@
 }}
 {{#generated}}
     <h4>{{#str}}invitationgenerated, quizaccess_presencial{{/str}}</h4>
+{{/generated}}
+{{#link}}
     <p id="presencial-invitation-warning">{{#str}}invitationlinkwarning, quizaccess_presencial{{/str}}</p>
     <div class="form-group">
         <label for="presencial-invitation-link">{{#str}}invitationlink, quizaccess_presencial{{/str}}</label>
@@ -46,14 +50,16 @@
         data-clipboard-success-message="{{#str}}invitationcopied, quizaccess_presencial{{/str}}">
         {{#str}}invitationcopy, quizaccess_presencial{{/str}}
     </button>
-    <p><a href="{{returnurl}}">{{#str}}invitationreturn, quizaccess_presencial{{/str}}</a></p>
+    {{#generated}}<p><a href="{{returnurl}}">{{#str}}invitationreturn, quizaccess_presencial{{/str}}</a></p>{{/generated}}
     {{#js}}
         require(['core/copy_to_clipboard']);
     {{/js}}
-{{/generated}}
+{{/link}}
 {{^generated}}
     <p>{{state}}</p>
     {{#expires}}<p>{{expires}}</p>{{/expires}}
+    {{#copylegacy}}<p>{{#str}}invitationcopylegacy, quizaccess_presencial{{/str}}</p>{{/copylegacy}}
+    {{#copyunavailable}}<p>{{#str}}invitationcopyunavailable, quizaccess_presencial{{/str}}</p>{{/copyunavailable}}
     {{#unavailable}}
         <p>{{#str}}invitationunavailable, quizaccess_presencial{{/str}}</p>
     {{/unavailable}}

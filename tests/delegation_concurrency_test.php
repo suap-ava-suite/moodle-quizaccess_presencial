@@ -221,6 +221,119 @@ final class delegation_concurrency_test extends \advanced_testcase {
     }
 
     /**
+     * Invitation management rechecks authority after waiting for the quiz lock.
+     *
+     * @dataProvider delayed_invitation_authority_provider
+     * @param bool $revoke Whether the manager's role is revoked while waiting.
+     */
+    public function test_invitation_details_recheck_authority_after_lock_wait(bool $revoke): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test monitors PostgreSQL locks across independent connections.');
+        }
+        $this->preventResetByRollback();
+        $this->setAdminUser();
+        $quiz = $this->create_authority_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $context = \context_module::instance($quiz->cmid);
+        $teacher = self::getDataGenerator()->create_user();
+        $role = create_role('Invitation manager', 'invitationmanager', '');
+        assign_capability('mod/quiz:manage', CAP_ALLOW, $role, $context->id);
+        role_assign($role, $teacher->id, $context->id);
+        $this->assertTrue(has_capability('mod/quiz:manage', $context, $teacher->id));
+
+        $result = $this->run_delayed_inclusion($quiz, [
+            'operation' => 'invitation_details',
+            'actorid' => (int) $teacher->id,
+            'sessionid' => (int) $teacher->id,
+        ], static function () use ($revoke, $role, $teacher, $context): void {
+            if ($revoke) {
+                role_unassign($role, $teacher->id, $context->id);
+            }
+        });
+        if ($revoke) {
+            $this->assertSame(['permissiondenied' => true], $result);
+        } else {
+            $this->assertSame(['token' => $issued['token'], 'generation' => 1], $result);
+        }
+        $this->setAdminUser();
+        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
+     * Invitation changes recheck management authority after waiting for the lock.
+     *
+     * @dataProvider invitation_mutation_authority_provider
+     * @param string $operation Requested operation.
+     * @param bool $revoke Whether authority is revoked during the wait.
+     */
+    public function test_invitation_mutation_rechecks_authority(string $operation, bool $revoke): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        if (!function_exists('proc_open') || $DB->get_dbfamily() !== 'postgres') {
+            $this->markTestSkipped('This test monitors PostgreSQL locks across independent connections.');
+        }
+        $this->preventResetByRollback();
+        $this->setAdminUser();
+        $quiz = $this->create_authority_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $context = \context_module::instance($quiz->cmid);
+        $teacher = self::getDataGenerator()->create_user();
+        $role = create_role('Invitation manager', 'invitationmanager', '');
+        assign_capability('mod/quiz:manage', CAP_ALLOW, $role, $context->id);
+        role_assign($role, $teacher->id, $context->id);
+        $result = $this->run_delayed_inclusion($quiz, [
+            'operation' => $operation,
+            'actorid' => (int) $teacher->id,
+            'sessionid' => (int) $teacher->id,
+        ], static function () use ($revoke, $role, $teacher, $context): void {
+            if ($revoke) {
+                role_unassign($role, $teacher->id, $context->id);
+            }
+        });
+        if ($revoke) {
+            $this->assertSame(['permissiondenied' => true], $result);
+            $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        } else if ($operation === 'invitation_generate') {
+            $this->assertSame(2, $result['generation']);
+            $this->assertTrue(invitation::validate($quiz->cmid, $result['token']));
+            $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
+        } else {
+            $this->assertSame(['disabled' => true], $result);
+            $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
+        }
+    }
+
+    /**
+     * Provide authority outcomes for invitation changes.
+     *
+     * @return array Named mutation authority scenarios.
+     */
+    public static function invitation_mutation_authority_provider(): array {
+        return [
+            'generate revoked' => ['invitation_generate', true],
+            'generate allowed' => ['invitation_generate', false],
+            'disable revoked' => ['invitation_disable', true],
+            'disable allowed' => ['invitation_disable', false],
+        ];
+    }
+
+    /**
+     * Provide both authority outcomes after a lock wait.
+     *
+     * @return array Named authority scenarios.
+     */
+    public static function delayed_invitation_authority_provider(): array {
+        return [
+            'manager loses authority' => [true],
+            'manager retains authority' => [false],
+        ];
+    }
+
+    /**
      * Provide authority and session scenarios for delayed direct inclusion.
      *
      * @return array Named authority and session scenarios.
@@ -613,7 +726,7 @@ final class delegation_concurrency_test extends \advanced_testcase {
                     }
                     usleep(10000);
                 } while (microtime(true) < $deadline);
-                $this->assertNotFalse($waiting, 'The inclusion must actually wait for the quiz lock.');
+                $this->assertNotFalse($waiting, 'The operation must actually wait for the quiz lock.');
             }
             $change();
             $transaction->allow_commit();

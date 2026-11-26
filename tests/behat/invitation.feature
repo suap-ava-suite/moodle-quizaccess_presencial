@@ -2,7 +2,7 @@
 Feature: Manage the in-person release invitation
   In order to share the invitation securely
   As a quiz manager
-  I need to generate a link that is displayed only once
+  I need to copy the active invitation link
 
   Background:
     Given the following "users" exist:
@@ -20,7 +20,8 @@ Feature: Manage the in-person release invitation
       | activity | name   | intro                    | course | idnumber | presencial_enabled | presencial_timeopen       | presencial_timeclose      |
       | quiz     | Quiz 1 | Secret quiz introduction | C1     | quiz1    | 1                  | ## 1 January 2020 08:00 ## | ## 1 January 2030 20:00 ## |
 
-  Scenario: Generate a link through quiz navigation and hide it after returning
+  @javascript
+  Scenario: Generate a link through quiz navigation and copy it after returning
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
     When I navigate to "Manage application team" in current page administration
     Then I should see "No invitation has been generated."
@@ -29,9 +30,13 @@ Feature: Manage the in-person release invitation
     And the "value" attribute of "#presencial-invitation-link" "css_element" should contain "/mod/quiz/accessrule/presencial/invite.php?cmid="
     And the "value" attribute of "#presencial-invitation-link" "css_element" should contain "token="
     And "Generate invitation" "button" should not exist
+    And I remember the generated invitation link
     When I follow "Return to invitation management"
-    Then I should see "The invitation is active."
-    And "Invitation link" "field" should not exist
+    Then the invitation link should match the remembered link
+    When I press "Copy invitation link"
+    Then I should see "Invitation link copied."
+    And I should see "The invitation is active."
+    And "Invitation link" "field" should exist
     And "Regenerate invitation" "button" should exist
 
   @javascript
@@ -52,12 +57,13 @@ Feature: Manage the in-person release invitation
     And I follow "Return to invitation management"
     When I press "Disable invitation"
     Then I should see "The invitation is disabled."
+    And I should not see "Invitation expires:"
     And "Invitation link" "field" should not exist
     When I press "Regenerate invitation"
     Then the generated invitation link should differ from the previous link
     When I follow "Return to invitation management"
     Then I should see "The invitation is active."
-    And "Invitation link" "field" should not exist
+    And "Invitation link" "field" should exist
 
   Scenario: A student cannot access invitation management
     Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "student1"
@@ -71,13 +77,37 @@ Feature: Manage the in-person release invitation
     And I remember the generated invitation link
     And the generated invitation for "Quiz 1" has expired
     When I follow "Return to invitation management"
-    Then I should see "The invitation has expired."
+    Then the invitation for "Quiz 1" should display its expiration date and time
+    And I should not see "The invitation has expired."
+    And I should not see "Invitation expires:"
     And "Invitation link" "field" should not exist
     And "Disable invitation" "button" should not exist
     When I press "Regenerate invitation"
     Then the generated invitation link should differ from the previous link
     When I follow "Return to invitation management"
     Then I should see "The invitation is active."
+    And "Invitation link" "field" should exist
+
+  Scenario: An expired invitation after privacy erasure has no fabricated expiration date
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Manage application team" in current page administration
+    And I press "Generate invitation"
+    And the generated invitation for "Quiz 1" has expired
+    And the invitation data for "Quiz 1" has been erased
+    When I follow "Return to invitation management"
+    Then I should see "The invitation has expired."
+    And I should not see "The invitation expired on"
+    And "Invitation link" "field" should not exist
+
+  Scenario: An incompatible quiz schedule does not report an encryption failure
+    Given I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher1"
+    And I navigate to "Manage application team" in current page administration
+    And I press "Generate invitation"
+    And the opening of "Quiz 1" conflicts with its in-person release period
+    When I follow "Return to invitation management"
+    Then I should see "The invitation is active."
+    And I should see "Enable in-person release and set a valid authorization period before generating an invitation."
+    And I should not see "The invitation link cannot be copied."
     And "Invitation link" "field" should not exist
 
   Scenario: An expired authorization period does not allow issuing invitations

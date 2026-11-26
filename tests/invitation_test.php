@@ -34,9 +34,214 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
  */
 final class invitation_test extends \advanced_testcase {
     /**
+     * A manager can recover the current token without changing its validity.
+     */
+    public function test_manager_can_recover_active_invitation(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
+        $status = invitation::get_status($quiz->cmid);
+        $this->assertSame(1, $status['generation']);
+        $this->assertSame($issued['timeexpires'], $status['timeexpires']);
+        invitation::disable($quiz->cmid, 1);
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+    }
+
+    /**
+     * Recovering a valid link records its generation without leaking the secret.
+     */
+    public function test_recovery_emits_a_secret_free_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $sink = $this->redirectEvents();
+        invitation::get_status($quiz->cmid);
+        $this->assertCount(0, $sink->get_events());
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame($issued['token'], $details['token']);
+        $events = $sink->get_events();
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(\quizaccess_presencial\event\invitation_link_retrieved::class, $events[0]);
+        $data = $events[0]->get_data();
+        $this->assertSame(1, $data['other']['generation']);
+        $this->assertSame(['generation'], array_keys($data['other']));
+        $this->assertEquals($quiz->id, $data['objectid']);
+        $this->assertEquals(\context_module::instance($quiz->cmid)->id, $data['contextid']);
+        $this->assertEquals(2, $data['userid']);
+        $this->assertStringNotContainsString($issued['token'], json_encode($data));
+        $sink->close();
+    }
+
+    /**
+     * Management receives state, generation, expiry and token for the same invitation.
+     */
+    public function test_management_details_follow_regeneration_and_disabling(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $first = invitation::generate($quiz->cmid, 0);
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame('active', $details['state']);
+        $this->assertSame(1, $details['generation']);
+        $this->assertSame($first['timeexpires'], $details['timeexpires']);
+        $this->assertSame($first['token'], $details['token']);
+
+        $second = invitation::generate($quiz->cmid, 1);
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame('active', $details['state']);
+        $this->assertSame(2, $details['generation']);
+        $this->assertSame($second['timeexpires'], $details['timeexpires']);
+        $this->assertSame($second['token'], $details['token']);
+        $this->assertNotSame($first['token'], $details['token']);
+
+        invitation::disable($quiz->cmid, 2);
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame('disabled', $details['state']);
+        $this->assertSame(2, $details['generation']);
+        $this->assertNull($details['token']);
+    }
+
+    /**
+     * An invitation created before the upgrade remains valid until explicitly replaced.
+     */
+    public function test_legacy_invitation_requires_regeneration_for_recovery(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $this->replace_encrypted_token($quiz->id);
+
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertNull($details['token']);
+        $this->assertTrue($details['copylegacy']);
+        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        $this->assertSame(1, invitation::get_status($quiz->cmid)['generation']);
+        $replacement = invitation::generate($quiz->cmid, 1);
+        $this->assertSame($replacement['token'], invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
+        $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
+    }
+
+    /**
+     * An incompatible quiz schedule is not reported as an encryption failure.
+     */
+    public function test_incompatible_quiz_schedule_prevents_invitation_recovery(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $this->mock_clock_with_frozen(strtotime('2030-01-01 09:00:00 UTC'));
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        require_once($CFG->dirroot . '/mod/quiz/lib.php');
+        $quiz->instance = $quiz->id;
+        $quiz->quizpassword = $quiz->password;
+        $quiz->timeopen = strtotime('2030-01-01 11:00:00 UTC');
+        quiz_update_instance($quiz, null);
+
+        $sink = $this->redirectEvents();
+        $details = invitation::get_management_details($quiz->cmid);
+        $this->assertSame('active', $details['state']);
+        $this->assertNull($details['token']);
+        $this->assertSame('configuration', $details['copyreason']);
+        $this->assertFalse($details['canissue']);
+        $this->assertCount(0, $sink->get_events());
+        $sink->close();
+        $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
+     * Invalid encrypted data cannot disclose or silently replace a valid invitation.
+     */
+    public function test_unreadable_encrypted_token_does_not_invalidate_invitation(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $hadsecretroot = isset($CFG->secretdataroot);
+        $originalsecretroot = $CFG->secretdataroot ?? null;
+        $newroot = make_temp_directory('quizaccess_presencial_wrongkey_' . bin2hex(random_bytes(8)));
+        try {
+            $CFG->secretdataroot = $newroot;
+            \core\encryption::create_key();
+            $sink = $this->redirectEvents();
+            $details = invitation::get_management_details($quiz->cmid);
+            $this->assertNull($details['token']);
+            $this->assertSame('recoveryfailed', $details['copyreason']);
+            $this->assertSame('active', $details['state']);
+            $this->assertCount(0, $sink->get_events());
+            $sink->close();
+            $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        } finally {
+            if ($hadsecretroot) {
+                $CFG->secretdataroot = $originalsecretroot;
+            } else {
+                unset($CFG->secretdataroot);
+            }
+            remove_dir($newroot);
+        }
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
+    }
+
+    /**
+     * Reading an invitation without its server key must not create a replacement key.
+     */
+    public function test_missing_encryption_key_does_not_create_a_replacement(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        $hadsecretroot = isset($CFG->secretdataroot);
+        $originalsecretroot = $CFG->secretdataroot ?? null;
+        $emptyroot = make_temp_directory('quizaccess_presencial_keytest_' . bin2hex(random_bytes(8)));
+        try {
+            $CFG->secretdataroot = $emptyroot;
+            $this->assertFalse(\core\encryption::key_exists());
+            $details = invitation::get_management_details($quiz->cmid);
+            $this->assertNull($details['token']);
+            $this->assertFalse($details['copylegacy']);
+            $this->assertFalse(\core\encryption::key_exists());
+            $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+        } finally {
+            if ($hadsecretroot) {
+                $CFG->secretdataroot = $originalsecretroot;
+            } else {
+                unset($CFG->secretdataroot);
+            }
+            remove_dir($emptyroot);
+        }
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
+     * A recoverable ciphertext must belong to the same invitation as the stored hash.
+     */
+    public function test_recovery_rejects_another_invitations_ciphertext(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $quiz = $this->configured_quiz();
+        $other = $this->configured_quiz();
+        $issued = invitation::generate($quiz->cmid, 0);
+        invitation::generate($other->cmid, 0);
+        $this->replace_encrypted_token($quiz->id, $other->id);
+
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertTrue(invitation::validate($quiz->cmid, $issued['token']));
+    }
+
+    /**
      * A generated invitation is valid only for its quiz and is not recoverable from status.
      */
-    public function test_generation_exposes_secret_once_and_scopes_it_to_the_quiz(): void {
+    public function test_generation_scopes_secret_to_the_quiz_and_keeps_status_secret_free(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -65,12 +270,13 @@ final class invitation_test extends \advanced_testcase {
         $this->assertSame('generated', $events[0]->get_data()['other']['action']);
         $this->assertEquals($quiz->cmid, $events[0]->get_data()['contextinstanceid']);
         $this->assertStringNotContainsString($issued['token'], json_encode($events[0]->get_data()));
+        $this->assertStringNotContainsString($persisted->tokenencrypted, json_encode($events[0]->get_data()));
     }
 
     /**
-     * Only a one-way derivation of the secret is persisted, never the secret, its body or a trivial rewriting of it.
+     * The token is protected in storage and validation uses its one-way derivation.
      */
-    public function test_only_a_non_reversible_derivation_of_the_secret_is_persisted(): void {
+    public function test_secret_is_not_stored_in_plaintext(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -79,12 +285,12 @@ final class invitation_test extends \advanced_testcase {
 
         $first = invitation::generate($quiz->cmid, 0);
         $firstrow = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], '*', MUST_EXIST);
-        $this->assert_only_the_derivation_is_persisted($first['token'], $firstrow, $quiz->cmid);
+        $this->assert_secret_is_not_stored_in_plaintext($first['token'], $firstrow, $quiz->cmid);
 
         // Regeneration replaces the derivation; no trace of the previous one survives.
         $second = invitation::generate($quiz->cmid, 1);
         $secondrow = $DB->get_record('quizaccess_presencial_invite', ['quizid' => $quiz->id], '*', MUST_EXIST);
-        $this->assert_only_the_derivation_is_persisted($second['token'], $secondrow, $quiz->cmid);
+        $this->assert_secret_is_not_stored_in_plaintext($second['token'], $secondrow, $quiz->cmid);
         $this->assertNotSame($firstrow->tokenhash, $secondrow->tokenhash);
         $this->assertStringNotContainsString($firstrow->tokenhash, json_encode($secondrow));
         $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
@@ -104,8 +310,13 @@ final class invitation_test extends \advanced_testcase {
         $this->assertNotSame($first['token'], $second['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $first['token']));
         $this->assertTrue(invitation::validate($quiz->cmid, $second['token']));
+        $this->assertSame($second['token'], invitation::get_management_details($quiz->cmid)['token']);
         $this->assertSame(2, invitation::get_status($quiz->cmid)['generation']);
-        $this->assertSame('regenerated', $sink->get_events()[1]->get_data()['other']['action']);
+        $transitions = array_values(array_filter(
+            $sink->get_events(),
+            static fn($event) => $event instanceof \quizaccess_presencial\event\invitation_updated
+        ));
+        $this->assertSame('regenerated', $transitions[1]->get_data()['other']['action']);
         try {
             invitation::generate($quiz->cmid, 1);
             $this->fail('A stale form must not replace the invitation.');
@@ -173,8 +384,10 @@ final class invitation_test extends \advanced_testcase {
         $quiz = $this->configured_quiz();
         $issued = invitation::generate($quiz->cmid, 0);
         $sink = $this->redirectEvents();
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $clock->set_to($issued['timeexpires']);
 
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertSame('expired', invitation::get_status($quiz->cmid)['state']);
         $task = new \quizaccess_presencial\task\expire_invitations();
@@ -223,7 +436,9 @@ final class invitation_test extends \advanced_testcase {
         \quizaccess_presencial::save_settings($quiz);
 
         $this->assertSame(strtotime('2030-01-01 15:00:00 UTC'), invitation::get_status($quiz->cmid)['timeexpires']);
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         $clock->set_to(strtotime('2030-01-01 15:00:00 UTC'));
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $replacement = invitation::generate($quiz->cmid, 1);
         $this->assertSame($quiz->presencial_timeclose, $replacement['timeexpires']);
@@ -257,6 +472,7 @@ final class invitation_test extends \advanced_testcase {
         $issued = invitation::generate($quiz->cmid, 0);
         $quiz->presencial_enabled = 0;
         \quizaccess_presencial::save_settings($quiz);
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertFalse(invitation::get_status($quiz->cmid)['canissue']);
         $quiz->presencial_enabled = 1;
@@ -306,10 +522,12 @@ final class invitation_test extends \advanced_testcase {
         role_assign($role, $teacher->id, \context_module::instance($quiz->cmid));
         $this->setUser($teacher);
         $this->assertSame('active', invitation::get_status($quiz->cmid)['state']);
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
 
         foreach (
             [
             fn() => invitation::get_status($other->cmid),
+            fn() => invitation::get_management_details($other->cmid)['token'],
             fn() => invitation::generate($other->cmid, 0),
             fn() => invitation::disable($other->cmid, 0),
             ] as $operation
@@ -379,9 +597,9 @@ final class invitation_test extends \advanced_testcase {
     }
 
     /**
-     * A waiting process cannot prevent further invitation operations in the transaction owning the quiz.
+     * A waiting management read returns the committed generation and its matching token.
      */
-    public function test_concurrent_status_does_not_deadlock_an_outer_transaction(): void {
+    public function test_concurrent_management_details_match_the_committed_generation(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -390,7 +608,7 @@ final class invitation_test extends \advanced_testcase {
         $quiz = $this->configured_quiz();
         $first = invitation::generate($quiz->cmid, 0);
         $process = proc_open(
-            $this->worker_command($quiz, 'status'),
+            $this->worker_command($quiz, 'details'),
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes
         );
@@ -416,7 +634,10 @@ final class invitation_test extends \advanced_testcase {
             $transaction = null;
 
             $result = json_decode(stream_get_contents($pipes[1]), true, 512, JSON_THROW_ON_ERROR);
-            $this->assertSame(['state' => 'active', 'generation' => 2], $result);
+            $this->assertSame('active', $result['state']);
+            $this->assertSame(2, $result['generation']);
+            $this->assertSame($second['timeexpires'], $result['timeexpires']);
+            $this->assertSame($second['token'], $result['token']);
             $this->assertSame('', stream_get_contents($pipes[2]));
         } catch (\Throwable $exception) {
             if ($transaction !== null) {
@@ -446,13 +667,13 @@ final class invitation_test extends \advanced_testcase {
     }
 
     /**
-     * Assert that a persisted invitation holds exactly the one-way derivation of its secret and nothing usable.
+     * Assert that the persisted invitation does not contain the plaintext secret and retains the validation hash.
      *
-     * @param string $token Complete secret, as shown once to the manager.
+     * @param string $token Complete invitation secret.
      * @param \stdClass $row Persisted invitation record.
      * @param int $cmid Quiz course module.
      */
-    private function assert_only_the_derivation_is_persisted(string $token, \stdClass $row, int $cmid): void {
+    private function assert_secret_is_not_stored_in_plaintext(string $token, \stdClass $row, int $cmid): void {
         $this->assertSame(1, preg_match('/\Ai1_([0-9a-f]{64})\z/', $token, $matches));
         $body = $matches[1];
 
@@ -479,7 +700,7 @@ final class invitation_test extends \advanced_testcase {
      *
      * Changing this on purpose requires an upgrade step that invalidates the links already issued, and this test.
      *
-     * @param string $token Complete secret, as shown once to the manager.
+     * @param string $token Complete invitation secret.
      * @return string Expected persisted derivation.
      */
     private function expected_derivation(string $token): string {
@@ -510,6 +731,24 @@ final class invitation_test extends \advanced_testcase {
         PHP;
 
         return [PHP_BINARY, '-d', 'max_input_vars=5000', '-r', $bootstrap, $CFG->dirroot, $quiz->cmid, $USER->id, $mode];
+    }
+
+    /**
+     * Prepare legacy or mismatched encrypted data, states unavailable through the public interface.
+     *
+     * @param int $quizid Invitation to alter.
+     * @param int|null $sourcequizid Invitation supplying ciphertext, or null for a legacy invitation.
+     */
+    private function replace_encrypted_token(int $quizid, ?int $sourcequizid = null): void {
+        global $DB;
+
+        $ciphertext = $sourcequizid === null ? null : $DB->get_field(
+            'quizaccess_presencial_invite',
+            'tokenencrypted',
+            ['quizid' => $sourcequizid],
+            MUST_EXIST
+        );
+        $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', $ciphertext, ['quizid' => $quizid]);
     }
 
     /**

@@ -158,8 +158,11 @@ final class provider_test extends provider_testcase {
         $issued = invitation::generate($quiz->cmid, 0);
         $otherissued = invitation::generate($other->cmid, 0);
 
+        $this->assertSame($issued['token'], invitation::get_management_details($quiz->cmid)['token']);
         provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
 
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+        $this->assertSame($otherissued['token'], invitation::get_management_details($other->cmid)['token']);
         $this->assertFalse(invitation::validate($quiz->cmid, $issued['token']));
         $this->assertTrue(invitation::validate($other->cmid, $otherissued['token']));
         $status = invitation::get_status($quiz->cmid);
@@ -276,6 +279,41 @@ final class provider_test extends provider_testcase {
         $this->assertSame(2, $replacement['generation']);
         $this->assertSame($issued['timeexpires'], $replacement['timeexpires']);
         $this->assertTrue(invitation::validate($quiz->cmid, $replacement['token']));
+    }
+
+    /**
+     * Erasing an expired invitation retains its state without a fabricated date.
+     *
+     * @dataProvider expired_erasure_scope_provider
+     * @param string $scope Erasure scope.
+     */
+    public function test_erasing_expired_invitation_clears_its_deadline(string $scope): void {
+        $this->resetAfterTest();
+        $clock = $this->mock_clock_with_frozen(strtotime('2030-01-01 09:00:00 UTC'));
+        $creator = self::getDataGenerator()->create_user();
+        $quiz = $this->configured_quiz([$creator]);
+        $context = \context_module::instance($quiz->cmid);
+        $this->setUser($creator);
+        $issued = invitation::generate($quiz->cmid, 0);
+        $clock->set_to($issued['timeexpires']);
+        (new \quizaccess_presencial\task\expire_invitations())->execute();
+        if ($scope === 'context') {
+            provider::delete_data_for_all_users_in_context($context);
+        } else {
+            provider::delete_data_for_user(new approved_contextlist($creator, 'quizaccess_presencial', [$context->id]));
+        }
+        $status = invitation::get_status($quiz->cmid);
+        $this->assertSame('expired', $status['state']);
+        $this->assertSame(0, $status['timeexpires']);
+        $this->assertNull(invitation::get_management_details($quiz->cmid)['token']);
+    }
+
+    /**
+     * Provide approved erasure scopes.
+     * @return array
+     */
+    public static function expired_erasure_scope_provider(): array {
+        return ['user' => ['user'], 'context' => ['context']];
     }
 
     /**
