@@ -743,7 +743,10 @@ final class invitation_test extends \advanced_testcase {
         global $DB;
 
         $ciphertext = $sourcequizid === null ? null : $DB->get_field(
-            'quizaccess_presencial_invite', 'tokenencrypted', ['quizid' => $sourcequizid], MUST_EXIST
+            'quizaccess_presencial_invite',
+            'tokenencrypted',
+            ['quizid' => $sourcequizid],
+            MUST_EXIST
         );
         $DB->set_field('quizaccess_presencial_invite', 'tokenencrypted', $ciphertext, ['quizid' => $quizid]);
     }
