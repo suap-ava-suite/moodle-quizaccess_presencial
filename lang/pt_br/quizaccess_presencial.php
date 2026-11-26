@@ -188,6 +188,7 @@ $string['requestpending'] = 'Sua solicitação de liberação está pendente. Ma
 $string['requestpolling'] = 'Esta página verifica automaticamente se houve atualização a cada cinco segundos.';
 $string['requestrejected'] = 'Rejeitado. Você pode voltar ao Questionário e solicitar a liberação novamente.';
 $string['requeststartattempt'] = 'Iniciar tentativa';
+$string['requeststarting'] = 'Sua tentativa está sendo iniciada. Mantenha esta página aberta enquanto o carregamento é concluído.';
 $string['requestupdateerror'] = 'Não foi possível atualizar sua Solicitação de liberação. Volte ao Questionário para verificar a situação.';
 $string['requestvalidity'] = 'Validade da solicitação de liberação';
 $string['requestvalidity_desc'] = 'Número de minutos inteiros durante os quais uma solicitação de liberação pendente ' .
