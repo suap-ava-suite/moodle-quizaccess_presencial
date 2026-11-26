@@ -174,13 +174,13 @@ function xmldb_quizaccess_presencial_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2026111100, 'quizaccess', 'presencial');
     }
-    if ($oldversion < 2026112400) {
+    if ($oldversion < 2026112601) {
         $table = new xmldb_table('quizaccess_presencial_invite');
         $field = new xmldb_field('tokenencrypted', XMLDB_TYPE_TEXT, null, null, null, null, null, 'tokenhash');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
-        upgrade_plugin_savepoint(true, 2026112400, 'quizaccess', 'presencial');
+        upgrade_plugin_savepoint(true, 2026112601, 'quizaccess', 'presencial');
     }
     return true;
 }

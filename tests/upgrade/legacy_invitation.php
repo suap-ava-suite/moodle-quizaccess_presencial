@@ -39,7 +39,7 @@ require_once($CFG->dirroot . '/mod/quiz/accessrule/presencial/rule.php');
 $version = (int) get_config('quizaccess_presencial', 'version');
 $statefile = $argv[2];
 if ($argv[1] === 'create') {
-    if ($version !== 2026111100 || file_exists($statefile)) {
+    if (!in_array($version, [2026111100, 2026112600], true) || file_exists($statefile)) {
         throw new RuntimeException('Expected the installed legacy version and a new state file.');
     }
     require_once($CFG->dirroot . '/lib/testing/generator/lib.php');
@@ -64,7 +64,7 @@ if ($argv[1] === 'create') {
     file_put_contents($statefile, json_encode(['cmid' => $quiz->cmid, 'token' => $issued['token']], JSON_THROW_ON_ERROR));
     echo "Legacy invitation created.\n";
 } else if ($argv[1] === 'verify') {
-    if ($version < 2026112400 || !is_file($statefile)) {
+    if ($version < 2026112601 || !is_file($statefile)) {
         throw new RuntimeException('Expected the updated plugin and the legacy state file.');
     }
     $state = json_decode(file_get_contents($statefile), true, 512, JSON_THROW_ON_ERROR);

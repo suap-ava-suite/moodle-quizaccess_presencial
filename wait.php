@@ -75,10 +75,7 @@ $data = [
     'rejectionreason' => $request->rejectionreason,
     'expired' => $state === release_request::STATE_EXPIRED,
     'consumed' => $state === release_request::STATE_CONSUMED,
-    'message' => get_string(
-        $state === release_request::STATE_STARTING ? 'requestpending' : 'request' . $state,
-        'quizaccess_presencial',
-    ),
+    'message' => get_string('request' . $state, 'quizaccess_presencial'),
     'expiresat' => $request->expiresat,
     'quizurl' => $quizobj->view_url()->out(false),
     'starturl' => (new moodle_url('/mod/quiz/accessrule/presencial/start.php', ['requestid' => $requestid]))->out(false),
