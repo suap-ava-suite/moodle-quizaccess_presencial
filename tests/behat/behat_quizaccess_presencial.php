@@ -152,6 +152,25 @@ class behat_quizaccess_presencial extends behat_base {
     }
 
     /**
+     * Check the next Tab stop without wrapping around the page.
+     *
+     * @Then the next focused element should be :element :selectortype
+     * @param string $element Element identifier.
+     * @param string $selectortype Moodle selector type.
+     */
+    public function next_focused_element_should_be(string $element, string $selectortype): void {
+        self::require_javascript_in_session($this->getSession());
+        $node = $this->get_selected_node($selectortype, $element);
+        $xpath = json_encode($node->getXpath());
+        self::type_keys($this->getSession(), [behat_keys::TAB]);
+        $script = "return document.activeElement === document.evaluate({$xpath}, document,
+            null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;";
+        if (!$this->evaluate_script($script)) {
+            throw new ExpectationException("Next focus is not {$element}.", $this->getSession());
+        }
+    }
+
+    /**
      * Verify the native course and quiz routes still demand enrolment.
      *
      * @Then academic access to :quizname should still require enrolment

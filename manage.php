@@ -56,6 +56,14 @@ $submitteddata = data_submitted();
 if (!empty($submitteddata->addapplicators)) {
     require_sesskey();
     $users = $selector->get_selected_users();
+    if (!$users) {
+        redirect(
+            $url,
+            get_string('noaccountselected', 'quizaccess_presencial'),
+            null,
+            \core\output\notification::NOTIFY_WARNING,
+        );
+    }
     delegation_manager::include_users(
         (int) $quiz->id,
         array_map(static fn($user): int => (int) $user->id, $users),
@@ -125,24 +133,12 @@ if ($issued !== null) {
     $delegations = delegation_manager::list_current((int) $quiz->id);
     $users = $delegations ? $DB->get_records_list('user', 'id', array_column($delegations, 'userid')) : [];
 
-    echo html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
-    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
-    echo html_writer::tag('label', get_string('applicators', 'quizaccess_presencial'), ['for' => 'applicators']);
-    echo $selector->display(true);
-    echo html_writer::empty_tag('input', [
-        'type' => 'submit',
-        'name' => 'addapplicators',
-        'value' => get_string('addapplicators', 'quizaccess_presencial'),
-        'class' => 'btn btn-primary mt-3 mb-3',
-    ]);
-    echo html_writer::end_tag('form');
-
     echo $OUTPUT->heading(get_string('currentapplicators', 'quizaccess_presencial'), 3);
     if (!$delegations) {
         echo html_writer::tag('p', get_string('none'));
     } else {
         $table = new html_table();
-        $table->attributes['class'] = 'presencial-current-applicators';
+        $table->attributes['class'] = 'generaltable table-bordered w-100 presencial-current-applicators';
         $table->head = [get_string('fullname'), get_string('delegationorigin', 'quizaccess_presencial'),
             get_string('authorizationperiodstart', 'quizaccess_presencial'),
             get_string('authorizationperiodend', 'quizaccess_presencial'), get_string('actions')];
@@ -169,15 +165,28 @@ if ($issued !== null) {
                 $revokeform,
             ];
         }
-        echo html_writer::table($table);
+        echo html_writer::div(html_writer::table($table), 'table-responsive');
     }
 
-    echo $OUTPUT->heading(get_string('invitationmanage', 'quizaccess_presencial'), 3);
+    echo html_writer::start_div('d-flex align-items-center');
+    echo $OUTPUT->heading(get_string('addapplicatorsheading', 'quizaccess_presencial'), 3);
+    echo $OUTPUT->help_icon('addapplicatorsheading', 'quizaccess_presencial');
+    echo html_writer::end_div();
+    echo html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+    echo $selector->display_for_inclusion(get_string('addapplicators', 'quizaccess_presencial'));
+    echo html_writer::end_tag('form');
+
+    echo html_writer::start_div('d-flex align-items-center');
+    echo $OUTPUT->heading(get_string('inviteapplicatorsheading', 'quizaccess_presencial'), 3);
+    echo $OUTPUT->help_icon('inviteapplicatorsheading', 'quizaccess_presencial');
+    echo html_writer::end_div();
     $token = $status['token'];
     $link = $token ? new moodle_url('/mod/quiz/accessrule/presencial/invite.php', [
         'cmid' => $cm->id,
         'token' => $token,
     ]) : null;
+
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
         'state' => $status['state'] === 'expired' && $status['timeexpires'] > 0
             ? get_string('invitationexpiredat', 'quizaccess_presencial', userdate($status['timeexpires']))

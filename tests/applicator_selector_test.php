@@ -28,6 +28,21 @@ use quizaccess_presencial\local\applicator_selector;
  */
 final class applicator_selector_test extends \advanced_testcase {
     /**
+     * The rendered selector preserves accented account names and button labels.
+     */
+    public function test_render_preserves_accents(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        self::getDataGenerator()->create_user(['firstname' => 'João', 'lastname' => 'Conceição']);
+        $selector = new applicator_selector('applicators', ['accesscontext' => \context_system::instance()]);
+
+        $html = $selector->display_for_inclusion('Inclusão de contas');
+        $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->assertStringContainsString('João Conceição', $text);
+        $this->assertStringContainsString('Inclusão de contas', $text);
+    }
+
+    /**
      * Search returns only eligible accounts from the institutional identity search.
      */
     public function test_search_only_returns_eligible_accounts(): void {

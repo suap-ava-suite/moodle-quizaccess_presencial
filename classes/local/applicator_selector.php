@@ -42,6 +42,69 @@ final class applicator_selector extends \user_selector_base {
     }
 
     /**
+     * Render the native selector with search controls before the inclusion action and list.
+     *
+     * @param string $buttonlabel Inclusion button label.
+     * @return string Selector markup.
+     */
+    public function display_for_inclusion(string $buttonlabel): string {
+        $html = parent::display(true);
+        $buttonattributes = [
+            'type' => 'submit',
+            'name' => 'addapplicators',
+            'value' => $buttonlabel,
+            'class' => 'btn btn-primary mt-3 mb-3',
+        ];
+        $fallback = \html_writer::label(get_string('applicators', 'quizaccess_presencial'), $this->get_name()) .
+            $html . \html_writer::empty_tag('input', $buttonattributes);
+        $document = new \DOMDocument('1.0', 'UTF-8');
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $encoded = mb_encode_numericentity($html, [0x80, 0x10FFFF, 0, 0x1FFFFF], 'UTF-8');
+            $loaded = $document->loadHTML(
+                '<div id="selector-root">' . $encoded . '</div>',
+                LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+            );
+            $root = $document->getElementById('selector-root');
+            $wrapper = $document->getElementById($this->get_name() . '_wrapper');
+            $select = $document->getElementById($this->get_name());
+            $search = $document->getElementById($this->get_name() . '_searchtext');
+            if (
+                !$loaded || !$root || !$wrapper || !$select || !$search ||
+                $select->parentNode !== $wrapper || !$search->parentNode ||
+                $search->parentNode->parentNode !== $wrapper
+            ) {
+                debugging('Unexpected Moodle user selector markup; using the default layout.', DEBUG_DEVELOPER);
+                return $fallback;
+            }
+            $wrapper->insertBefore($search->parentNode, $select);
+            $button = $document->createElement('input');
+            foreach ($buttonattributes as $name => $value) {
+                $button->setAttribute($name, $value);
+            }
+            $wrapper->insertBefore($button, $select);
+            $label = $document->createElement('label');
+            $label->setAttribute('for', $this->get_name());
+            $label->setAttribute('class', 'd-block');
+            $label->appendChild($document->createTextNode(get_string('applicators', 'quizaccess_presencial')));
+            $wrapper->insertBefore($label, $select);
+            $result = '';
+            foreach ($root->childNodes as $child) {
+                $fragment = $document->saveHTML($child);
+                if ($fragment === false) {
+                    debugging('Could not serialize the Moodle user selector; using the default layout.', DEBUG_DEVELOPER);
+                    return $fallback;
+                }
+                $result .= $fragment;
+            }
+            return $result;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
      * Find only confirmed, active, non-guest accounts with an enabled login method.
      *
      * @param string $search Search text.
