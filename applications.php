@@ -40,10 +40,11 @@ $PAGE->navbar->add(get_string('myapplications', 'quizaccess_presencial'), $url);
 
 $applications = applications::get_page($page, $pagesize);
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('myapplications', 'quizaccess_presencial'));
 if (!$applications['total']) {
     echo html_writer::tag('p', get_string('noapplications', 'quizaccess_presencial'));
 } else {
+    echo html_writer::tag('p', get_string('applicationstate', 'quizaccess_presencial') .
+        $OUTPUT->help_icon('applicationstate', 'quizaccess_presencial'));
     $table = new html_table();
     $table->attributes['class'] = 'generaltable presencial-applications';
     $table->head = [
