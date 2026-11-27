@@ -57,8 +57,12 @@ if (!empty($submitteddata->addapplicators)) {
     require_sesskey();
     $users = $selector->get_selected_users();
     if (!$users) {
-        redirect($url, get_string('noaccountselected', 'quizaccess_presencial'), null,
-            \core\output\notification::NOTIFY_WARNING);
+        redirect(
+            $url,
+            get_string('noaccountselected', 'quizaccess_presencial'),
+            null,
+            \core\output\notification::NOTIFY_WARNING,
+        );
     }
     delegation_manager::include_users(
         (int) $quiz->id,

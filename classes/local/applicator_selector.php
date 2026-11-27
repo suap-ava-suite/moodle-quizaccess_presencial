@@ -69,9 +69,11 @@ final class applicator_selector extends \user_selector_base {
             $wrapper = $document->getElementById($this->get_name() . '_wrapper');
             $select = $document->getElementById($this->get_name());
             $search = $document->getElementById($this->get_name() . '_searchtext');
-            if (!$loaded || !$root || !$wrapper || !$select || !$search ||
-                    $select->parentNode !== $wrapper || !$search->parentNode ||
-                    $search->parentNode->parentNode !== $wrapper) {
+            if (
+                !$loaded || !$root || !$wrapper || !$select || !$search ||
+                $select->parentNode !== $wrapper || !$search->parentNode ||
+                $search->parentNode->parentNode !== $wrapper
+            ) {
                 debugging('Unexpected Moodle user selector markup; using the default layout.', DEBUG_DEVELOPER);
                 return $fallback;
             }
