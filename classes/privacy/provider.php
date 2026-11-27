@@ -76,6 +76,7 @@ class provider implements
             'generation' => 'privacy:metadata:invite:generation',
             'state' => 'privacy:metadata:invite:state',
             'tokenhash' => 'privacy:metadata:invite:tokenhash',
+            'tokenencrypted' => 'privacy:metadata:invite:tokenencrypted',
             'timecreated' => 'privacy:metadata:invite:timecreated',
             'timemodified' => 'privacy:metadata:invite:timemodified',
             'timeexpires' => 'privacy:metadata:invite:timeexpires',

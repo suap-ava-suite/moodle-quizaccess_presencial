@@ -49,12 +49,23 @@ if (!empty($request['waitforstart'])) {
     }
 }
 try {
-    $included = \quizaccess_presencial\local\delegation_manager::include_users(
-        $request['quizid'],
-        [$request['userid']],
-        $request['actorid'],
-    );
-    $result = ['delegationid' => (int) $included[$request['userid']]->id];
+    if (($request['operation'] ?? '') === 'invitation_details') {
+        $details = \quizaccess_presencial\local\invitation::get_management_details($request['cmid']);
+        $result = ['token' => $details['token'], 'generation' => $details['generation']];
+    } else if (($request['operation'] ?? '') === 'invitation_generate') {
+        $issued = \quizaccess_presencial\local\invitation::generate($request['cmid'], 1);
+        $result = ['token' => $issued['token'], 'generation' => $issued['generation']];
+    } else if (($request['operation'] ?? '') === 'invitation_disable') {
+        \quizaccess_presencial\local\invitation::disable($request['cmid'], 1);
+        $result = ['disabled' => true];
+    } else {
+        $included = \quizaccess_presencial\local\delegation_manager::include_users(
+            $request['quizid'],
+            [$request['userid']],
+            $request['actorid'],
+        );
+        $result = ['delegationid' => (int) $included[$request['userid']]->id];
+    }
 } catch (\required_capability_exception $exception) {
     $result = ['permissiondenied' => true];
 }

@@ -53,7 +53,7 @@ A forma de conceder uma Delegação de aplicação pela seleção de um usuário
 _Avoid_: convite direto, convite sem link
 
 **Convite por link**:
-A forma aberta de oferecer uma Delegação de aplicação. Qualquer usuário autenticado com uma conta Moodle ativa pode acessar o único link vigente do Questionário e aceitar tornar-se Aplicador antes ou durante o Período de disponibilidade do Questionário; o link completo é exibido somente quando gerado. Diferentemente da Delegação, o convite expira definitivamente no fechamento do Questionário e não volta a valer se ele for reaberto; sem fechamento, vale até ser desativado ou regenerado.
+A forma aberta de oferecer uma Delegação de aplicação. Qualquer usuário autenticado com uma conta Moodle ativa pode acessar o único link vigente do Questionário e aceitar tornar-se Aplicador antes ou durante o Período de disponibilidade do Questionário; o Professor pode copiá-lo novamente enquanto estiver ativo. Diferentemente da Delegação, o convite expira definitivamente no fechamento do Questionário e não volta a valer se ele for reaberto; sem fechamento, vale até ser desativado ou regenerado.
 _Avoid_: convite individual, link público, Inclusão direta
 
 **Painel do Aplicador**:

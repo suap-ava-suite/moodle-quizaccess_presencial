@@ -34,7 +34,11 @@ fwrite(STDOUT, "READY\n");
 fflush(STDOUT);
 fgets(STDIN);
 try {
-    if (($argv[4] ?? '') === 'status') {
+    if (($argv[4] ?? '') === 'details') {
+        fwrite(STDOUT, "ATTEMPTING\n");
+        fflush(STDOUT);
+        echo json_encode(\quizaccess_presencial\local\invitation::get_management_details((int) $argv[2]));
+    } else if (($argv[4] ?? '') === 'status') {
         fwrite(STDOUT, "ATTEMPTING\n");
         fflush(STDOUT);
         $result = \quizaccess_presencial\local\invitation::get_status((int) $argv[2]);

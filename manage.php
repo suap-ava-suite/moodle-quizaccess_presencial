@@ -85,7 +85,7 @@ if ($revokeid) {
     );
 }
 
-$status = invitation::get_status($cm->id);
+$status = $submitteddata ? invitation::get_status($cm->id) : invitation::get_management_details($cm->id);
 $form = new invitation_form($url, ['cmid' => $cm->id, 'status' => $status]);
 $issued = null;
 if ($data = $form->get_data()) {
@@ -103,6 +103,11 @@ if ($data = $form->get_data()) {
     }
 }
 
+if ($submitteddata && $issued === null) {
+    $status = invitation::get_management_details($cm->id);
+    $form = new invitation_form($url, ['cmid' => $cm->id, 'status' => $status]);
+}
+
 $header = $OUTPUT->header();
 // Core may apply the site's referrer policy while building its HTTP headers.
 header('Referrer-Policy: no-referrer');
@@ -110,7 +115,7 @@ echo $header;
 echo $OUTPUT->heading(get_string('manageapplicators', 'quizaccess_presencial'));
 
 if ($issued !== null) {
-    // The complete link exists only in this response; never retain its secret in the session.
+    // Show the newly generated invitation.
     $link = new moodle_url('/mod/quiz/accessrule/presencial/invite.php', [
         'cmid' => $cm->id,
         'token' => $issued['token'],
@@ -172,9 +177,20 @@ if ($issued !== null) {
     echo $OUTPUT->heading(get_string('inviteapplicatorsheading', 'quizaccess_presencial'), 3);
     echo $OUTPUT->help_icon('inviteapplicatorsheading', 'quizaccess_presencial');
     echo html_writer::end_div();
+    $token = $status['token'];
+    $link = $token ? new moodle_url('/mod/quiz/accessrule/presencial/invite.php', [
+        'cmid' => $cm->id,
+        'token' => $token,
+    ]) : null;
+
     echo $OUTPUT->render_from_template('quizaccess_presencial/invitation', [
-        'state' => get_string('invitationstate_' . $status['state'], 'quizaccess_presencial'),
-        'expires' => $status['timeexpires'] ? get_string(
+        'state' => $status['state'] === 'expired' && $status['timeexpires'] > 0
+            ? get_string('invitationexpiredat', 'quizaccess_presencial', userdate($status['timeexpires']))
+            : get_string('invitationstate_' . $status['state'], 'quizaccess_presencial'),
+        'link' => $link ? $link->out(false) : null,
+        'copylegacy' => $status['copylegacy'],
+        'copyunavailable' => $status['copyreason'] === 'recoveryfailed',
+        'expires' => $status['timeexpires'] && $status['state'] === 'active' ? get_string(
             'invitationexpires',
             'quizaccess_presencial',
             userdate($status['timeexpires'])
