@@ -32,9 +32,9 @@ $string['applicationstate_current'] = 'Current';
 $string['applicationstate_future'] = 'Future';
 $string['applicationstate_help'] = 'Indicates how you access the quiz application:
 
-* Current: you have an effective application delegation and the availability period has started.
+* Current: you have an active application delegation and the availability period has started.
 * Future: you have an application delegation, but the availability period has not started.
-* Direct quiz management: your access comes from permission to manage the quiz and does not require an application delegation.';
+* Direct quiz management: your access comes from permission to manage the quiz and does not require an application delegation. The panel can be operated once the availability period starts.';
 $string['applicationstate_teacher'] = 'Direct quiz management';
 $string['applicators'] = 'Eligible accounts';
 $string['authorisationvalidity'] = 'Attempt authorisation validity';

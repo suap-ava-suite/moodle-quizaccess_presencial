@@ -34,7 +34,7 @@ $string['applicationstate_help'] = 'Indica sua forma de acesso à aplicação do
 
 * Atual: você possui uma Delegação de aplicação vigente e o período de disponibilidade já começou.
 * Futura: você possui uma Delegação de aplicação, mas o período de disponibilidade ainda não começou.
-* Gestão direta do Questionário: seu acesso decorre da permissão para administrar o Questionário, sem depender de uma Delegação de aplicação.';
+* Gestão direta do Questionário: seu acesso decorre da permissão para administrar o Questionário, sem depender de uma Delegação de aplicação. O painel pode ser operado quando o período de disponibilidade começar.';
 $string['applicationstate_teacher'] = 'Gestão direta do Questionário';
 $string['applicators'] = 'Contas elegíveis';
 $string['authorisationvalidity'] = 'Validade da autorização de tentativa';

@@ -39,9 +39,24 @@ Feature: Find and open standalone applications
     And I should see "0" in the ".presencial-applications tbody tr td:nth-child(6)" "css_element"
     When I follow "Open application"
     Then I should see "Application panel" in the "h1" "css_element"
+    And I should see "Application panel" in the ".breadcrumb .breadcrumb-item:last-child" "css_element"
     And I should see "Quiz 1"
     And I should see "There are no actionable requests."
     And academic access to "Quiz 1" should still require enrolment
+    When I click on "My applications" "link" in the ".breadcrumb" "css_element"
+    Then I should see "My applications" in the "h1" "css_element"
+    And "//*[@id='region-main']//h2[contains(., 'My applications')]" "xpath_element" should not exist
+
+  @javascript
+  Scenario: An applicator reads help about each delegation state
+    Given I log in as "applicator1"
+    And I follow "My applications" in the user menu
+    Then "Help with Delegation state" "icon" should not exist in the ".presencial-applications" "css_element"
+    When I click on "Help with Delegation state" "icon"
+    Then I should see "Current: you have an active application delegation and the availability period has started."
+    And I should see "Future: you have an application delegation, but the availability period has not started."
+    And I should see "Direct quiz management: your access comes from permission to manage the quiz and does not require an application delegation."
+    And I should see "The panel can be operated once the availability period starts."
 
   Scenario: Revocation denies a known application URL in the existing session
     Given I log in as "applicator1"
@@ -82,6 +97,7 @@ Feature: Find and open standalone applications
     Then the focused element is "My applications" "link"
     When I press the enter key
     Then I should see "My applications" in the "h1" "css_element"
+    And "//*[@id='region-main']//h2[contains(., 'My applications')]" "xpath_element" should not exist
     When I reach "Open application" "link" using only the keyboard
     Then the focused element is "Open application" "link"
     When I press the enter key
@@ -96,6 +112,7 @@ Feature: Find and open standalone applications
     Then the focused element is "My applications" "link" in the "#region-main" "css_element"
     When I press the enter key
     Then I should see "My applications" in the "h1" "css_element"
+    And "//*[@id='region-main']//h2[contains(., 'My applications')]" "xpath_element" should not exist
 
   @javascript @presencial_keyboard
   Scenario: An applicator changes pages and opens an application using only the keyboard

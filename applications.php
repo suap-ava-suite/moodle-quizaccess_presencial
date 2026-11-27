@@ -43,6 +43,8 @@ echo $OUTPUT->header();
 if (!$applications['total']) {
     echo html_writer::tag('p', get_string('noapplications', 'quizaccess_presencial'));
 } else {
+    echo html_writer::tag('p', get_string('applicationstate', 'quizaccess_presencial') .
+        $OUTPUT->help_icon('applicationstate', 'quizaccess_presencial'));
     $table = new html_table();
     $table->attributes['class'] = 'generaltable presencial-applications';
     $table->head = [
@@ -50,8 +52,7 @@ if (!$applications['total']) {
         get_string('modulename', 'quiz'),
         get_string('authorizationperiodstart', 'quizaccess_presencial'),
         get_string('authorizationperiodend', 'quizaccess_presencial'),
-        get_string('applicationstate', 'quizaccess_presencial') .
-            $OUTPUT->help_icon('applicationstate', 'quizaccess_presencial'),
+        get_string('applicationstate', 'quizaccess_presencial'),
         get_string('pendingrequests', 'quizaccess_presencial'),
         get_string('actions'),
     ];
